@@ -1,0 +1,64 @@
+# 操作系统生成的文件
+.DS_Store
+Thumbs.db
+
+# 编辑器配置文件
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# 日志文件
+*.log
+logs/
+
+# 临时文件
+*.tmp
+*.temp
+.cache/
+
+# 编译生成的文件
+build/
+dist/
+
+# 环境变量文件
+.env
+.env.local
+.env.*.local
+
+# 包管理器文件
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Python相关（如果有）
+*.pyc
+__pycache__/
+venv/
+
+# Java相关（如果有）
+*.class
+target/
+
+# PHP相关（如果有）
+vendor/
+composer.lock
+
+# Ruby相关（如果有）
+Gemfile.lock
+
+# Go相关（如果有）
+bin/
+*.exe
+
+# Rust相关（如果有）
+target/
+
+# Docker相关（如果有）
+.dockerignore
+
+# Kubernetes相关（如果有）
+*.yaml
+*.yml

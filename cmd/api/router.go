@@ -11,7 +11,20 @@ import (
 
 	"smart-locker-backend/internal/common/config"
 	"smart-locker-backend/internal/common/jwt"
+	authHandler "smart-locker-backend/internal/handler/auth"
+	deviceHandler "smart-locker-backend/internal/handler/device"
+	paymentHandler "smart-locker-backend/internal/handler/payment"
+	rentalHandler "smart-locker-backend/internal/handler/rental"
+	userHandler "smart-locker-backend/internal/handler/user"
 	"smart-locker-backend/internal/middleware"
+	"smart-locker-backend/internal/repository"
+	authService "smart-locker-backend/internal/service/auth"
+	deviceService "smart-locker-backend/internal/service/device"
+	paymentService "smart-locker-backend/internal/service/payment"
+	rentalService "smart-locker-backend/internal/service/rental"
+	userService "smart-locker-backend/internal/service/user"
+	"smart-locker-backend/pkg/sms"
+	"smart-locker-backend/pkg/wechatpay"
 )
 
 // setupRouter 设置路由
@@ -29,6 +42,44 @@ func setupRouter(
 		RefreshExpireTime: time.Duration(cfg.JWT.RefreshExpire) * time.Second,
 		Issuer:            cfg.JWT.Issuer,
 	})
+
+	// 初始化仓储
+	userRepo := repository.NewUserRepository(db)
+	deviceRepo := repository.NewDeviceRepository(db)
+	venueRepo := repository.NewVenueRepository(db)
+	rentalRepo := repository.NewRentalRepository(db)
+	paymentRepo := repository.NewPaymentRepository(db)
+	refundRepo := repository.NewRefundRepository(db)
+
+	// 初始化外部服务客户端
+	smsClient := sms.NewMockClient() // 开发环境使用 Mock，生产环境使用阿里云
+	wechatPayClient, _ := wechatpay.NewClient(&wechatpay.Config{})
+
+	// 初始化服务
+	codeService := authService.NewCodeService(redisClient, smsClient, &authService.CodeConfig{
+		CodeLength:   6,
+		ExpireTime:   5 * time.Minute,
+		SendInterval: 60 * time.Second,
+		DailyLimit:   10,
+	})
+	authSvc := authService.NewAuthService(db, jwtManager, userRepo, codeService)
+	wechatSvc := authService.NewWechatService(db, jwtManager, userRepo, &authService.WechatConfig{})
+
+	userSvc := userService.NewUserService(db, userRepo)
+	walletSvc := userService.NewWalletService(db, userRepo)
+
+	deviceSvc := deviceService.NewDeviceService(db, deviceRepo, venueRepo)
+	venueSvc := deviceService.NewVenueService(db, venueRepo, deviceRepo)
+
+	rentalSvc := rentalService.NewRentalService(db, rentalRepo, deviceRepo, deviceSvc, walletSvc, nil)
+	paymentSvc := paymentService.NewPaymentService(db, paymentRepo, refundRepo, rentalRepo, wechatPayClient)
+
+	// 初始化处理器
+	authH := authHandler.NewHandler(authSvc, wechatSvc, codeService)
+	userH := userHandler.NewHandler(userSvc, walletSvc)
+	deviceH := deviceHandler.NewHandler(deviceSvc, venueSvc)
+	rentalH := rentalHandler.NewHandler(rentalSvc)
+	paymentH := paymentHandler.NewHandler(paymentSvc)
 
 	// 全局中间件
 	r.Use(middleware.Recovery(logger))
@@ -48,13 +99,11 @@ func setupRouter(
 		// 公开接口（无需认证）
 		public := v1.Group("")
 		{
-			// 认证相关
-			auth := public.Group("/auth")
-			{
-				auth.POST("/sms/send", placeholderHandler("发送短信验证码"))
-				auth.POST("/login/sms", placeholderHandler("短信验证码登录"))
-				auth.POST("/login/wechat", placeholderHandler("微信小程序登录"))
-			}
+			// 注册认证路由
+			authH.RegisterRoutes(public)
+
+			// 设备和场地公开接口
+			deviceH.RegisterRoutes(public)
 
 			// 公开信息
 			public.GET("/banners", placeholderHandler("获取轮播图"))
@@ -65,15 +114,24 @@ func setupRouter(
 			public.GET("/categories", placeholderHandler("获取分类列表"))
 		}
 
+		// 支付回调（需要验签，不需要认证）
+		paymentH.RegisterCallbackRoutes(v1)
+
 		// 用户端接口（需要用户认证）
 		user := v1.Group("")
 		user.Use(middleware.UserAuth(jwtManager))
 		{
-			// 用户信息
-			user.GET("/user/profile", placeholderHandler("获取用户信息"))
-			user.PUT("/user/profile", placeholderHandler("更新用户信息"))
-			user.GET("/user/wallet", placeholderHandler("获取钱包信息"))
-			user.GET("/user/wallet/transactions", placeholderHandler("获取钱包交易记录"))
+			// 认证保护路由
+			authH.RegisterProtectedRoutes(user)
+
+			// 用户路由
+			userH.RegisterRoutes(user)
+
+			// 租借路由
+			rentalH.RegisterRoutes(user)
+
+			// 支付路由
+			paymentH.RegisterRoutes(user)
 
 			// 收货地址
 			user.GET("/addresses", placeholderHandler("获取地址列表"))
@@ -81,22 +139,12 @@ func setupRouter(
 			user.PUT("/addresses/:id", placeholderHandler("更新地址"))
 			user.DELETE("/addresses/:id", placeholderHandler("删除地址"))
 
-			// 租借相关
-			user.GET("/rentals", placeholderHandler("获取租借订单列表"))
-			user.POST("/rentals", placeholderHandler("创建租借订单"))
-			user.GET("/rentals/:id", placeholderHandler("获取租借订单详情"))
-			user.POST("/rentals/:id/return", placeholderHandler("归还"))
-
 			// 订单相关
 			user.GET("/orders", placeholderHandler("获取订单列表"))
 			user.POST("/orders", placeholderHandler("创建订单"))
 			user.GET("/orders/:id", placeholderHandler("获取订单详情"))
 			user.POST("/orders/:id/cancel", placeholderHandler("取消订单"))
 			user.POST("/orders/:id/confirm", placeholderHandler("确认收货"))
-
-			// 支付相关
-			user.POST("/payments", placeholderHandler("创建支付"))
-			user.GET("/payments/:id", placeholderHandler("获取支付详情"))
 
 			// 购物车
 			user.GET("/cart", placeholderHandler("获取购物车"))
@@ -136,13 +184,6 @@ func setupRouter(
 			device.POST("/heartbeat", placeholderHandler("设备心跳"))
 			device.POST("/status", placeholderHandler("上报状态"))
 			device.POST("/event", placeholderHandler("上报事件"))
-		}
-
-		// 支付回调（需要验签，不需要认证）
-		callback := v1.Group("/callback")
-		{
-			callback.POST("/wechat/pay", placeholderHandler("微信支付回调"))
-			callback.POST("/alipay/pay", placeholderHandler("支付宝支付回调"))
 		}
 	}
 

@@ -114,6 +114,10 @@ var (
 	ErrSlotNotAvailable  = New(4006, "无可用格口")
 	ErrUnlockFailed      = New(4007, "开锁失败")
 	ErrLockFailed        = New(4008, "锁定失败")
+	ErrDeviceNoSlot      = New(4009, "设备无可用槽位")
+	ErrVenueNotFound     = New(4010, "场地不存在")
+	ErrVenueDisabled     = New(4011, "场地已禁用")
+	ErrPricingNotFound   = New(4012, "定价方案不存在")
 )
 
 // 订单错误码 (5000-5999)

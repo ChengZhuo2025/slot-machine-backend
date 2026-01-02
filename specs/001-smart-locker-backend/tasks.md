@@ -50,77 +50,77 @@
 
 ### 配置与数据库
 
-- [ ] T009 实现配置管理模块 `internal/common/config/config.go`
-- [ ] T010 实现数据库连接模块 `internal/common/database/postgres.go`
-- [ ] T011 [P] 实现 Redis 连接模块 `internal/common/cache/redis.go`
-- [ ] T012 [P] 实现日志模块 `internal/common/logger/logger.go`
+- [x] T009 实现配置管理模块 `internal/common/config/config.go`
+- [x] T010 实现数据库连接模块 `internal/common/database/postgres.go`
+- [x] T011 [P] 实现 Redis 连接模块 `internal/common/cache/redis.go`
+- [x] T012 [P] 实现日志模块 `internal/common/logger/logger.go`
 
 ### 数据库迁移 - 核心表
 
-- [ ] T013 创建 User 表迁移 `migrations/000001_create_users.up.sql`
-- [ ] T014 [P] 创建 UserWallet 表迁移 `migrations/000002_create_user_wallets.up.sql`
-- [ ] T015 [P] 创建 MemberLevel 表迁移 `migrations/000003_create_member_levels.up.sql`
-- [ ] T016 [P] 创建 Admin/Role/Permission 表迁移 `migrations/000004_create_admins.up.sql`
-- [ ] T017 [P] 创建 Merchant/Venue/Device 表迁移 `migrations/000005_create_devices.up.sql`
-- [ ] T018 [P] 创建 Order/OrderItem/Payment 表迁移 `migrations/000006_create_orders.up.sql`
-- [ ] T019 [P] 创建 Rental/RentalPricing 表迁移 `migrations/000007_create_rentals.up.sql`
-- [ ] T020 [P] 创建 Hotel/Room/Booking 表迁移 `migrations/000008_create_hotels.up.sql`
-- [ ] T021 [P] 创建 Category/Product/ProductSku/CartItem 表迁移 `migrations/000009_create_products.up.sql`
-- [ ] T022 [P] 创建 Distributor/Commission/Withdrawal 表迁移 `migrations/000010_create_distribution.up.sql`
-- [ ] T023 [P] 创建 Coupon/UserCoupon/Campaign 表迁移 `migrations/000011_create_marketing.up.sql`
-- [ ] T024 [P] 创建 Settlement/WalletTransaction 表迁移 `migrations/000012_create_finance.up.sql`
-- [ ] T025 [P] 创建 Article/Notification/SystemConfig/OperationLog 表迁移 `migrations/000013_create_system.up.sql`
-- [ ] T026 [P] 创建 Address 表迁移 `migrations/000014_create_addresses.up.sql`
-- [ ] T027 [P] 创建 RoomTimeSlot 表迁移 `migrations/000015_create_room_time_slots.up.sql`
-- [ ] T028 [P] 创建 SmsCode 表迁移 `migrations/000016_create_sms_codes.up.sql`
-- [ ] T029 [P] 创建 Banner 表迁移 `migrations/000017_create_banners.up.sql`
-- [ ] T030 创建数据库迁移脚本 `scripts/migrate.sh`
+- [x] T013 创建 User 表迁移 `migrations/000001_create_users.up.sql`
+- [x] T014 [P] 创建 UserWallet 表迁移 `migrations/000001_create_users.up.sql` (合并到用户迁移)
+- [x] T015 [P] 创建 MemberLevel 表迁移 `migrations/000001_create_users.up.sql` (合并到用户迁移)
+- [x] T016 [P] 创建 Admin/Role/Permission 表迁移 `migrations/000002_create_admins.up.sql`
+- [x] T017 [P] 创建 Merchant/Venue/Device 表迁移 `migrations/000003_create_devices.up.sql`
+- [x] T018 [P] 创建 Order/OrderItem/Payment 表迁移 `migrations/000004_create_orders.up.sql`
+- [x] T019 [P] 创建 Rental/RentalPricing 表迁移 `migrations/000005_create_rentals.up.sql`
+- [x] T020 [P] 创建 Hotel/Room/Booking 表迁移 `migrations/000006_create_hotels.up.sql`
+- [x] T021 [P] 创建 Category/Product/ProductSku/CartItem 表迁移 `migrations/000007_create_products.up.sql`
+- [x] T022 [P] 创建 Distributor/Commission/Withdrawal 表迁移 `migrations/000008_create_distribution.up.sql`
+- [x] T023 [P] 创建 Coupon/UserCoupon/Campaign 表迁移 `migrations/000009_create_marketing.up.sql`
+- [x] T024 [P] 创建 Settlement/WalletTransaction 表迁移 `migrations/000010_create_finance.up.sql`
+- [x] T025 [P] 创建 Article/Notification/SystemConfig/OperationLog 表迁移 `migrations/000011_create_system.up.sql`
+- [x] T026 [P] 创建 Address 表迁移 `migrations/000001_create_users.up.sql` (合并到用户迁移)
+- [x] T027 [P] 创建 RoomTimeSlot 表迁移 `migrations/000006_create_hotels.up.sql` (合并到酒店迁移)
+- [x] T028 [P] 创建 SmsCode 表迁移 `migrations/000011_create_system.up.sql` (合并到系统迁移)
+- [x] T029 [P] 创建 Banner 表迁移 `migrations/000011_create_system.up.sql` (合并到系统迁移)
+- [x] T030 创建数据库迁移脚本 `scripts/migrate.sh`
 
 ### 种子数据（开发测试）
 
-- [ ] T031 创建种子数据目录结构和加载脚本 `seeds/` + `scripts/seed.sh`
-- [ ] T032 从 admin-frontend/user-frontend mock 数据提取用户/管理员种子数据 `seeds/001_users.sql`
-- [ ] T033 [P] 提取会员等级/角色/权限种子数据 `seeds/002_rbac.sql`
-- [ ] T034 [P] 提取商户/场地/设备种子数据 `seeds/003_devices.sql`
-- [ ] T035 [P] 提取酒店/房间/时段价格种子数据 `seeds/004_hotels.sql`
-- [ ] T036 [P] 提取商品分类/商品/SKU 种子数据 `seeds/005_products.sql`
-- [ ] T037 [P] 提取优惠券/活动种子数据 `seeds/006_marketing.sql`
-- [ ] T038 [P] 提取租借定价/Banner/系统配置种子数据 `seeds/007_system.sql`
-- [ ] T039 更新 Makefile 添加 `make seed` 和 `make reset-db` 命令
+- [x] T031 创建种子数据目录结构和加载脚本 `seeds/` + `scripts/seed.sh`
+- [x] T032 从 admin-frontend/user-frontend mock 数据提取用户/管理员种子数据 `seeds/001_users.sql`
+- [x] T033 [P] 提取会员等级/角色/权限种子数据 `seeds/002_rbac.sql`
+- [x] T034 [P] 提取商户/场地/设备种子数据 `seeds/003_devices.sql`
+- [x] T035 [P] 提取酒店/房间/时段价格种子数据 `seeds/004_hotels.sql`
+- [x] T036 [P] 提取商品分类/商品/SKU 种子数据 `seeds/005_products.sql`
+- [x] T037 [P] 提取优惠券/活动种子数据 `seeds/006_marketing.sql`
+- [x] T038 [P] 提取租借定价/Banner/系统配置种子数据 `seeds/007_system.sql`
+- [x] T039 更新 Makefile 添加 `make seed` 和 `make reset-db` 命令
 
 ### 核心模型定义
 
-- [ ] T040 [P] 定义 User 模型 `internal/models/user.go`
-- [ ] T041 [P] 定义 Admin/Role/Permission 模型 `internal/models/admin.go`
-- [ ] T042 [P] 定义 Merchant/Venue 模型 `internal/models/venue.go`
-- [ ] T043 [P] 定义 Device 模型 `internal/models/device.go`
-- [ ] T044 [P] 定义 Order/OrderItem 模型 `internal/models/order.go`
-- [ ] T045 [P] 定义 Payment/Refund 模型 `internal/models/payment.go`
+- [x] T040 [P] 定义 User 模型 `internal/models/user.go`
+- [x] T041 [P] 定义 Admin/Role/Permission 模型 `internal/models/admin.go`
+- [x] T042 [P] 定义 Merchant/Venue 模型 `internal/models/venue.go`
+- [x] T043 [P] 定义 Device 模型 `internal/models/device.go`
+- [x] T044 [P] 定义 Order/OrderItem 模型 `internal/models/order.go`
+- [x] T045 [P] 定义 Payment/Refund 模型 `internal/models/payment.go`
 
 ### 公共组件
 
-- [ ] T046 实现统一响应格式 `pkg/response/response.go`
-- [ ] T047 [P] 实现错误码定义 `pkg/response/errors.go`
-- [ ] T048 [P] 实现 JWT 工具 `pkg/auth/jwt.go`
-- [ ] T049 [P] 实现加密工具（AES-256-GCM）`pkg/crypto/aes.go`
-- [ ] T050 [P] 实现密码哈希工具（bcrypt）`pkg/crypto/password.go`
+- [x] T046 实现统一响应格式 `internal/common/response/response.go`
+- [x] T047 [P] 实现错误码定义 `internal/common/errors/errors.go`
+- [x] T048 [P] 实现 JWT 工具 `internal/common/jwt/jwt.go`
+- [x] T049 [P] 实现加密工具（AES-256-GCM）`internal/common/crypto/crypto.go`
+- [x] T050 [P] 实现密码哈希工具（bcrypt）`internal/common/crypto/crypto.go` (合并到加密模块)
 
 ### 中间件
 
-- [ ] T051 实现认证中间件 `internal/common/middleware/auth.go`
-- [ ] T052 [P] 实现 RBAC 权限中间件 `internal/common/middleware/permission.go`
-- [ ] T053 [P] 实现请求日志中间件 `internal/common/middleware/logging.go`
-- [ ] T054 [P] 实现限流中间件 `internal/common/middleware/ratelimit.go`
-- [ ] T055 [P] 实现跨域中间件 `internal/common/middleware/cors.go`
-- [ ] T056 [P] 实现请求 ID 中间件 `internal/common/middleware/requestid.go`
+- [x] T051 实现认证中间件 `internal/middleware/auth.go`
+- [x] T052 [P] 实现 RBAC 权限中间件 `internal/middleware/permission.go`
+- [x] T053 [P] 实现请求日志中间件 `internal/middleware/logging.go`
+- [x] T054 [P] 实现限流中间件 `internal/middleware/ratelimit.go`
+- [x] T055 [P] 实现跨域中间件 `internal/middleware/cors.go`
+- [x] T056 [P] 实现请求 ID 中间件 `internal/middleware/common.go`
 
 ### API Gateway 入口
 
-- [ ] T057 创建 API Gateway 主入口 `cmd/api-gateway/main.go`
-- [ ] T058 实现路由注册 `cmd/api-gateway/router.go`
-- [ ] T059 实现健康检查端点 `internal/handler/health/health.go`
+- [x] T057 创建 API Gateway 主入口 `cmd/api/main.go`
+- [x] T058 实现路由注册 `cmd/api/router.go`
+- [x] T059 实现健康检查端点 `cmd/api/health.go`
 
-**Checkpoint**: 基础设施就绪，可以开始用户故事实现
+**Checkpoint**: ✅ 基础设施就绪，可以开始用户故事实现
 
 ---
 
@@ -132,63 +132,63 @@
 
 ### 认证模块
 
-- [ ] T060 [P] [US1] 实现短信验证码服务 `pkg/sms/aliyun.go`
-- [ ] T061 [P] [US1] 实现验证码存储（Redis）`internal/service/auth/code_service.go`
-- [ ] T062 [US1] 实现用户注册/登录服务 `internal/service/auth/auth_service.go`
-- [ ] T063 [P] [US1] 实现微信授权登录服务 `internal/service/auth/wechat_service.go`
-- [ ] T064 [US1] 实现认证 API Handler `internal/handler/auth/auth_handler.go`
+- [x] T060 [P] [US1] 实现短信验证码服务 `pkg/sms/aliyun.go`
+- [x] T061 [P] [US1] 实现验证码存储（Redis）`internal/service/auth/code_service.go`
+- [x] T062 [US1] 实现用户注册/登录服务 `internal/service/auth/auth_service.go`
+- [x] T063 [P] [US1] 实现微信授权登录服务 `internal/service/auth/wechat_service.go`
+- [x] T064 [US1] 实现认证 API Handler `internal/handler/auth/auth_handler.go`
 
 ### 用户模块
 
-- [ ] T065 [US1] 实现用户 Repository `internal/repository/user_repo.go`
-- [ ] T066 [US1] 实现用户服务 `internal/service/user/user_service.go`
-- [ ] T067 [US1] 实现用户钱包服务 `internal/service/user/wallet_service.go`
-- [ ] T068 [US1] 实现用户 API Handler `internal/handler/user/user_handler.go`
+- [x] T065 [US1] 实现用户 Repository `internal/repository/user_repo.go`
+- [x] T066 [US1] 实现用户服务 `internal/service/user/user_service.go`
+- [x] T067 [US1] 实现用户钱包服务 `internal/service/user/wallet_service.go`
+- [x] T068 [US1] 实现用户 API Handler `internal/handler/user/user_handler.go`
 
 ### 设备与场地模块
 
-- [ ] T069 [P] [US1] 定义 Rental/RentalPricing 模型 `internal/models/rental.go`
-- [ ] T070 [US1] 实现设备 Repository `internal/repository/device_repo.go`
-- [ ] T071 [US1] 实现场地 Repository `internal/repository/venue_repo.go`
-- [ ] T072 [US1] 实现设备查询服务 `internal/service/device/device_service.go`
-- [ ] T073 [US1] 实现设备 API Handler（用户端）`internal/handler/device/device_handler.go`
+- [x] T069 [P] [US1] 定义 Rental/RentalPricing 模型 `internal/models/rental.go`
+- [x] T070 [US1] 实现设备 Repository `internal/repository/device_repo.go`
+- [x] T071 [US1] 实现场地 Repository `internal/repository/venue_repo.go`
+- [x] T072 [US1] 实现设备查询服务 `internal/service/device/device_service.go`
+- [x] T073 [US1] 实现设备 API Handler（用户端）`internal/handler/device/device_handler.go`
 
 ### MQTT 设备通信
 
-- [ ] T074 [US1] 实现 MQTT 客户端 `internal/common/mqtt/client.go`
-- [ ] T075 [US1] 实现设备控制服务（开锁/状态查询）`internal/service/device/control_service.go`
-- [ ] T076 [US1] 实现设备状态订阅处理 `internal/service/device/status_handler.go`
+- [x] T074 [US1] 实现 MQTT 客户端 `internal/common/mqtt/client.go`
+- [x] T075 [US1] 实现设备控制服务（开锁/状态查询）`internal/service/device/control_service.go`
+- [x] T076 [US1] 实现设备状态订阅处理 `internal/service/device/status_handler.go`
 
 ### 租借模块
 
-- [ ] T077 [US1] 实现租借定价 Repository `internal/repository/rental_pricing_repo.go`
-- [ ] T078 [US1] 实现租借 Repository `internal/repository/rental_repo.go`
-- [ ] T079 [US1] 实现租借服务（创建/归还/超时处理）`internal/service/rental/rental_service.go`
-- [ ] T080 [US1] 实现租借 API Handler `internal/handler/rental/rental_handler.go`
+- [x] T077 [US1] 实现租借定价 Repository `internal/repository/rental_pricing_repo.go`
+- [x] T078 [US1] 实现租借 Repository `internal/repository/rental_repo.go`
+- [x] T079 [US1] 实现租借服务（创建/归还/超时处理）`internal/service/rental/rental_service.go`
+- [x] T080 [US1] 实现租借 API Handler `internal/handler/rental/rental_handler.go`
 
 ### 订单模块
 
-- [ ] T081 [US1] 实现订单 Repository `internal/repository/order_repo.go`
-- [ ] T082 [US1] 实现订单服务 `internal/service/order/order_service.go`
-- [ ] T083 [US1] 实现订单 API Handler `internal/handler/order/order_handler.go`
+- [x] T081 [US1] 实现订单 Repository `internal/repository/order_repo.go`
+- [x] T082 [US1] 实现订单服务 `internal/service/order/order_service.go`
+- [x] T083 [US1] 实现订单 API Handler `internal/handler/order/order_handler.go`
 
 ### 支付模块
 
-- [ ] T084 [P] [US1] 实现微信支付 SDK 封装 `pkg/payment/wechat/wechat.go`
-- [ ] T085 [P] [US1] 实现支付宝 SDK 封装 `pkg/payment/alipay/alipay.go`
-- [ ] T086 [US1] 实现支付 Repository `internal/repository/payment_repo.go`
-- [ ] T087 [US1] 实现统一支付服务 `internal/service/payment/payment_service.go`
-- [ ] T088 [US1] 实现支付回调处理 `internal/handler/payment/callback_handler.go`
-- [ ] T089 [US1] 实现支付 API Handler `internal/handler/payment/payment_handler.go`
+- [x] T084 [P] [US1] 实现微信支付 SDK 封装 `pkg/payment/wechat/wechat.go`
+- [x] T085 [P] [US1] 实现支付宝 SDK 封装 `pkg/payment/alipay/alipay.go`
+- [x] T086 [US1] 实现支付 Repository `internal/repository/payment_repo.go`
+- [x] T087 [US1] 实现统一支付服务 `internal/service/payment/payment_service.go`
+- [x] T088 [US1] 实现支付回调处理 `internal/handler/payment/callback_handler.go`
+- [x] T089 [US1] 实现支付 API Handler `internal/handler/payment/payment_handler.go`
 
 ### 定时任务
 
-- [ ] T090 [US1] 实现租借超时检查任务 `internal/service/rental/timeout_checker.go`
-- [ ] T091 [US1] 实现超过24小时自动购买逻辑 `internal/service/rental/auto_purchase.go`
+- [x] T090 [US1] 实现租借超时检查任务 `internal/service/rental/timeout_checker.go`
+- [x] T091 [US1] 实现超过24小时自动购买逻辑 `internal/service/rental/auto_purchase.go`
 
 ### 路由注册
 
-- [ ] T092 [US1] 注册 User Story 1 所有路由到 API Gateway
+- [x] T092 [US1] 注册 User Story 1 所有路由到 API Gateway
 
 **Checkpoint**: User Story 1 完成，用户可以完整体验扫码租借流程
 

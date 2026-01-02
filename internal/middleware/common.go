@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
-	"smart-locker-backend/internal/common/response"
+	"github.com/dumeirei/smart-locker-backend/internal/common/response"
 )
 
 // 上下文键

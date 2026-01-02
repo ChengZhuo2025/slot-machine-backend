@@ -6,11 +6,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"smart-locker-backend/internal/common/errors"
-	"smart-locker-backend/internal/common/response"
-	"smart-locker-backend/internal/common/utils"
-	"smart-locker-backend/internal/middleware"
-	userService "smart-locker-backend/internal/service/user"
+	"github.com/dumeirei/smart-locker-backend/internal/common/errors"
+	"github.com/dumeirei/smart-locker-backend/internal/common/response"
+	"github.com/dumeirei/smart-locker-backend/internal/common/utils"
+	"github.com/dumeirei/smart-locker-backend/internal/middleware"
+	userService "github.com/dumeirei/smart-locker-backend/internal/service/user"
 )
 
 // Handler 用户处理器

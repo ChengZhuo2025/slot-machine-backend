@@ -6,7 +6,7 @@ import (
 
 	"gorm.io/gorm"
 
-	"smart-locker-backend/internal/models"
+	"github.com/dumeirei/smart-locker-backend/internal/models"
 )
 
 // UserRepository 用户仓储

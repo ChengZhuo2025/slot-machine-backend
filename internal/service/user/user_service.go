@@ -7,9 +7,9 @@ import (
 
 	"gorm.io/gorm"
 
-	"smart-locker-backend/internal/common/errors"
-	"smart-locker-backend/internal/models"
-	"smart-locker-backend/internal/repository"
+	"github.com/dumeirei/smart-locker-backend/internal/common/errors"
+	"github.com/dumeirei/smart-locker-backend/internal/models"
+	"github.com/dumeirei/smart-locker-backend/internal/repository"
 )
 
 // UserService 用户服务

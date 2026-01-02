@@ -6,11 +6,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"smart-locker-backend/internal/common/errors"
-	"smart-locker-backend/internal/common/response"
-	"smart-locker-backend/internal/common/utils"
-	"smart-locker-backend/internal/middleware"
-	rentalService "smart-locker-backend/internal/service/rental"
+	"github.com/dumeirei/smart-locker-backend/internal/common/errors"
+	"github.com/dumeirei/smart-locker-backend/internal/common/response"
+	"github.com/dumeirei/smart-locker-backend/internal/common/utils"
+	"github.com/dumeirei/smart-locker-backend/internal/middleware"
+	rentalService "github.com/dumeirei/smart-locker-backend/internal/service/rental"
 )
 
 // Handler 租借处理器

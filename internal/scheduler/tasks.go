@@ -8,10 +8,10 @@ import (
 
 	"gorm.io/gorm"
 
-	"smart-locker-backend/internal/models"
-	"smart-locker-backend/internal/repository"
-	paymentService "smart-locker-backend/internal/service/payment"
-	rentalService "smart-locker-backend/internal/service/rental"
+	"github.com/dumeirei/smart-locker-backend/internal/models"
+	"github.com/dumeirei/smart-locker-backend/internal/repository"
+	paymentService "github.com/dumeirei/smart-locker-backend/internal/service/payment"
+	rentalService "github.com/dumeirei/smart-locker-backend/internal/service/rental"
 )
 
 // TaskHandler 任务处理器

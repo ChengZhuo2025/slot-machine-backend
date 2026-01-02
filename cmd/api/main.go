@@ -13,10 +13,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 
-	"smart-locker-backend/internal/common/cache"
-	"smart-locker-backend/internal/common/config"
-	"smart-locker-backend/internal/common/database"
-	"smart-locker-backend/internal/common/logger"
+	"github.com/dumeirei/smart-locker-backend/internal/common/cache"
+	"github.com/dumeirei/smart-locker-backend/internal/common/config"
+	"github.com/dumeirei/smart-locker-backend/internal/common/database"
+	"github.com/dumeirei/smart-locker-backend/internal/common/logger"
 )
 
 func main() {

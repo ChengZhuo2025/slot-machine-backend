@@ -8,12 +8,12 @@ import (
 
 	"gorm.io/gorm"
 
-	"smart-locker-backend/internal/common/errors"
-	"smart-locker-backend/internal/common/utils"
-	"smart-locker-backend/internal/models"
-	"smart-locker-backend/internal/repository"
-	deviceService "smart-locker-backend/internal/service/device"
-	userService "smart-locker-backend/internal/service/user"
+	"github.com/dumeirei/smart-locker-backend/internal/common/errors"
+	"github.com/dumeirei/smart-locker-backend/internal/common/utils"
+	"github.com/dumeirei/smart-locker-backend/internal/models"
+	"github.com/dumeirei/smart-locker-backend/internal/repository"
+	deviceService "github.com/dumeirei/smart-locker-backend/internal/service/device"
+	userService "github.com/dumeirei/smart-locker-backend/internal/service/user"
 )
 
 // RentalService 租借服务

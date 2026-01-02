@@ -4,7 +4,7 @@ package middleware
 import (
 	"github.com/gin-gonic/gin"
 
-	"smart-locker-backend/internal/common/response"
+	"github.com/dumeirei/smart-locker-backend/internal/common/response"
 )
 
 // PermissionChecker 权限检查器接口

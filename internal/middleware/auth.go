@@ -6,8 +6,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"smart-locker-backend/internal/common/jwt"
-	"smart-locker-backend/internal/common/response"
+	"github.com/dumeirei/smart-locker-backend/internal/common/jwt"
+	"github.com/dumeirei/smart-locker-backend/internal/common/response"
 )
 
 // AuthConfig 认证配置

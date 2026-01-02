@@ -7,7 +7,7 @@ import (
 
 	"gorm.io/gorm"
 
-	"smart-locker-backend/internal/models"
+	"github.com/dumeirei/smart-locker-backend/internal/models"
 )
 
 // OrderRepository 订单仓储

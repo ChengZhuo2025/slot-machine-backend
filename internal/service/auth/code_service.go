@@ -8,7 +8,7 @@ import (
 
 	"github.com/redis/go-redis/v9"
 
-	"smart-locker-backend/internal/common/utils"
+	"github.com/dumeirei/smart-locker-backend/internal/common/utils"
 	"smart-locker-backend/pkg/sms"
 )
 

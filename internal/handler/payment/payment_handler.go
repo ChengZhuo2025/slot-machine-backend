@@ -6,10 +6,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"smart-locker-backend/internal/common/errors"
-	"smart-locker-backend/internal/common/response"
-	"smart-locker-backend/internal/middleware"
-	paymentService "smart-locker-backend/internal/service/payment"
+	"github.com/dumeirei/smart-locker-backend/internal/common/errors"
+	"github.com/dumeirei/smart-locker-backend/internal/common/response"
+	"github.com/dumeirei/smart-locker-backend/internal/middleware"
+	paymentService "github.com/dumeirei/smart-locker-backend/internal/service/payment"
 )
 
 // Handler 支付处理器

@@ -74,7 +74,7 @@ vim configs/config.yaml
 
 ```bash
 # 执行数据库迁移
-make migrate-up
+make migrate
 
 # 初始化种子数据（开发环境）
 make seed
@@ -94,10 +94,10 @@ go run cmd/api-gateway/main.go
 
 ```bash
 # 健康检查
-curl http://localhost:8080/health
+curl http://localhost:8000/health
 
 # API 文档
-open http://localhost:8080/swagger/index.html
+open http://localhost:8000/swagger/index.html
 ```
 
 ## 项目结构
@@ -231,6 +231,15 @@ make migrate-down
 # 初始化种子数据
 make seed
 
+# 回滚最后一次迁移
+make migrate-down
+
+# 重置所有迁移
+make migrate-reset
+
+# 查看迁移状态
+make migrate-status
+
 # 重置数据库（清空并重建）
 make reset-db
 
@@ -247,7 +256,7 @@ make docker-build
 
 ```yaml
 server:
-  port: 8080
+  port: 8000
   mode: debug  # debug/release
 
 database:

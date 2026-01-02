@@ -9,7 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
 
-	"smart-locker-backend/internal/common/response"
+	"github.com/dumeirei/smart-locker-backend/internal/common/response"
 )
 
 // RateLimitConfig 限流配置

@@ -1,0 +1,1844 @@
+openapi: 3.0.3
+info:
+  title: 爱上杜美人智能开锁管理系统 API
+  description: B2B2C智能柜租借与电商平台后端API接口规范
+  version: 1.0.0
+  contact:
+    name: API Support
+
+servers:
+  - url: https://api.example.com/api/v1
+    description: Production server
+  - url: http://localhost:8080/api/v1
+    description: Development server
+
+tags:
+  - name: Auth
+    description: 认证授权
+  - name: User
+    description: 用户管理
+  - name: Device
+    description: 设备管理
+  - name: Rental
+    description: 租借服务
+  - name: Order
+    description: 订单管理
+  - name: Payment
+    description: 支付服务
+  - name: Hotel
+    description: 酒店预订
+  - name: Mall
+    description: 商城服务
+  - name: Distribution
+    description: 分销服务
+  - name: Marketing
+    description: 营销服务
+  - name: Admin
+    description: 管理后台
+
+paths:
+  # ==================== 认证授权 ====================
+  /auth/sms/send:
+    post:
+      tags: [Auth]
+      summary: 发送短信验证码
+      operationId: sendSmsCode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone]
+              properties:
+                phone:
+                  type: string
+                  pattern: "^1[3-9]\\d{9}$"
+                  example: "13800138000"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+
+  /auth/login/sms:
+    post:
+      tags: [Auth]
+      summary: 手机验证码登录
+      operationId: loginBySms
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone, code]
+              properties:
+                phone:
+                  type: string
+                  example: "13800138000"
+                code:
+                  type: string
+                  example: "123456"
+                referrer_code:
+                  type: string
+                  description: 推荐人邀请码
+      responses:
+        "200":
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+
+  /auth/login/wechat:
+    post:
+      tags: [Auth]
+      summary: 微信授权登录
+      operationId: loginByWechat
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code:
+                  type: string
+                  description: 微信授权code
+                referrer_code:
+                  type: string
+      responses:
+        "200":
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+
+  /auth/token/refresh:
+    post:
+      tags: [Auth]
+      summary: 刷新Token
+      operationId: refreshToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token:
+                  type: string
+      responses:
+        "200":
+          description: 刷新成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+
+  # ==================== 用户端 - 用户信息 ====================
+  /user/profile:
+    get:
+      tags: [User]
+      summary: 获取用户信息
+      operationId: getUserProfile
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserProfile"
+
+    put:
+      tags: [User]
+      summary: 更新用户信息
+      operationId: updateUserProfile
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nickname:
+                  type: string
+                  maxLength: 50
+                avatar:
+                  type: string
+                gender:
+                  type: integer
+                  enum: [0, 1, 2]
+                birthday:
+                  type: string
+                  format: date
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /user/wallet:
+    get:
+      tags: [User]
+      summary: 获取钱包信息
+      operationId: getUserWallet
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserWallet"
+
+  /user/wallet/transactions:
+    get:
+      tags: [User]
+      summary: 获取钱包交易记录
+      operationId: getWalletTransactions
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/PageSizeParam"
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [recharge, consume, refund, withdraw, deposit, return_deposit]
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedWalletTransactions"
+
+  # ==================== 用户端 - 设备与租借 ====================
+  /devices/{device_no}:
+    get:
+      tags: [Device]
+      summary: 扫码获取设备信息
+      operationId: getDeviceByNo
+      parameters:
+        - name: device_no
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeviceDetail"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /devices/{device_no}/pricing:
+    get:
+      tags: [Device]
+      summary: 获取设备租借价格
+      operationId: getDevicePricing
+      parameters:
+        - name: device_no
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/RentalPricing"
+
+  /rentals:
+    post:
+      tags: [Rental]
+      summary: 创建租借订单
+      operationId: createRental
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [device_no, duration_hours]
+              properties:
+                device_no:
+                  type: string
+                duration_hours:
+                  type: integer
+                  enum: [1, 2, 3, 6, 12, 24]
+                coupon_id:
+                  type: integer
+                  format: int64
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RentalOrderResponse"
+
+    get:
+      tags: [Rental]
+      summary: 获取我的租借记录
+      operationId: getMyRentals
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/PageSizeParam"
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending_unlock, in_use, overtime, returned, purchased]
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedRentals"
+
+  /rentals/{id}/return:
+    post:
+      tags: [Rental]
+      summary: 归还租借物品
+      operationId: returnRental
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RentalReturnResponse"
+
+  # ==================== 用户端 - 订单与支付 ====================
+  /orders:
+    get:
+      tags: [Order]
+      summary: 获取订单列表
+      operationId: getOrders
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/PageSizeParam"
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [rental, hotel, mall]
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedOrders"
+
+  /orders/{id}:
+    get:
+      tags: [Order]
+      summary: 获取订单详情
+      operationId: getOrderDetail
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrderDetail"
+
+  /orders/{id}/cancel:
+    post:
+      tags: [Order]
+      summary: 取消订单
+      operationId: cancelOrder
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /payments/create:
+    post:
+      tags: [Payment]
+      summary: 创建支付
+      operationId: createPayment
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [order_id, channel]
+              properties:
+                order_id:
+                  type: integer
+                  format: int64
+                channel:
+                  type: string
+                  enum: [wechat, alipay, wallet]
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentCreateResponse"
+
+  /payments/callback/wechat:
+    post:
+      tags: [Payment]
+      summary: 微信支付回调
+      operationId: wechatPayCallback
+      requestBody:
+        required: true
+        content:
+          application/xml:
+            schema:
+              type: string
+      responses:
+        "200":
+          description: 处理成功
+
+  /payments/callback/alipay:
+    post:
+      tags: [Payment]
+      summary: 支付宝支付回调
+      operationId: alipayCallback
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: 处理成功
+
+  # ==================== 用户端 - 酒店预订 ====================
+  /hotels:
+    get:
+      tags: [Hotel]
+      summary: 获取酒店列表
+      operationId: getHotels
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/PageSizeParam"
+        - name: city
+          in: query
+          schema:
+            type: string
+        - name: keyword
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedHotels"
+
+  /hotels/{id}:
+    get:
+      tags: [Hotel]
+      summary: 获取酒店详情
+      operationId: getHotelDetail
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HotelDetail"
+
+  /hotels/{id}/rooms:
+    get:
+      tags: [Hotel]
+      summary: 获取酒店房间列表
+      operationId: getHotelRooms
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: date
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HotelRoomList"
+
+  /bookings:
+    post:
+      tags: [Hotel]
+      summary: 创建酒店预订
+      operationId: createBooking
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [room_id, check_in_time, check_out_time]
+              properties:
+                room_id:
+                  type: integer
+                  format: int64
+                check_in_time:
+                  type: string
+                  format: date-time
+                check_out_time:
+                  type: string
+                  format: date-time
+                coupon_id:
+                  type: integer
+                  format: int64
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingResponse"
+
+    get:
+      tags: [Hotel]
+      summary: 获取我的预订列表
+      operationId: getMyBookings
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/PageSizeParam"
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedBookings"
+
+  /bookings/{id}/unlock:
+    post:
+      tags: [Hotel]
+      summary: 输入开锁码开锁
+      operationId: unlockByCode
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [unlock_code]
+              properties:
+                unlock_code:
+                  type: string
+                  minLength: 6
+                  maxLength: 10
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+        "400":
+          description: 开锁码无效或不在有效时段
+
+  # ==================== 用户端 - 商城 ====================
+  /mall/categories:
+    get:
+      tags: [Mall]
+      summary: 获取商品分类
+      operationId: getCategories
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CategoryList"
+
+  /mall/products:
+    get:
+      tags: [Mall]
+      summary: 获取商品列表
+      operationId: getProducts
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/PageSizeParam"
+        - name: category_id
+          in: query
+          schema:
+            type: integer
+            format: int64
+        - name: keyword
+          in: query
+          schema:
+            type: string
+        - name: min_price
+          in: query
+          schema:
+            type: number
+        - name: max_price
+          in: query
+          schema:
+            type: number
+        - name: sort
+          in: query
+          schema:
+            type: string
+            enum: [price_asc, price_desc, sales, newest]
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedProducts"
+
+  /mall/products/{id}:
+    get:
+      tags: [Mall]
+      summary: 获取商品详情
+      operationId: getProductDetail
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProductDetail"
+
+  /mall/cart:
+    get:
+      tags: [Mall]
+      summary: 获取购物车
+      operationId: getCart
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CartList"
+
+    post:
+      tags: [Mall]
+      summary: 添加商品到购物车
+      operationId: addToCart
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [product_id, quantity]
+              properties:
+                product_id:
+                  type: integer
+                  format: int64
+                sku_id:
+                  type: integer
+                  format: int64
+                quantity:
+                  type: integer
+                  minimum: 1
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /mall/cart/{id}:
+    put:
+      tags: [Mall]
+      summary: 更新购物车商品数量
+      operationId: updateCartItem
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [quantity]
+              properties:
+                quantity:
+                  type: integer
+                  minimum: 1
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+    delete:
+      tags: [Mall]
+      summary: 删除购物车商品
+      operationId: removeFromCart
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /mall/orders:
+    post:
+      tags: [Mall]
+      summary: 创建商城订单
+      operationId: createMallOrder
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  items:
+                    type: object
+                    required: [cart_item_id]
+                    properties:
+                      cart_item_id:
+                        type: integer
+                        format: int64
+                coupon_id:
+                  type: integer
+                  format: int64
+                address_id:
+                  type: integer
+                  format: int64
+                remark:
+                  type: string
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MallOrderResponse"
+
+  # ==================== 用户端 - 分销 ====================
+  /distribution/apply:
+    post:
+      tags: [Distribution]
+      summary: 申请成为分销商
+      operationId: applyDistributor
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [real_name, phone]
+              properties:
+                real_name:
+                  type: string
+                phone:
+                  type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /distribution/info:
+    get:
+      tags: [Distribution]
+      summary: 获取分销商信息
+      operationId: getDistributorInfo
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DistributorInfo"
+
+  /distribution/invite-link:
+    get:
+      tags: [Distribution]
+      summary: 获取推广链接
+      operationId: getInviteLink
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                  data:
+                    type: object
+                    properties:
+                      invite_code:
+                        type: string
+                      invite_link:
+                        type: string
+                      qr_code:
+                        type: string
+
+  /distribution/commissions:
+    get:
+      tags: [Distribution]
+      summary: 获取佣金记录
+      operationId: getCommissions
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/PageSizeParam"
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedCommissions"
+
+  /distribution/team:
+    get:
+      tags: [Distribution]
+      summary: 获取团队成员
+      operationId: getTeamMembers
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/PageSizeParam"
+        - name: level
+          in: query
+          schema:
+            type: integer
+            enum: [1, 2]
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedTeamMembers"
+
+  /distribution/withdraw:
+    post:
+      tags: [Distribution]
+      summary: 申请佣金提现
+      operationId: withdrawCommission
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount, withdraw_to]
+              properties:
+                amount:
+                  type: number
+                  minimum: 10
+                withdraw_to:
+                  type: string
+                  enum: [wechat, alipay, bank]
+                account_info:
+                  type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  # ==================== 用户端 - 营销 ====================
+  /marketing/coupons/available:
+    get:
+      tags: [Marketing]
+      summary: 获取可领取的优惠券
+      operationId: getAvailableCoupons
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CouponList"
+
+  /marketing/coupons/{id}/receive:
+    post:
+      tags: [Marketing]
+      summary: 领取优惠券
+      operationId: receiveCoupon
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /marketing/my-coupons:
+    get:
+      tags: [Marketing]
+      summary: 获取我的优惠券
+      operationId: getMyCoupons
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: integer
+            enum: [0, 1, 2]
+            description: "0未使用 1已使用 2已过期"
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserCouponList"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    PageParam:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+
+    PageSizeParam:
+      name: page_size
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+  responses:
+    Success:
+      description: 操作成功
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              code:
+                type: integer
+                example: 0
+              message:
+                type: string
+                example: "success"
+
+    NotFound:
+      description: 资源不存在
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+    TooManyRequests:
+      description: 请求过于频繁
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+        request_id:
+          type: string
+
+    LoginResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          type: object
+          properties:
+            access_token:
+              type: string
+            refresh_token:
+              type: string
+            expires_in:
+              type: integer
+            user:
+              $ref: "#/components/schemas/UserProfile"
+
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        phone:
+          type: string
+        nickname:
+          type: string
+        avatar:
+          type: string
+        gender:
+          type: integer
+        member_level:
+          type: object
+          properties:
+            id:
+              type: integer
+            name:
+              type: string
+            discount:
+              type: number
+        points:
+          type: integer
+        is_verified:
+          type: boolean
+        is_distributor:
+          type: boolean
+
+    UserWallet:
+      type: object
+      properties:
+        balance:
+          type: number
+        frozen_balance:
+          type: number
+        total_recharged:
+          type: number
+        total_consumed:
+          type: number
+
+    PaginatedWalletTransactions:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          type: object
+          properties:
+            total:
+              type: integer
+            page:
+              type: integer
+            page_size:
+              type: integer
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/WalletTransaction"
+
+    WalletTransaction:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        type:
+          type: string
+        amount:
+          type: number
+        balance_after:
+          type: number
+        remark:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    DeviceDetail:
+      type: object
+      properties:
+        device_no:
+          type: string
+        product_name:
+          type: string
+        product_image:
+          type: string
+        venue:
+          type: object
+          properties:
+            name:
+              type: string
+            address:
+              type: string
+        rental_status:
+          type: integer
+        online_status:
+          type: integer
+
+    RentalPricing:
+      type: object
+      properties:
+        duration_hours:
+          type: integer
+        price:
+          type: number
+        deposit:
+          type: number
+        overtime_rate:
+          type: number
+
+    RentalOrderResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          type: object
+          properties:
+            order_id:
+              type: integer
+              format: int64
+            order_no:
+              type: string
+            actual_amount:
+              type: number
+            deposit_amount:
+              type: number
+
+    PaginatedRentals:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          type: object
+          properties:
+            total:
+              type: integer
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/RentalItem"
+
+    RentalItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        device_no:
+          type: string
+        product_name:
+          type: string
+        duration_hours:
+          type: integer
+        rental_fee:
+          type: number
+        deposit:
+          type: number
+        status:
+          type: string
+        unlocked_at:
+          type: string
+          format: date-time
+        expected_return_at:
+          type: string
+          format: date-time
+
+    RentalReturnResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          type: object
+          properties:
+            overtime_fee:
+              type: number
+            refund_deposit:
+              type: number
+            total_cost:
+              type: number
+
+    PaginatedOrders:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          type: object
+          properties:
+            total:
+              type: integer
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/OrderItem"
+
+    OrderItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        order_no:
+          type: string
+        type:
+          type: string
+        actual_amount:
+          type: number
+        status:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    OrderDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        order_no:
+          type: string
+        type:
+          type: string
+        original_amount:
+          type: number
+        discount_amount:
+          type: number
+        actual_amount:
+          type: number
+        deposit_amount:
+          type: number
+        status:
+          type: string
+        items:
+          type: array
+          items:
+            type: object
+        created_at:
+          type: string
+          format: date-time
+        paid_at:
+          type: string
+          format: date-time
+
+    PaymentCreateResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          type: object
+          properties:
+            payment_no:
+              type: string
+            channel:
+              type: string
+            pay_params:
+              type: object
+              description: 支付参数（微信/支付宝）
+
+    PaginatedHotels:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          type: object
+          properties:
+            total:
+              type: integer
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/HotelItem"
+
+    HotelItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        star_rating:
+          type: integer
+        address:
+          type: string
+        images:
+          type: array
+          items:
+            type: string
+        min_price:
+          type: number
+
+    HotelDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        star_rating:
+          type: integer
+        address:
+          type: string
+        phone:
+          type: string
+        images:
+          type: array
+          items:
+            type: string
+        facilities:
+          type: array
+          items:
+            type: string
+        description:
+          type: string
+        check_in_time:
+          type: string
+        check_out_time:
+          type: string
+
+    HotelRoomList:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/RoomItem"
+
+    RoomItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        room_no:
+          type: string
+        room_type:
+          type: string
+        images:
+          type: array
+          items:
+            type: string
+        hourly_price:
+          type: number
+        daily_price:
+          type: number
+        status:
+          type: integer
+
+    BookingResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          type: object
+          properties:
+            order_id:
+              type: integer
+              format: int64
+            booking_no:
+              type: string
+            amount:
+              type: number
+
+    PaginatedBookings:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          type: object
+          properties:
+            total:
+              type: integer
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/BookingItem"
+
+    BookingItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        booking_no:
+          type: string
+        hotel_name:
+          type: string
+        room_type:
+          type: string
+        check_in_time:
+          type: string
+          format: date-time
+        check_out_time:
+          type: string
+          format: date-time
+        amount:
+          type: number
+        status:
+          type: string
+        verification_code:
+          type: string
+        unlock_code:
+          type: string
+        qr_code:
+          type: string
+
+    CategoryList:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/CategoryItem"
+
+    CategoryItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        icon:
+          type: string
+        children:
+          type: array
+          items:
+            $ref: "#/components/schemas/CategoryItem"
+
+    PaginatedProducts:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          type: object
+          properties:
+            total:
+              type: integer
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/ProductItem"
+
+    ProductItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        images:
+          type: array
+          items:
+            type: string
+        price:
+          type: number
+        original_price:
+          type: number
+        sales:
+          type: integer
+
+    ProductDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        subtitle:
+          type: string
+        images:
+          type: array
+          items:
+            type: string
+        description:
+          type: string
+        price:
+          type: number
+        original_price:
+          type: number
+        stock:
+          type: integer
+        sales:
+          type: integer
+        skus:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProductSku"
+
+    ProductSku:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        sku_code:
+          type: string
+        attributes:
+          type: object
+        price:
+          type: number
+        stock:
+          type: integer
+        image:
+          type: string
+
+    CartList:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/CartItemDetail"
+            total_amount:
+              type: number
+            total_count:
+              type: integer
+
+    CartItemDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        product_id:
+          type: integer
+          format: int64
+        product_name:
+          type: string
+        product_image:
+          type: string
+        sku_info:
+          type: string
+        price:
+          type: number
+        quantity:
+          type: integer
+        selected:
+          type: boolean
+
+    MallOrderResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          type: object
+          properties:
+            order_id:
+              type: integer
+              format: int64
+            order_no:
+              type: string
+            actual_amount:
+              type: number
+
+    DistributorInfo:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          type: object
+          properties:
+            id:
+              type: integer
+              format: int64
+            invite_code:
+              type: string
+            level:
+              type: integer
+            status:
+              type: integer
+            total_commission:
+              type: number
+            available_commission:
+              type: number
+            team_count:
+              type: integer
+            direct_count:
+              type: integer
+
+    PaginatedCommissions:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          type: object
+          properties:
+            total:
+              type: integer
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/CommissionItem"
+
+    CommissionItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        type:
+          type: string
+        order_amount:
+          type: number
+        rate:
+          type: number
+        amount:
+          type: number
+        status:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+
+    PaginatedTeamMembers:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          type: object
+          properties:
+            total:
+              type: integer
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/TeamMember"
+
+    TeamMember:
+      type: object
+      properties:
+        user_id:
+          type: integer
+          format: int64
+        nickname:
+          type: string
+        avatar:
+          type: string
+        level:
+          type: integer
+        total_orders:
+          type: integer
+        total_amount:
+          type: number
+        joined_at:
+          type: string
+          format: date-time
+
+    CouponList:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/CouponItem"
+
+    CouponItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        type:
+          type: string
+        value:
+          type: number
+        min_amount:
+          type: number
+        applicable_type:
+          type: string
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+        remaining:
+          type: integer
+
+    UserCouponList:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserCouponItem"
+
+    UserCouponItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        coupon:
+          $ref: "#/components/schemas/CouponItem"
+        status:
+          type: integer
+        expire_at:
+          type: string
+          format: date-time
+        used_at:
+          type: string
+          format: date-time

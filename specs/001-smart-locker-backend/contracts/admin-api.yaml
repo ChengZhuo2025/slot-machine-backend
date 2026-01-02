@@ -1,0 +1,2245 @@
+openapi: 3.0.3
+info:
+  title: 爱上杜美人智能开锁管理系统 - 管理后台 API
+  description: 管理后台API接口规范
+  version: 1.0.0
+
+servers:
+  - url: https://api.example.com/api/v1/admin
+    description: Production server
+  - url: http://localhost:8080/api/v1/admin
+    description: Development server
+
+tags:
+  - name: AdminAuth
+    description: 管理员认证
+  - name: AdminUser
+    description: 用户管理
+  - name: AdminDevice
+    description: 设备管理
+  - name: AdminVenue
+    description: 场地管理
+  - name: AdminMerchant
+    description: 商户管理
+  - name: AdminOrder
+    description: 订单管理
+  - name: AdminHotel
+    description: 酒店管理
+  - name: AdminMall
+    description: 商城管理
+  - name: AdminDistribution
+    description: 分销管理
+  - name: AdminMarketing
+    description: 营销管理
+  - name: AdminFinance
+    description: 财务管理
+  - name: AdminContent
+    description: 内容管理
+  - name: AdminSystem
+    description: 系统管理
+  - name: AdminDashboard
+    description: 仪表盘
+
+paths:
+  # ==================== 管理员认证 ====================
+  /auth/login:
+    post:
+      tags: [AdminAuth]
+      summary: 管理员登录
+      operationId: adminLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+      responses:
+        "200":
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminLoginResponse"
+
+  /auth/logout:
+    post:
+      tags: [AdminAuth]
+      summary: 管理员登出
+      operationId: adminLogout
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /auth/password:
+    put:
+      tags: [AdminAuth]
+      summary: 修改密码
+      operationId: changePassword
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [old_password, new_password]
+              properties:
+                old_password:
+                  type: string
+                new_password:
+                  type: string
+                  minLength: 8
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  # ==================== 用户管理 ====================
+  /users:
+    get:
+      tags: [AdminUser]
+      summary: 获取用户列表
+      operationId: getUsers
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/PageSizeParam"
+        - name: phone
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedUsers"
+
+  /users/{id}:
+    get:
+      tags: [AdminUser]
+      summary: 获取用户详情
+      operationId: getUserDetail
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUserDetail"
+
+  /users/{id}/status:
+    put:
+      tags: [AdminUser]
+      summary: 修改用户状态
+      operationId: updateUserStatus
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: integer
+                  enum: [0, 1]
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  # ==================== 设备管理 ====================
+  /devices:
+    get:
+      tags: [AdminDevice]
+      summary: 获取设备列表
+      operationId: getDevices
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/PageSizeParam"
+        - name: venue_id
+          in: query
+          schema:
+            type: integer
+            format: int64
+        - name: online_status
+          in: query
+          schema:
+            type: integer
+        - name: rental_status
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedDevices"
+
+    post:
+      tags: [AdminDevice]
+      summary: 添加设备
+      operationId: createDevice
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [device_no, venue_id, product_name]
+              properties:
+                device_no:
+                  type: string
+                venue_id:
+                  type: integer
+                  format: int64
+                product_name:
+                  type: string
+                product_image:
+                  type: string
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeviceCreateResponse"
+
+  /devices/{id}:
+    get:
+      tags: [AdminDevice]
+      summary: 获取设备详情
+      operationId: getDeviceDetail
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminDeviceDetail"
+
+    put:
+      tags: [AdminDevice]
+      summary: 更新设备信息
+      operationId: updateDevice
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                venue_id:
+                  type: integer
+                  format: int64
+                product_name:
+                  type: string
+                product_image:
+                  type: string
+                status:
+                  type: integer
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /devices/{id}/command:
+    post:
+      tags: [AdminDevice]
+      summary: 发送设备控制命令
+      operationId: sendDeviceCommand
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [command]
+              properties:
+                command:
+                  type: string
+                  enum: [unlock, reboot, refresh]
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommandResponse"
+
+  /devices/{id}/logs:
+    get:
+      tags: [AdminDevice]
+      summary: 获取设备日志
+      operationId: getDeviceLogs
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/PageSizeParam"
+        - name: type
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedDeviceLogs"
+
+  # ==================== 场地管理 ====================
+  /venues:
+    get:
+      tags: [AdminVenue]
+      summary: 获取场地列表
+      operationId: getVenues
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/PageSizeParam"
+        - name: merchant_id
+          in: query
+          schema:
+            type: integer
+            format: int64
+        - name: type
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedVenues"
+
+    post:
+      tags: [AdminVenue]
+      summary: 添加场地
+      operationId: createVenue
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VenueInput"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /venues/{id}:
+    put:
+      tags: [AdminVenue]
+      summary: 更新场地
+      operationId: updateVenue
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VenueInput"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+    delete:
+      tags: [AdminVenue]
+      summary: 删除场地
+      operationId: deleteVenue
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  # ==================== 商户管理 ====================
+  /merchants:
+    get:
+      tags: [AdminMerchant]
+      summary: 获取商户列表
+      operationId: getMerchants
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/PageSizeParam"
+        - name: keyword
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedMerchants"
+
+    post:
+      tags: [AdminMerchant]
+      summary: 添加商户
+      operationId: createMerchant
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MerchantInput"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /merchants/{id}:
+    put:
+      tags: [AdminMerchant]
+      summary: 更新商户
+      operationId: updateMerchant
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MerchantInput"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  # ==================== 酒店管理 ====================
+  /hotels:
+    get:
+      tags: [AdminHotel]
+      summary: 获取酒店列表
+      operationId: getAdminHotels
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/PageSizeParam"
+        - name: keyword
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedAdminHotels"
+
+    post:
+      tags: [AdminHotel]
+      summary: 添加酒店
+      operationId: createHotel
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HotelInput"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /hotels/{id}/rooms:
+    get:
+      tags: [AdminHotel]
+      summary: 获取酒店房间列表
+      operationId: getAdminHotelRooms
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminRoomList"
+
+    post:
+      tags: [AdminHotel]
+      summary: 添加房间
+      operationId: createRoom
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoomInput"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /bookings/verify:
+    post:
+      tags: [AdminHotel]
+      summary: 核销预订
+      operationId: verifyBooking
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [verification_code]
+              properties:
+                verification_code:
+                  type: string
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BookingVerifyResponse"
+
+  # ==================== 订单管理 ====================
+  /orders:
+    get:
+      tags: [AdminOrder]
+      summary: 获取订单列表
+      operationId: getAdminOrders
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/PageSizeParam"
+        - name: order_no
+          in: query
+          schema:
+            type: string
+        - name: type
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedAdminOrders"
+
+  /orders/{id}/refund:
+    post:
+      tags: [AdminOrder]
+      summary: 处理退款
+      operationId: processRefund
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action:
+                  type: string
+                  enum: [approve, reject]
+                amount:
+                  type: number
+                reason:
+                  type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  # ==================== 分销管理 ====================
+  /distributors:
+    get:
+      tags: [AdminDistribution]
+      summary: 获取分销商列表
+      operationId: getDistributors
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/PageSizeParam"
+        - name: status
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedDistributors"
+
+  /distributors/{id}/audit:
+    post:
+      tags: [AdminDistribution]
+      summary: 审核分销商
+      operationId: auditDistributor
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action:
+                  type: string
+                  enum: [approve, reject]
+                reason:
+                  type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /commission-settings:
+    get:
+      tags: [AdminDistribution]
+      summary: 获取佣金设置
+      operationId: getCommissionSettings
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommissionSettings"
+
+    put:
+      tags: [AdminDistribution]
+      summary: 更新佣金设置
+      operationId: updateCommissionSettings
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CommissionSettings"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  # ==================== 营销管理 ====================
+  /coupons:
+    get:
+      tags: [AdminMarketing]
+      summary: 获取优惠券列表
+      operationId: getAdminCoupons
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/PageSizeParam"
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedCoupons"
+
+    post:
+      tags: [AdminMarketing]
+      summary: 创建优惠券
+      operationId: createCoupon
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CouponInput"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /coupons/{id}/issue:
+    post:
+      tags: [AdminMarketing]
+      summary: 发放优惠券
+      operationId: issueCoupon
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_ids:
+                  type: array
+                  items:
+                    type: integer
+                    format: int64
+                issue_all:
+                  type: boolean
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  # ==================== 财务管理 ====================
+  /finance/statistics:
+    get:
+      tags: [AdminFinance]
+      summary: 获取财务统计
+      operationId: getFinanceStatistics
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: start_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FinanceStatistics"
+
+  /finance/transactions:
+    get:
+      tags: [AdminFinance]
+      summary: 获取交易流水
+      operationId: getTransactions
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/PageSizeParam"
+        - name: channel
+          in: query
+          schema:
+            type: string
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedTransactions"
+
+  /finance/withdrawals:
+    get:
+      tags: [AdminFinance]
+      summary: 获取提现申请列表
+      operationId: getWithdrawals
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/PageSizeParam"
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedWithdrawals"
+
+  /finance/withdrawals/{id}/process:
+    post:
+      tags: [AdminFinance]
+      summary: 处理提现申请
+      operationId: processWithdrawal
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action:
+                  type: string
+                  enum: [approve, reject, complete]
+                reject_reason:
+                  type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /finance/settlements:
+    get:
+      tags: [AdminFinance]
+      summary: 获取结算列表
+      operationId: getSettlements
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/PageSizeParam"
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [merchant, distributor]
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedSettlements"
+
+    post:
+      tags: [AdminFinance]
+      summary: 创建结算单
+      operationId: createSettlement
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [type, target_id, period_start, period_end]
+              properties:
+                type:
+                  type: string
+                  enum: [merchant, distributor]
+                target_id:
+                  type: integer
+                  format: int64
+                period_start:
+                  type: string
+                  format: date
+                period_end:
+                  type: string
+                  format: date
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /finance/export:
+    get:
+      tags: [AdminFinance]
+      summary: 导出财务报表
+      operationId: exportFinanceReport
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: type
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [income, transaction, settlement]
+        - name: start_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+
+  # ==================== 系统管理 ====================
+  /system/configs:
+    get:
+      tags: [AdminSystem]
+      summary: 获取系统配置
+      operationId: getSystemConfigs
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: group
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SystemConfigList"
+
+    put:
+      tags: [AdminSystem]
+      summary: 更新系统配置
+      operationId: updateSystemConfigs
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                type: object
+                required: [key, value]
+                properties:
+                  key:
+                    type: string
+                  value:
+                    type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /system/admins:
+    get:
+      tags: [AdminSystem]
+      summary: 获取管理员列表
+      operationId: getAdmins
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/PageSizeParam"
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedAdmins"
+
+    post:
+      tags: [AdminSystem]
+      summary: 添加管理员
+      operationId: createAdmin
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminInput"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /system/roles:
+    get:
+      tags: [AdminSystem]
+      summary: 获取角色列表
+      operationId: getRoles
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoleList"
+
+  /system/permissions:
+    get:
+      tags: [AdminSystem]
+      summary: 获取权限列表
+      operationId: getPermissions
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PermissionTree"
+
+  /system/operation-logs:
+    get:
+      tags: [AdminSystem]
+      summary: 获取操作日志
+      operationId: getOperationLogs
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/PageSizeParam"
+        - name: admin_id
+          in: query
+          schema:
+            type: integer
+            format: int64
+        - name: module
+          in: query
+          schema:
+            type: string
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedOperationLogs"
+
+  # ==================== 仪表盘 ====================
+  /dashboard/overview:
+    get:
+      tags: [AdminDashboard]
+      summary: 获取概览数据
+      operationId: getDashboardOverview
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardOverview"
+
+  /dashboard/trends:
+    get:
+      tags: [AdminDashboard]
+      summary: 获取趋势数据
+      operationId: getDashboardTrends
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: type
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [revenue, orders, users, devices]
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [week, month, year]
+            default: week
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TrendData"
+
+  /dashboard/device-status:
+    get:
+      tags: [AdminDashboard]
+      summary: 获取设备状态统计
+      operationId: getDeviceStatusStats
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeviceStatusStats"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    PageParam:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+
+    PageSizeParam:
+      name: page_size
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+  responses:
+    Success:
+      description: 操作成功
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              code:
+                type: integer
+                example: 0
+              message:
+                type: string
+                example: "success"
+
+  schemas:
+    AdminLoginResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          type: object
+          properties:
+            access_token:
+              type: string
+            expires_in:
+              type: integer
+            admin:
+              type: object
+              properties:
+                id:
+                  type: integer
+                  format: int64
+                username:
+                  type: string
+                name:
+                  type: string
+                role:
+                  type: object
+                  properties:
+                    code:
+                      type: string
+                    name:
+                      type: string
+                permissions:
+                  type: array
+                  items:
+                    type: string
+
+    PaginatedUsers:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          type: object
+          properties:
+            total:
+              type: integer
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/AdminUserItem"
+
+    AdminUserItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        phone:
+          type: string
+        nickname:
+          type: string
+        avatar:
+          type: string
+        member_level:
+          type: string
+        points:
+          type: integer
+        balance:
+          type: number
+        status:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+
+    AdminUserDetail:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          allOf:
+            - $ref: "#/components/schemas/AdminUserItem"
+            - type: object
+              properties:
+                is_verified:
+                  type: boolean
+                is_distributor:
+                  type: boolean
+                referrer:
+                  type: object
+                  properties:
+                    id:
+                      type: integer
+                      format: int64
+                    nickname:
+                      type: string
+                order_count:
+                  type: integer
+                total_consumed:
+                  type: number
+
+    PaginatedDevices:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          type: object
+          properties:
+            total:
+              type: integer
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/AdminDeviceItem"
+
+    AdminDeviceItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        device_no:
+          type: string
+        product_name:
+          type: string
+        venue_name:
+          type: string
+        online_status:
+          type: integer
+        rental_status:
+          type: integer
+        status:
+          type: integer
+        last_heartbeat_at:
+          type: string
+          format: date-time
+
+    AdminDeviceDetail:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          allOf:
+            - $ref: "#/components/schemas/AdminDeviceItem"
+            - type: object
+              properties:
+                qr_code:
+                  type: string
+                product_image:
+                  type: string
+                firmware_version:
+                  type: string
+                venue:
+                  $ref: "#/components/schemas/VenueItem"
+                current_rental:
+                  type: object
+
+    DeviceCreateResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          type: object
+          properties:
+            id:
+              type: integer
+              format: int64
+            qr_code:
+              type: string
+
+    CommandResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          type: object
+          properties:
+            success:
+              type: boolean
+            message:
+              type: string
+
+    PaginatedDeviceLogs:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          type: object
+          properties:
+            total:
+              type: integer
+            items:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    format: int64
+                  type:
+                    type: string
+                  content:
+                    type: string
+                  operator:
+                    type: string
+                  created_at:
+                    type: string
+                    format: date-time
+
+    PaginatedVenues:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          type: object
+          properties:
+            total:
+              type: integer
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/VenueItem"
+
+    VenueItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        type:
+          type: string
+        address:
+          type: string
+        merchant_name:
+          type: string
+        device_count:
+          type: integer
+        status:
+          type: integer
+
+    VenueInput:
+      type: object
+      required: [merchant_id, name, type, province, city, district, address]
+      properties:
+        merchant_id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        type:
+          type: string
+        province:
+          type: string
+        city:
+          type: string
+        district:
+          type: string
+        address:
+          type: string
+        longitude:
+          type: number
+        latitude:
+          type: number
+        contact_name:
+          type: string
+        contact_phone:
+          type: string
+
+    PaginatedMerchants:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          type: object
+          properties:
+            total:
+              type: integer
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/MerchantItem"
+
+    MerchantItem:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        contact_name:
+          type: string
+        contact_phone:
+          type: string
+        commission_rate:
+          type: number
+        venue_count:
+          type: integer
+        device_count:
+          type: integer
+        status:
+          type: integer
+
+    MerchantInput:
+      type: object
+      required: [name, contact_name, contact_phone]
+      properties:
+        name:
+          type: string
+        contact_name:
+          type: string
+        contact_phone:
+          type: string
+        address:
+          type: string
+        business_license:
+          type: string
+        commission_rate:
+          type: number
+        settlement_type:
+          type: string
+        bank_name:
+          type: string
+        bank_account:
+          type: string
+        bank_holder:
+          type: string
+
+    PaginatedAdminHotels:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          type: object
+          properties:
+            total:
+              type: integer
+            items:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    format: int64
+                  name:
+                    type: string
+                  address:
+                    type: string
+                  room_count:
+                    type: integer
+                  status:
+                    type: integer
+
+    HotelInput:
+      type: object
+      required: [name, province, city, district, address, phone]
+      properties:
+        name:
+          type: string
+        star_rating:
+          type: integer
+        province:
+          type: string
+        city:
+          type: string
+        district:
+          type: string
+        address:
+          type: string
+        phone:
+          type: string
+        images:
+          type: array
+          items:
+            type: string
+        facilities:
+          type: array
+          items:
+            type: string
+        description:
+          type: string
+        commission_rate:
+          type: number
+
+    AdminRoomList:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+                format: int64
+              room_no:
+                type: string
+              room_type:
+                type: string
+              device_no:
+                type: string
+              hourly_price:
+                type: number
+              daily_price:
+                type: number
+              status:
+                type: integer
+
+    RoomInput:
+      type: object
+      required: [room_no, room_type, hourly_price, daily_price]
+      properties:
+        room_no:
+          type: string
+        room_type:
+          type: string
+        device_id:
+          type: integer
+          format: int64
+        images:
+          type: array
+          items:
+            type: string
+        facilities:
+          type: array
+          items:
+            type: string
+        area:
+          type: integer
+        bed_type:
+          type: string
+        max_guests:
+          type: integer
+        hourly_price:
+          type: number
+        daily_price:
+          type: number
+
+    BookingVerifyResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          type: object
+          properties:
+            booking_no:
+              type: string
+            user_phone:
+              type: string
+            room_no:
+              type: string
+            check_in_time:
+              type: string
+              format: date-time
+            check_out_time:
+              type: string
+              format: date-time
+
+    PaginatedAdminOrders:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          type: object
+          properties:
+            total:
+              type: integer
+            items:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    format: int64
+                  order_no:
+                    type: string
+                  type:
+                    type: string
+                  user_phone:
+                    type: string
+                  actual_amount:
+                    type: number
+                  status:
+                    type: string
+                  created_at:
+                    type: string
+                    format: date-time
+
+    PaginatedDistributors:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          type: object
+          properties:
+            total:
+              type: integer
+            items:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    format: int64
+                  user_phone:
+                    type: string
+                  user_nickname:
+                    type: string
+                  invite_code:
+                    type: string
+                  level:
+                    type: integer
+                  team_count:
+                    type: integer
+                  total_commission:
+                    type: number
+                  status:
+                    type: integer
+                  created_at:
+                    type: string
+                    format: date-time
+
+    CommissionSettings:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          type: object
+          properties:
+            direct_rate:
+              type: number
+              description: 直推佣金比例
+            indirect_rate:
+              type: number
+              description: 间推佣金比例
+            min_withdraw:
+              type: number
+              description: 最低提现金额
+            withdraw_fee_rate:
+              type: number
+              description: 提现手续费比例
+
+    PaginatedCoupons:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          type: object
+          properties:
+            total:
+              type: integer
+            items:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    format: int64
+                  name:
+                    type: string
+                  type:
+                    type: string
+                  value:
+                    type: number
+                  total_count:
+                    type: integer
+                  issued_count:
+                    type: integer
+                  used_count:
+                    type: integer
+                  status:
+                    type: integer
+
+    CouponInput:
+      type: object
+      required: [name, type, value, total_count, start_time, end_time]
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+          enum: [fixed, percent]
+        value:
+          type: number
+        min_amount:
+          type: number
+        max_discount:
+          type: number
+        applicable_type:
+          type: string
+        total_count:
+          type: integer
+        per_user_limit:
+          type: integer
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+        validity_days:
+          type: integer
+
+    FinanceStatistics:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          type: object
+          properties:
+            total_revenue:
+              type: number
+            total_orders:
+              type: integer
+            total_refund:
+              type: number
+            revenue_by_channel:
+              type: object
+              additionalProperties:
+                type: number
+            revenue_by_type:
+              type: object
+              additionalProperties:
+                type: number
+
+    PaginatedTransactions:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          type: object
+          properties:
+            total:
+              type: integer
+            items:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    format: int64
+                  payment_no:
+                    type: string
+                  order_no:
+                    type: string
+                  channel:
+                    type: string
+                  amount:
+                    type: number
+                  status:
+                    type: string
+                  created_at:
+                    type: string
+                    format: date-time
+
+    PaginatedWithdrawals:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          type: object
+          properties:
+            total:
+              type: integer
+            items:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    format: int64
+                  withdrawal_no:
+                    type: string
+                  user_phone:
+                    type: string
+                  type:
+                    type: string
+                  amount:
+                    type: number
+                  status:
+                    type: string
+                  created_at:
+                    type: string
+                    format: date-time
+
+    PaginatedSettlements:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          type: object
+          properties:
+            total:
+              type: integer
+            items:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    format: int64
+                  settlement_no:
+                    type: string
+                  type:
+                    type: string
+                  target_name:
+                    type: string
+                  period:
+                    type: string
+                  total_amount:
+                    type: number
+                  status:
+                    type: string
+
+    SystemConfigList:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              group:
+                type: string
+              key:
+                type: string
+              value:
+                type: string
+              type:
+                type: string
+              description:
+                type: string
+
+    PaginatedAdmins:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          type: object
+          properties:
+            total:
+              type: integer
+            items:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    format: int64
+                  username:
+                    type: string
+                  name:
+                    type: string
+                  role_name:
+                    type: string
+                  status:
+                    type: integer
+                  last_login_at:
+                    type: string
+                    format: date-time
+
+    AdminInput:
+      type: object
+      required: [username, password, name, role_id]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+        name:
+          type: string
+        phone:
+          type: string
+        email:
+          type: string
+        role_id:
+          type: integer
+          format: int64
+        merchant_id:
+          type: integer
+          format: int64
+
+    RoleList:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+                format: int64
+              code:
+                type: string
+              name:
+                type: string
+              is_system:
+                type: boolean
+
+    PermissionTree:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+                format: int64
+              code:
+                type: string
+              name:
+                type: string
+              type:
+                type: string
+              children:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PermissionTree/properties/data/items"
+
+    PaginatedOperationLogs:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          type: object
+          properties:
+            total:
+              type: integer
+            items:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    format: int64
+                  admin_name:
+                    type: string
+                  module:
+                    type: string
+                  action:
+                    type: string
+                  target:
+                    type: string
+                  ip:
+                    type: string
+                  created_at:
+                    type: string
+                    format: date-time
+
+    DashboardOverview:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          type: object
+          properties:
+            today_revenue:
+              type: number
+            today_orders:
+              type: integer
+            total_users:
+              type: integer
+            total_devices:
+              type: integer
+            online_devices:
+              type: integer
+            in_use_devices:
+              type: integer
+
+    TrendData:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          type: object
+          properties:
+            labels:
+              type: array
+              items:
+                type: string
+            values:
+              type: array
+              items:
+                type: number
+
+    DeviceStatusStats:
+      type: object
+      properties:
+        code:
+          type: integer
+        data:
+          type: object
+          properties:
+            total:
+              type: integer
+            online:
+              type: integer
+            offline:
+              type: integer
+            in_use:
+              type: integer
+            maintenance:
+              type: integer
+            by_venue_type:
+              type: object
+              additionalProperties:
+                type: integer

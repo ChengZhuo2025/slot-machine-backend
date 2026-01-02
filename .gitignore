@@ -1,64 +1,249 @@
-# 操作系统生成的文件
-.DS_Store
-Thumbs.db
+# =====================================================
+# Go Backend Project .gitignore
+# 技术栈: Go + Gin + GORM + PostgreSQL + Redis + EMQX
+# =====================================================
 
-# 编辑器配置文件
+# ====================
+# 操作系统生成的文件
+# ====================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# ====================
+# 编辑器/IDE 配置文件
+# ====================
 .idea/
 .vscode/
 *.swp
 *.swo
 *~
+*.sublime-workspace
+*.sublime-project
+.project
+.classpath
+.settings/
+*.iml
 
-# 日志文件
-*.log
-logs/
-
-# 临时文件
-*.tmp
-*.temp
-.cache/
-
-# 编译生成的文件
+# ====================
+# Go 相关
+# ====================
+# 编译输出
+bin/
 build/
 dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Go 测试二进制文件
+*.test
+
+# Go 覆盖率文件
+*.out
+coverage.txt
+coverage.html
+coverage/
+
+# Go vendor 目录 (如果不使用 go modules 管理)
+# vendor/
+
+# Go 工具生成的文件
+go.work
+go.work.sum
+
+# Delve 调试器
+__debug_bin
+__debug_bin*
+
+# Air 热重载工具
+tmp/
+
+# ====================
+# 项目特定配置
+# ====================
+# 实际配置文件 (包含敏感信息)
+configs/config.yaml
+configs/config.local.yaml
+configs/config.dev.yaml
+configs/config.prod.yaml
+configs/config.test.yaml
+
+# 保留配置模板
+!configs/config.example.yaml
 
 # 环境变量文件
 .env
 .env.local
+.env.development
+.env.production
+.env.test
 .env.*.local
 
-# 包管理器文件
-node_modules/
-package-lock.json
-yarn.lock
-pnpm-lock.yaml
+# ====================
+# 数据库相关
+# ====================
+# PostgreSQL 数据目录
+data/postgres/
+postgres-data/
+pgdata/
 
-# Python相关（如果有）
-*.pyc
-__pycache__/
-venv/
+# 数据库备份文件
+*.sql.gz
+*.sql.bak
+*.dump
+backups/
 
-# Java相关（如果有）
-*.class
-target/
+# ====================
+# Redis 相关
+# ====================
+# Redis 持久化文件
+data/redis/
+redis-data/
+*.rdb
+*.aof
+dump.rdb
+appendonly.aof
 
-# PHP相关（如果有）
-vendor/
-composer.lock
+# ====================
+# MQTT/EMQX 相关
+# ====================
+data/emqx/
+emqx-data/
 
-# Ruby相关（如果有）
-Gemfile.lock
+# ====================
+# Docker 相关
+# ====================
+# Docker 数据卷
+data/
+volumes/
 
-# Go相关（如果有）
-bin/
-*.exe
+# Docker 环境文件
+.docker-env
+docker-compose.override.yml
 
-# Rust相关（如果有）
-target/
+# ====================
+# 日志文件
+# ====================
+*.log
+logs/
+log/
+*.log.*
 
-# Docker相关（如果有）
-.dockerignore
+# ====================
+# 临时文件
+# ====================
+*.tmp
+*.temp
+*.bak
+*.backup
+.cache/
+.tmp/
+temp/
 
-# Kubernetes相关（如果有）
-*.yaml
-*.yml
+# ====================
+# 证书和密钥文件
+# ====================
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+certs/
+secrets/
+
+# 保留示例证书
+!*.example.pem
+!*.example.key
+
+# ====================
+# 支付相关证书
+# ====================
+# 微信支付证书
+wechat_cert/
+apiclient_cert.pem
+apiclient_key.pem
+
+# 支付宝证书
+alipay_cert/
+alipay_public_key.pem
+app_private_key.pem
+
+# ====================
+# 上传文件目录
+# ====================
+uploads/
+static/uploads/
+
+# ====================
+# Swagger/API 文档生成
+# ====================
+docs/swagger.json
+docs/swagger.yaml
+docs/docs.go
+
+# ====================
+# 测试相关
+# ====================
+# 测试输出
+test-results/
+test-reports/
+
+# 性能测试结果
+*.prof
+*.trace
+cpu.out
+mem.out
+pprof/
+
+# ====================
+# 构建产物
+# ====================
+# 二进制输出
+/smart-locker-backend
+/api-gateway
+/user-service
+/device-service
+/order-service
+/payment-service
+/rental-service
+/hotel-service
+/mall-service
+/distribution-service
+/marketing-service
+/finance-service
+/content-service
+/notification-service
+/admin-service
+
+# ====================
+# CI/CD 相关
+# ====================
+.github/workflows/*.local.yml
+
+# ====================
+# 其他
+# ====================
+# 备份文件
+*.orig
+
+# 压缩文件
+*.zip
+*.tar.gz
+*.rar
+
+# 二维码生成缓存
+qrcodes/
+
+# PID 文件
+*.pid
+
+# 依赖分析
+go.sum.bak

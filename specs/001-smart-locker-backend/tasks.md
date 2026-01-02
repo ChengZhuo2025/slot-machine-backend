@@ -1,0 +1,733 @@
+# Tasks: 爱上杜美人智能开锁管理系统后端服务
+
+**Input**: Design documents from `/specs/001-smart-locker-backend/`
+**Prerequisites**: plan.md, spec.md, research.md, data-model.md, contracts/
+
+**Tests**: 包含单元测试、集成测试和 E2E 测试任务（Phase 12），目标覆盖率：单测 > 80%，关键业务 > 90%。
+
+**Seed Data**: 使用前端 mock 数据作为初始化测试数据，支持 `make seed` 一键初始化开发环境。
+
+**Organization**: 任务按用户故事组织，支持独立实现和测试每个故事。
+
+## Format: `[ID] [P?] [Story] Description`
+
+- **[P]**: 可并行执行（不同文件，无依赖）
+- **[Story]**: 所属用户故事（US1, US2, US3...）
+- 描述中包含具体文件路径
+
+## Path Conventions
+
+基于 plan.md 定义的项目结构：
+- 服务入口: `cmd/`
+- 内部实现: `internal/`
+- 公共包: `pkg/`
+- 数据库迁移: `migrations/`
+- 配置: `configs/`
+- 部署: `deployments/`
+
+---
+
+## Phase 1: Setup (项目初始化)
+
+**Purpose**: 项目基础结构和开发环境配置
+
+- [ ] T001 创建项目目录结构，按 plan.md 中的结构创建所有目录
+- [ ] T002 初始化 Go Module，创建 `go.mod` 文件
+- [ ] T003 [P] 添加核心依赖到 `go.mod`：gin, gorm, viper, jwt, redis, mqtt
+- [ ] T004 [P] 创建 Makefile 定义常用命令（build, run, test, lint, migrate）
+- [ ] T005 [P] 创建 `.gitignore` 文件
+- [ ] T006 [P] 配置 golangci-lint，创建 `.golangci.yml`
+- [ ] T007 [P] 创建 Docker Compose 开发环境配置 `deployments/docker/docker-compose.yml`
+- [ ] T008 创建配置文件模板 `configs/config.example.yaml`
+
+---
+
+## Phase 2: Foundational (基础设施)
+
+**Purpose**: 所有用户故事都依赖的核心基础设施
+
+**⚠️ CRITICAL**: 此阶段必须完成后才能开始任何用户故事
+
+### 配置与数据库
+
+- [ ] T009 实现配置管理模块 `internal/common/config/config.go`
+- [ ] T010 实现数据库连接模块 `internal/common/database/postgres.go`
+- [ ] T011 [P] 实现 Redis 连接模块 `internal/common/cache/redis.go`
+- [ ] T012 [P] 实现日志模块 `internal/common/logger/logger.go`
+
+### 数据库迁移 - 核心表
+
+- [ ] T013 创建 User 表迁移 `migrations/000001_create_users.up.sql`
+- [ ] T014 [P] 创建 UserWallet 表迁移 `migrations/000002_create_user_wallets.up.sql`
+- [ ] T015 [P] 创建 MemberLevel 表迁移 `migrations/000003_create_member_levels.up.sql`
+- [ ] T016 [P] 创建 Admin/Role/Permission 表迁移 `migrations/000004_create_admins.up.sql`
+- [ ] T017 [P] 创建 Merchant/Venue/Device 表迁移 `migrations/000005_create_devices.up.sql`
+- [ ] T018 [P] 创建 Order/OrderItem/Payment 表迁移 `migrations/000006_create_orders.up.sql`
+- [ ] T019 [P] 创建 Rental/RentalPricing 表迁移 `migrations/000007_create_rentals.up.sql`
+- [ ] T020 [P] 创建 Hotel/Room/Booking 表迁移 `migrations/000008_create_hotels.up.sql`
+- [ ] T021 [P] 创建 Category/Product/ProductSku/CartItem 表迁移 `migrations/000009_create_products.up.sql`
+- [ ] T022 [P] 创建 Distributor/Commission/Withdrawal 表迁移 `migrations/000010_create_distribution.up.sql`
+- [ ] T023 [P] 创建 Coupon/UserCoupon/Campaign 表迁移 `migrations/000011_create_marketing.up.sql`
+- [ ] T024 [P] 创建 Settlement/WalletTransaction 表迁移 `migrations/000012_create_finance.up.sql`
+- [ ] T025 [P] 创建 Article/Notification/SystemConfig/OperationLog 表迁移 `migrations/000013_create_system.up.sql`
+- [ ] T026 [P] 创建 Address 表迁移 `migrations/000014_create_addresses.up.sql`
+- [ ] T027 [P] 创建 RoomTimeSlot 表迁移 `migrations/000015_create_room_time_slots.up.sql`
+- [ ] T028 [P] 创建 SmsCode 表迁移 `migrations/000016_create_sms_codes.up.sql`
+- [ ] T029 [P] 创建 Banner 表迁移 `migrations/000017_create_banners.up.sql`
+- [ ] T030 创建数据库迁移脚本 `scripts/migrate.sh`
+
+### 种子数据（开发测试）
+
+- [ ] T031 创建种子数据目录结构和加载脚本 `seeds/` + `scripts/seed.sh`
+- [ ] T032 从 admin-frontend/user-frontend mock 数据提取用户/管理员种子数据 `seeds/001_users.sql`
+- [ ] T033 [P] 提取会员等级/角色/权限种子数据 `seeds/002_rbac.sql`
+- [ ] T034 [P] 提取商户/场地/设备种子数据 `seeds/003_devices.sql`
+- [ ] T035 [P] 提取酒店/房间/时段价格种子数据 `seeds/004_hotels.sql`
+- [ ] T036 [P] 提取商品分类/商品/SKU 种子数据 `seeds/005_products.sql`
+- [ ] T037 [P] 提取优惠券/活动种子数据 `seeds/006_marketing.sql`
+- [ ] T038 [P] 提取租借定价/Banner/系统配置种子数据 `seeds/007_system.sql`
+- [ ] T039 更新 Makefile 添加 `make seed` 和 `make reset-db` 命令
+
+### 核心模型定义
+
+- [ ] T040 [P] 定义 User 模型 `internal/models/user.go`
+- [ ] T041 [P] 定义 Admin/Role/Permission 模型 `internal/models/admin.go`
+- [ ] T042 [P] 定义 Merchant/Venue 模型 `internal/models/venue.go`
+- [ ] T043 [P] 定义 Device 模型 `internal/models/device.go`
+- [ ] T044 [P] 定义 Order/OrderItem 模型 `internal/models/order.go`
+- [ ] T045 [P] 定义 Payment/Refund 模型 `internal/models/payment.go`
+
+### 公共组件
+
+- [ ] T046 实现统一响应格式 `pkg/response/response.go`
+- [ ] T047 [P] 实现错误码定义 `pkg/response/errors.go`
+- [ ] T048 [P] 实现 JWT 工具 `pkg/auth/jwt.go`
+- [ ] T049 [P] 实现加密工具（AES-256-GCM）`pkg/crypto/aes.go`
+- [ ] T050 [P] 实现密码哈希工具（bcrypt）`pkg/crypto/password.go`
+
+### 中间件
+
+- [ ] T051 实现认证中间件 `internal/common/middleware/auth.go`
+- [ ] T052 [P] 实现 RBAC 权限中间件 `internal/common/middleware/permission.go`
+- [ ] T053 [P] 实现请求日志中间件 `internal/common/middleware/logging.go`
+- [ ] T054 [P] 实现限流中间件 `internal/common/middleware/ratelimit.go`
+- [ ] T055 [P] 实现跨域中间件 `internal/common/middleware/cors.go`
+- [ ] T056 [P] 实现请求 ID 中间件 `internal/common/middleware/requestid.go`
+
+### API Gateway 入口
+
+- [ ] T057 创建 API Gateway 主入口 `cmd/api-gateway/main.go`
+- [ ] T058 实现路由注册 `cmd/api-gateway/router.go`
+- [ ] T059 实现健康检查端点 `internal/handler/health/health.go`
+
+**Checkpoint**: 基础设施就绪，可以开始用户故事实现
+
+---
+
+## Phase 3: User Story 1 - 用户扫码租借智能柜 (Priority: P1) 🎯 MVP
+
+**Goal**: 实现用户扫码→支付→开锁→归还→结算的完整租借流程
+
+**Independent Test**: 模拟用户完整租借流程，验证从扫码到结算的完整链路
+
+### 认证模块
+
+- [ ] T060 [P] [US1] 实现短信验证码服务 `pkg/sms/aliyun.go`
+- [ ] T061 [P] [US1] 实现验证码存储（Redis）`internal/service/auth/code_service.go`
+- [ ] T062 [US1] 实现用户注册/登录服务 `internal/service/auth/auth_service.go`
+- [ ] T063 [P] [US1] 实现微信授权登录服务 `internal/service/auth/wechat_service.go`
+- [ ] T064 [US1] 实现认证 API Handler `internal/handler/auth/auth_handler.go`
+
+### 用户模块
+
+- [ ] T065 [US1] 实现用户 Repository `internal/repository/user_repo.go`
+- [ ] T066 [US1] 实现用户服务 `internal/service/user/user_service.go`
+- [ ] T067 [US1] 实现用户钱包服务 `internal/service/user/wallet_service.go`
+- [ ] T068 [US1] 实现用户 API Handler `internal/handler/user/user_handler.go`
+
+### 设备与场地模块
+
+- [ ] T069 [P] [US1] 定义 Rental/RentalPricing 模型 `internal/models/rental.go`
+- [ ] T070 [US1] 实现设备 Repository `internal/repository/device_repo.go`
+- [ ] T071 [US1] 实现场地 Repository `internal/repository/venue_repo.go`
+- [ ] T072 [US1] 实现设备查询服务 `internal/service/device/device_service.go`
+- [ ] T073 [US1] 实现设备 API Handler（用户端）`internal/handler/device/device_handler.go`
+
+### MQTT 设备通信
+
+- [ ] T074 [US1] 实现 MQTT 客户端 `internal/common/mqtt/client.go`
+- [ ] T075 [US1] 实现设备控制服务（开锁/状态查询）`internal/service/device/control_service.go`
+- [ ] T076 [US1] 实现设备状态订阅处理 `internal/service/device/status_handler.go`
+
+### 租借模块
+
+- [ ] T077 [US1] 实现租借定价 Repository `internal/repository/rental_pricing_repo.go`
+- [ ] T078 [US1] 实现租借 Repository `internal/repository/rental_repo.go`
+- [ ] T079 [US1] 实现租借服务（创建/归还/超时处理）`internal/service/rental/rental_service.go`
+- [ ] T080 [US1] 实现租借 API Handler `internal/handler/rental/rental_handler.go`
+
+### 订单模块
+
+- [ ] T081 [US1] 实现订单 Repository `internal/repository/order_repo.go`
+- [ ] T082 [US1] 实现订单服务 `internal/service/order/order_service.go`
+- [ ] T083 [US1] 实现订单 API Handler `internal/handler/order/order_handler.go`
+
+### 支付模块
+
+- [ ] T084 [P] [US1] 实现微信支付 SDK 封装 `pkg/payment/wechat/wechat.go`
+- [ ] T085 [P] [US1] 实现支付宝 SDK 封装 `pkg/payment/alipay/alipay.go`
+- [ ] T086 [US1] 实现支付 Repository `internal/repository/payment_repo.go`
+- [ ] T087 [US1] 实现统一支付服务 `internal/service/payment/payment_service.go`
+- [ ] T088 [US1] 实现支付回调处理 `internal/handler/payment/callback_handler.go`
+- [ ] T089 [US1] 实现支付 API Handler `internal/handler/payment/payment_handler.go`
+
+### 定时任务
+
+- [ ] T090 [US1] 实现租借超时检查任务 `internal/service/rental/timeout_checker.go`
+- [ ] T091 [US1] 实现超过24小时自动购买逻辑 `internal/service/rental/auto_purchase.go`
+
+### 路由注册
+
+- [ ] T092 [US1] 注册 User Story 1 所有路由到 API Gateway
+
+**Checkpoint**: User Story 1 完成，用户可以完整体验扫码租借流程
+
+---
+
+## Phase 4: User Story 2 - 管理员设备监控与管理 (Priority: P1)
+
+**Goal**: 管理员可实时监控设备状态、远程控制设备、管理场地和商户
+
+**Independent Test**: 通过管理后台进行设备状态查看和远程控制操作
+
+### 管理员认证
+
+- [ ] T093 [US2] 实现管理员 Repository `internal/repository/admin_repo.go`
+- [ ] T094 [US2] 实现管理员登录服务 `internal/service/admin/admin_auth_service.go`
+- [ ] T095 [US2] 实现管理员认证 API Handler `internal/handler/admin/auth_handler.go`
+
+### 权限管理
+
+- [ ] T096 [US2] 实现角色权限 Repository `internal/repository/role_repo.go`
+- [ ] T097 [US2] 实现权限服务 `internal/service/admin/permission_service.go`
+
+### 设备管理（管理端）
+
+- [ ] T098 [P] [US2] 定义 DeviceLog/DeviceMaintenance 模型 `internal/models/device_log.go`
+- [ ] T099 [US2] 实现设备日志 Repository `internal/repository/device_log_repo.go`
+- [ ] T100 [US2] 实现设备管理服务（CRUD/远程控制）`internal/service/admin/device_admin_service.go`
+- [ ] T101 [US2] 实现设备管理 API Handler `internal/handler/admin/device_handler.go`
+
+### 场地管理
+
+- [ ] T102 [US2] 实现场地管理服务 `internal/service/admin/venue_admin_service.go`
+- [ ] T103 [US2] 实现场地管理 API Handler `internal/handler/admin/venue_handler.go`
+
+### 商户管理
+
+- [ ] T104 [US2] 实现商户 Repository `internal/repository/merchant_repo.go`
+- [ ] T105 [US2] 实现商户管理服务 `internal/service/admin/merchant_admin_service.go`
+- [ ] T106 [US2] 实现商户管理 API Handler `internal/handler/admin/merchant_handler.go`
+
+### 二维码生成
+
+- [ ] T107 [US2] 实现二维码生成工具 `pkg/qrcode/generator.go`
+- [ ] T108 [US2] 实现设备二维码生成逻辑 `internal/service/device/qrcode_service.go`
+
+### 设备告警
+
+- [ ] T109 [US2] 实现设备异常告警服务 `internal/service/device/alert_service.go`
+
+### 操作日志
+
+- [ ] T110 [P] [US2] 定义 OperationLog 模型 `internal/models/operation_log.go`
+- [ ] T111 [US2] 实现操作日志 Repository `internal/repository/operation_log_repo.go`
+- [ ] T112 [US2] 实现操作日志中间件 `internal/common/middleware/operation_log.go`
+
+### 路由注册
+
+- [ ] T113 [US2] 注册 User Story 2 所有管理端路由
+
+**Checkpoint**: User Story 2 完成，管理员可监控和管理设备
+
+---
+
+## Phase 5: User Story 3 - 用户商城购物 (Priority: P2)
+
+**Goal**: 用户可浏览商品、加购、下单支付、查看订单、申请退款
+
+**Independent Test**: 完整购物流程从商品浏览到支付完成
+
+### 商品模块
+
+- [ ] T114 [P] [US3] 定义 Category/Product/ProductSku 模型 `internal/models/product.go`
+- [ ] T115 [P] [US3] 定义 CartItem 模型 `internal/models/cart.go`
+- [ ] T116 [P] [US3] 定义 Review 模型 `internal/models/review.go`
+- [ ] T117 [US3] 实现分类 Repository `internal/repository/category_repo.go`
+- [ ] T118 [US3] 实现商品 Repository `internal/repository/product_repo.go`
+- [ ] T119 [US3] 实现商品服务 `internal/service/mall/product_service.go`
+- [ ] T120 [US3] 实现商品搜索服务 `internal/service/mall/search_service.go`
+- [ ] T121 [US3] 实现商品 API Handler `internal/handler/mall/product_handler.go`
+
+### 购物车模块
+
+- [ ] T122 [US3] 实现购物车 Repository `internal/repository/cart_repo.go`
+- [ ] T123 [US3] 实现购物车服务 `internal/service/mall/cart_service.go`
+- [ ] T124 [US3] 实现购物车 API Handler `internal/handler/mall/cart_handler.go`
+
+### 商城订单
+
+- [ ] T125 [US3] 实现商城订单服务 `internal/service/mall/mall_order_service.go`
+- [ ] T126 [US3] 实现商城订单 API Handler `internal/handler/mall/order_handler.go`
+
+### 商品评价
+
+- [ ] T127 [US3] 实现评价 Repository `internal/repository/review_repo.go`
+- [ ] T128 [US3] 实现评价服务 `internal/service/mall/review_service.go`
+- [ ] T129 [US3] 实现评价 API Handler `internal/handler/mall/review_handler.go`
+
+### 退款处理
+
+- [ ] T130 [P] [US3] 定义 Refund 模型 `internal/models/refund.go`
+- [ ] T131 [US3] 实现退款 Repository `internal/repository/refund_repo.go`
+- [ ] T132 [US3] 实现退款服务 `internal/service/order/refund_service.go`
+- [ ] T133 [US3] 实现退款 API Handler `internal/handler/order/refund_handler.go`
+
+### 商品管理（管理端）
+
+- [ ] T134 [US3] 实现商品管理服务 `internal/service/admin/product_admin_service.go`
+- [ ] T135 [US3] 实现商品管理 API Handler `internal/handler/admin/product_handler.go`
+
+### 路由注册
+
+- [ ] T136 [US3] 注册 User Story 3 所有路由
+
+**Checkpoint**: User Story 3 完成，商城购物功能可用
+
+---
+
+## Phase 6: User Story 4 - 酒店房间智能柜租借 (Priority: P2)
+
+**Goal**: 用户可预订酒店房间，获取核销码和开锁码，到店核销后使用开锁码开锁
+
+**Independent Test**: 预订→支付→核销→开锁的完整流程
+
+### 酒店模块
+
+- [ ] T137 [P] [US4] 定义 Hotel/Room/Booking 模型 `internal/models/hotel.go`
+- [ ] T138 [US4] 实现酒店 Repository `internal/repository/hotel_repo.go`
+- [ ] T139 [US4] 实现房间 Repository `internal/repository/room_repo.go`
+- [ ] T140 [US4] 实现酒店服务 `internal/service/hotel/hotel_service.go`
+- [ ] T141 [US4] 实现酒店 API Handler `internal/handler/hotel/hotel_handler.go`
+
+### 预订模块
+
+- [ ] T142 [US4] 实现预订 Repository `internal/repository/booking_repo.go`
+- [ ] T143 [US4] 实现预订服务（创建/核销/开锁码验证）`internal/service/hotel/booking_service.go`
+- [ ] T144 [US4] 实现开锁码生成与验证 `internal/service/hotel/unlock_code_service.go`
+- [ ] T145 [US4] 实现核销码生成 `internal/service/hotel/verify_code_service.go`
+- [ ] T146 [US4] 实现预订 API Handler `internal/handler/hotel/booking_handler.go`
+
+### 酒店管理（管理端）
+
+- [ ] T147 [US4] 实现酒店管理服务 `internal/service/admin/hotel_admin_service.go`
+- [ ] T148 [US4] 实现酒店管理 API Handler `internal/handler/admin/hotel_handler.go`
+- [ ] T149 [US4] 实现前台核销 API Handler `internal/handler/admin/booking_verify_handler.go`
+
+### 路由注册
+
+- [ ] T150 [US4] 注册 User Story 4 所有路由
+
+**Checkpoint**: User Story 4 完成，酒店预订功能可用
+
+---
+
+## Phase 7: User Story 5 - 分销商推广与佣金管理 (Priority: P2)
+
+**Goal**: 分销商可生成推广链接，推广用户消费后获得佣金
+
+**Independent Test**: 推广链接→用户注册→消费→佣金计算→提现的完整流程
+
+### 分销模块
+
+- [ ] T151 [P] [US5] 定义 Distributor/Commission/Withdrawal 模型 `internal/models/distribution.go`
+- [ ] T152 [US5] 实现分销商 Repository `internal/repository/distributor_repo.go`
+- [ ] T153 [US5] 实现佣金 Repository `internal/repository/commission_repo.go`
+- [ ] T154 [US5] 实现提现 Repository `internal/repository/withdrawal_repo.go`
+- [ ] T155 [US5] 实现分销商服务（申请/审核/团队）`internal/service/distribution/distributor_service.go`
+- [ ] T156 [US5] 实现佣金计算服务（按实付金额）`internal/service/distribution/commission_service.go`
+- [ ] T157 [US5] 实现推广链接生成服务 `internal/service/distribution/invite_service.go`
+- [ ] T158 [US5] 实现提现服务 `internal/service/distribution/withdraw_service.go`
+- [ ] T159 [US5] 实现分销 API Handler（用户端）`internal/handler/distribution/distribution_handler.go`
+
+### 分销管理（管理端）
+
+- [ ] T160 [US5] 实现分销管理服务 `internal/service/admin/distribution_admin_service.go`
+- [ ] T161 [US5] 实现分销管理 API Handler `internal/handler/admin/distribution_handler.go`
+
+### 佣金设置
+
+- [ ] T162 [US5] 实现佣金设置服务 `internal/service/admin/commission_setting_service.go`
+
+### 订单完成触发佣金
+
+- [ ] T163 [US5] 在订单完成时触发佣金计算 `internal/service/order/order_complete_hook.go`
+
+### 路由注册
+
+- [ ] T164 [US5] 注册 User Story 5 所有路由
+
+**Checkpoint**: User Story 5 完成，分销体系可用
+
+---
+
+## Phase 8: User Story 6 - 财务对账与结算 (Priority: P3)
+
+**Goal**: 财务管理员可查看统计、执行结算、审核提现、导出报表
+
+**Independent Test**: 财务报表查询、结算操作、提现审核独立测试
+
+### 财务模块
+
+- [ ] T165 [P] [US6] 定义 Settlement/WalletTransaction 模型 `internal/models/finance.go`
+- [ ] T166 [US6] 实现结算 Repository `internal/repository/settlement_repo.go`
+- [ ] T167 [US6] 实现交易流水 Repository `internal/repository/transaction_repo.go`
+- [ ] T168 [US6] 实现财务统计服务 `internal/service/finance/statistics_service.go`
+- [ ] T169 [US6] 实现结算服务（商户/分销商）`internal/service/finance/settlement_service.go`
+- [ ] T170 [US6] 实现提现审核服务 `internal/service/finance/withdrawal_audit_service.go`
+- [ ] T171 [US6] 实现报表导出服务 `internal/service/finance/export_service.go`
+- [ ] T172 [US6] 实现财务 API Handler `internal/handler/admin/finance_handler.go`
+
+### 路由注册
+
+- [ ] T173 [US6] 注册 User Story 6 所有路由
+
+**Checkpoint**: User Story 6 完成，财务管理功能可用
+
+---
+
+## Phase 9: User Story 7 - 营销活动与优惠券管理 (Priority: P3)
+
+**Goal**: 运营管理员可创建优惠券、管理活动，用户可领取和使用
+
+**Independent Test**: 优惠券创建→发放→领取→下单使用的完整流程
+
+### 优惠券模块
+
+- [ ] T174 [P] [US7] 定义 Coupon/UserCoupon/Campaign 模型 `internal/models/marketing.go`
+- [ ] T175 [US7] 实现优惠券 Repository `internal/repository/coupon_repo.go`
+- [ ] T176 [US7] 实现用户优惠券 Repository `internal/repository/user_coupon_repo.go`
+- [ ] T177 [US7] 实现优惠券服务 `internal/service/marketing/coupon_service.go`
+- [ ] T178 [US7] 实现用户优惠券服务（领取/使用/过期）`internal/service/marketing/user_coupon_service.go`
+- [ ] T179 [US7] 实现营销 API Handler（用户端）`internal/handler/marketing/coupon_handler.go`
+
+### 营销活动
+
+- [ ] T180 [US7] 实现活动 Repository `internal/repository/campaign_repo.go`
+- [ ] T181 [US7] 实现活动服务 `internal/service/marketing/campaign_service.go`
+
+### 营销管理（管理端）
+
+- [ ] T182 [US7] 实现优惠券管理服务 `internal/service/admin/coupon_admin_service.go`
+- [ ] T183 [US7] 实现营销管理 API Handler `internal/handler/admin/marketing_handler.go`
+
+### 订单优惠计算
+
+- [ ] T184 [US7] 在订单创建时计算优惠 `internal/service/order/discount_calculator.go`
+
+### 路由注册
+
+- [ ] T185 [US7] 注册 User Story 7 所有路由
+
+**Checkpoint**: User Story 7 完成，营销功能可用
+
+---
+
+## Phase 10: User Story 8 - 会员体系与权益管理 (Priority: P3)
+
+**Goal**: 用户消费积分累积、等级升级、享受会员权益
+
+**Independent Test**: 消费→积分累积→等级升级→权益生效的流程测试
+
+### 会员模块
+
+- [ ] T186 [P] [US8] 定义 MemberPackage 模型 `internal/models/member.go`
+- [ ] T187 [US8] 实现会员等级 Repository `internal/repository/member_level_repo.go`
+- [ ] T188 [US8] 实现会员套餐 Repository `internal/repository/member_package_repo.go`
+- [ ] T189 [US8] 实现积分服务 `internal/service/user/points_service.go`
+- [ ] T190 [US8] 实现会员等级服务（升级检测）`internal/service/user/member_level_service.go`
+- [ ] T191 [US8] 实现会员套餐购买服务 `internal/service/user/member_package_service.go`
+- [ ] T192 [US8] 实现会员 API Handler `internal/handler/user/member_handler.go`
+
+### 会员管理（管理端）
+
+- [ ] T193 [US8] 实现会员管理服务 `internal/service/admin/member_admin_service.go`
+- [ ] T194 [US8] 实现会员管理 API Handler `internal/handler/admin/member_handler.go`
+
+### 订单完成触发积分
+
+- [ ] T195 [US8] 在订单完成时累加积分 `internal/service/order/points_hook.go`
+
+### 会员折扣计算
+
+- [ ] T196 [US8] 在订单创建时应用会员折扣 `internal/service/order/member_discount.go`
+
+### 路由注册
+
+- [ ] T197 [US8] 注册 User Story 8 所有路由
+
+**Checkpoint**: User Story 8 完成，会员体系可用
+
+---
+
+## Phase 11: Polish & Cross-Cutting Concerns
+
+**Purpose**: 跨故事的优化和完善
+
+### 仪表盘
+
+- [ ] T198 [P] 实现平台管理员仪表盘数据服务 `internal/service/admin/dashboard_service.go`
+- [ ] T199 [P] 实现分销商仪表盘数据服务 `internal/service/distribution/dashboard_service.go`
+- [ ] T200 [P] 实现财务仪表盘数据服务 `internal/service/finance/dashboard_service.go`
+- [ ] T201 [P] 实现运营仪表盘数据服务 `internal/service/admin/operation_dashboard_service.go`
+- [ ] T202 实现仪表盘 API Handler `internal/handler/admin/dashboard_handler.go`
+
+### 内容管理
+
+- [ ] T203 [P] 定义 Article/Notification/MessageTemplate 模型 `internal/models/content.go`
+- [ ] T204 [P] 实现文章 Repository `internal/repository/article_repo.go`
+- [ ] T205 [P] 实现通知 Repository `internal/repository/notification_repo.go`
+- [ ] T206 实现内容服务 `internal/service/content/content_service.go`
+- [ ] T207 实现通知服务 `internal/service/content/notification_service.go`
+- [ ] T208 实现内容 API Handler `internal/handler/content/content_handler.go`
+
+### 系统管理
+
+- [ ] T209 [P] 定义 SystemConfig 模型 `internal/models/system_config.go`
+- [ ] T210 实现系统配置 Repository `internal/repository/system_config_repo.go`
+- [ ] T211 实现系统配置服务 `internal/service/admin/system_config_service.go`
+- [ ] T212 实现系统管理 API Handler `internal/handler/admin/system_handler.go`
+
+### 用户管理（管理端）
+
+- [ ] T213 实现用户管理服务 `internal/service/admin/user_admin_service.go`
+- [ ] T214 实现用户管理 API Handler `internal/handler/admin/user_handler.go`
+
+### 订单管理（管理端）
+
+- [ ] T215 实现订单管理服务 `internal/service/admin/order_admin_service.go`
+- [ ] T216 实现订单管理 API Handler `internal/handler/admin/order_handler.go`
+
+### 用户反馈
+
+- [ ] T217 [P] 定义 UserFeedback 模型 `internal/models/feedback.go`
+- [ ] T218 实现反馈 Repository `internal/repository/feedback_repo.go`
+- [ ] T219 实现反馈服务 `internal/service/user/feedback_service.go`
+- [ ] T220 实现反馈 API Handler `internal/handler/user/feedback_handler.go`
+
+### 用户收货地址
+
+- [ ] T221 [P] 定义 Address 模型 `internal/models/address.go`
+- [ ] T222 实现 Address Repository `internal/repository/address_repo.go`
+- [ ] T223 实现地址服务（CRUD/设置默认）`internal/service/user/address_service.go`
+- [ ] T224 实现地址 API Handler `internal/handler/user/address_handler.go`
+
+### Banner 轮播图管理
+
+- [ ] T225 [P] 定义 Banner 模型 `internal/models/banner.go`
+- [ ] T226 实现 Banner Repository `internal/repository/banner_repo.go`
+- [ ] T227 实现 Banner 服务（用户端查询）`internal/service/content/banner_service.go`
+- [ ] T228 实现 Banner 管理服务（管理端 CRUD）`internal/service/admin/banner_admin_service.go`
+- [ ] T229 实现 Banner API Handler（用户端）`internal/handler/content/banner_handler.go`
+- [ ] T230 实现 Banner 管理 API Handler `internal/handler/admin/banner_handler.go`
+
+### 消息推送
+
+- [ ] T231 实现短信推送服务 `pkg/sms/sender.go`
+- [ ] T232 实现消息模板服务 `internal/service/content/template_service.go`
+
+### 对象存储
+
+- [ ] T233 实现阿里云 OSS 上传 `pkg/oss/aliyun.go`
+
+### 可观测性
+
+- [ ] T233a [P] 集成 Prometheus 指标收集 `internal/common/metrics/prometheus.go`，暴露 `/metrics` 端点，收集 API 请求量、响应时间、错误率、数据库连接池状态等核心指标
+- [ ] T233b [P] 集成 OpenTelemetry 分布式追踪 `internal/common/tracing/opentelemetry.go`，支持请求链路追踪、跨服务调用追踪、数据库查询追踪
+- [ ] T233c [P] 实现追踪中间件 `internal/common/middleware/tracing.go`，自动为每个请求生成 Trace ID 并传递到下游
+
+### API 文档
+
+- [ ] T234 集成 Swagger 文档生成 `cmd/api-gateway/swagger.go`
+- [ ] T235 生成 OpenAPI 文档到 `api/openapi/`
+
+### 部署配置
+
+- [ ] T236 [P] 创建 Dockerfile `deployments/docker/Dockerfile`
+- [ ] T237 [P] 创建 Kubernetes 部署配置 `deployments/k8s/deployment.yaml`
+- [ ] T238 [P] 创建 Kubernetes Service 配置 `deployments/k8s/service.yaml`
+
+### 文档完善
+
+- [ ] T239 更新 quickstart.md 验证所有功能
+
+---
+
+## Phase 12: Testing (测试)
+
+**Purpose**: 确保代码质量和业务逻辑正确性
+
+**⚠️ NOTE**: 测试任务可与功能开发并行，建议每完成一个模块即编写对应测试
+
+### 测试基础设施
+
+- [ ] T240 配置测试框架和 mock 工具 `tests/setup_test.go`
+- [ ] T241 [P] 配置 testcontainers-go 集成测试环境 `tests/integration/testcontainers.go`
+- [ ] T242 [P] 创建测试工具函数（数据库清理、mock 数据生成）`tests/helpers/`
+
+### 单元测试 - 核心业务
+
+- [ ] T243 [P] 编写 auth_service 单元测试 `internal/service/auth/auth_service_test.go`
+- [ ] T244 [P] 编写 rental_service 单元测试 `internal/service/rental/rental_service_test.go`
+- [ ] T245 [P] 编写 payment_service 单元测试 `internal/service/payment/payment_service_test.go`
+- [ ] T246 [P] 编写 order_service 单元测试 `internal/service/order/order_service_test.go`
+- [ ] T247 [P] 编写 booking_service 单元测试 `internal/service/hotel/booking_service_test.go`
+- [ ] T248 [P] 编写 commission_service 单元测试 `internal/service/distribution/commission_service_test.go`
+- [ ] T249 [P] 编写 wallet_service 单元测试 `internal/service/user/wallet_service_test.go`
+- [ ] T250 [P] 编写 coupon_service 单元测试 `internal/service/marketing/coupon_service_test.go`
+
+### 单元测试 - Repository 层
+
+- [ ] T251 [P] 编写 user_repo 单元测试 `internal/repository/user_repo_test.go`
+- [ ] T252 [P] 编写 device_repo 单元测试 `internal/repository/device_repo_test.go`
+- [ ] T253 [P] 编写 order_repo 单元测试 `internal/repository/order_repo_test.go`
+- [ ] T254 [P] 编写 rental_repo 单元测试 `internal/repository/rental_repo_test.go`
+
+### 集成测试
+
+- [ ] T255 编写用户认证流程集成测试 `tests/integration/auth_test.go`
+- [ ] T256 [P] 编写租借流程集成测试（扫码→支付→开锁→归还）`tests/integration/rental_test.go`
+- [ ] T257 [P] 编写支付流程集成测试（创建→回调→状态更新）`tests/integration/payment_test.go`
+- [ ] T258 [P] 编写酒店预订集成测试（预订→核销→开锁）`tests/integration/booking_test.go`
+- [ ] T259 [P] 编写商城订单集成测试（加购→下单→支付）`tests/integration/mall_order_test.go`
+- [ ] T260 [P] 编写分销佣金集成测试（推广→消费→计算佣金）`tests/integration/commission_test.go`
+
+### E2E 测试
+
+- [ ] T261 编写扫码租借完整流程 E2E 测试 `tests/e2e/rental_flow_test.go`
+- [ ] T262 [P] 编写酒店预订完整流程 E2E 测试 `tests/e2e/booking_flow_test.go`
+- [ ] T263 [P] 编写商城购物完整流程 E2E 测试 `tests/e2e/mall_flow_test.go`
+
+### API 测试
+
+- [ ] T264 编写 Auth API 测试 `tests/api/auth_api_test.go`
+- [ ] T265 [P] 编写 User API 测试 `tests/api/user_api_test.go`
+- [ ] T266 [P] 编写 Device API 测试 `tests/api/device_api_test.go`
+- [ ] T267 [P] 编写 Order API 测试 `tests/api/order_api_test.go`
+
+### 测试覆盖率报告
+
+- [ ] T268 配置测试覆盖率收集和报告 `scripts/coverage.sh`
+- [ ] T269 更新 Makefile 添加 `make test`, `make test-unit`, `make test-integration`, `make coverage` 命令
+- [ ] T270 实现覆盖率门禁验证脚本 `scripts/coverage-gate.sh`，验证：（1）整体单元测试覆盖率 ≥ 80%；（2）关键业务模块（auth/payment/order/rental/booking）覆盖率 ≥ 90%；不满足条件时返回非零退出码阻止 CI/CD 流水线继续执行
+
+**Checkpoint**: 测试覆盖率达标（单测 > 80%，关键业务 > 90%）
+
+---
+
+## Dependencies & Execution Order
+
+### Phase Dependencies
+
+- **Setup (Phase 1)**: 无依赖，可立即开始
+- **Foundational (Phase 2)**: 依赖 Phase 1 完成，**阻塞所有用户故事**
+- **User Stories (Phase 3-10)**: 依赖 Phase 2 完成
+  - US1 和 US2 是 P1 优先级，应先完成
+  - US3-US5 是 P2 优先级
+  - US6-US8 是 P3 优先级
+- **Polish (Phase 11)**: 依赖所有核心用户故事完成
+- **Testing (Phase 12)**: 可与 Phase 3-11 并行进行，建议每完成一个模块即编写测试
+
+### User Story Dependencies
+
+| Story | Priority | 可并行 | 依赖 |
+|-------|----------|--------|------|
+| US1 扫码租借 | P1 | ✅ | 仅依赖 Phase 2 |
+| US2 设备管理 | P1 | ✅ | 仅依赖 Phase 2 |
+| US3 商城购物 | P2 | ✅ | 仅依赖 Phase 2 |
+| US4 酒店预订 | P2 | ✅ | 仅依赖 Phase 2 |
+| US5 分销推广 | P2 | ⚠️ | 依赖 US1 的订单完成逻辑 |
+| US6 财务结算 | P3 | ⚠️ | 依赖 US5 的分销数据 |
+| US7 营销优惠 | P3 | ✅ | 仅依赖 Phase 2 |
+| US8 会员体系 | P3 | ✅ | 仅依赖 Phase 2 |
+
+### Parallel Opportunities
+
+- **Phase 1**: T003-T008 可并行
+- **Phase 2**: T011-T029, T033~T038, T040-T045, T047-T050, T052-T056 可并行
+- **Phase 3+**: 不同用户故事可由不同开发者并行开发
+- **Phase 12**: 测试任务可与功能开发并行（建议 TDD 或功能完成后立即测试）
+
+---
+
+## Parallel Example: Phase 2 Foundation
+
+```bash
+# 并行执行数据库迁移脚本（不同文件）:
+Task: "创建 User 表迁移 migrations/000001_create_users.up.sql"
+Task: "创建 Device 表迁移 migrations/000005_create_devices.up.sql"
+Task: "创建 Order 表迁移 migrations/000006_create_orders.up.sql"
+
+# 并行执行模型定义（不同文件）:
+Task: "定义 User 模型 internal/models/user.go"
+Task: "定义 Device 模型 internal/models/device.go"
+Task: "定义 Order 模型 internal/models/order.go"
+```
+
+---
+
+## Implementation Strategy
+
+### MVP First (User Story 1 Only)
+
+1. 完成 Phase 1: Setup
+2. 完成 Phase 2: Foundational（关键阻塞）
+3. 执行 `make seed` 初始化测试数据
+4. 完成 Phase 3: User Story 1（扫码租借）
+5. 编写 US1 相关测试（Phase 12 部分任务）
+6. **验证点**: 测试完整租借流程
+7. 可部署/演示 MVP
+
+### Incremental Delivery
+
+1. Setup + Foundational + Seed Data → 基础就绪
+2. 添加 US1 → 编写测试 → 部署（MVP！）
+3. 添加 US2 → 编写测试 → 部署（设备管理）
+4. 添加 US3/US4/US5 → 编写测试 → 部署（商城/酒店/分销）
+5. 添加 US6/US7/US8 → 编写测试 → 部署（财务/营销/会员）
+6. Polish + 完整测试覆盖 → 完整版本
+
+### Parallel Team Strategy
+
+多开发者并行：
+
+1. 团队共同完成 Setup + Foundational + Seed Data
+2. Foundational 完成后：
+   - 开发者 A: User Story 1（扫码租借）+ 对应测试
+   - 开发者 B: User Story 2（设备管理）+ 对应测试
+   - 开发者 C: User Story 3（商城购物）+ 对应测试
+3. 各故事独立完成和集成
+4. 最后统一补充集成测试和 E2E 测试
+
+---
+
+## Notes
+
+- [P] 任务 = 不同文件，无依赖，可并行
+- [Story] 标签映射任务到具体用户故事
+- 每个用户故事应可独立完成和测试
+- 每个任务或逻辑组完成后提交代码
+- 在任何检查点暂停以独立验证故事
+- 避免：模糊任务、同一文件冲突、破坏独立性的跨故事依赖
+- **Seed Data**: 种子数据来源于 `admin-frontend` 和 `user-frontend` 的 mock 数据，确保开发测试有真实数据支持
+- **Testing**: 建议采用 TDD 或功能完成后立即编写测试，确保测试覆盖率达标

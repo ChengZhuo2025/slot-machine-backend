@@ -1,0 +1,290 @@
+# =====================================================
+# 应用配置文件模板
+# 爱上杜美人智能开锁管理系统后端服务
+# =====================================================
+# 使用说明：
+# 1. 复制此文件为 config.yaml
+# 2. 根据环境修改配置值
+# 3. 切勿将实际配置文件提交到版本控制
+# =====================================================
+
+# 服务配置
+server:
+  # 服务名称
+  name: smart-locker-backend
+  # 运行模式: debug, release, test
+  mode: debug
+  # HTTP 服务端口
+  port: 8000
+  # 读取超时 (秒)
+  read_timeout: 30
+  # 写入超时 (秒)
+  write_timeout: 30
+  # 优雅关闭超时 (秒)
+  shutdown_timeout: 10
+
+# 数据库配置
+database:
+  # 数据库类型
+  driver: postgres
+  # 主机地址
+  host: localhost
+  # 端口
+  port: 5432
+  # 用户名
+  user: postgres
+  # 密码
+  password: postgres
+  # 数据库名
+  name: smart_locker
+  # SSL 模式: disable, require, verify-ca, verify-full
+  sslmode: disable
+  # 时区
+  timezone: Asia/Shanghai
+  # 最大空闲连接数
+  max_idle_conns: 10
+  # 最大打开连接数
+  max_open_conns: 100
+  # 连接最大生存时间 (分钟)
+  conn_max_lifetime: 60
+  # 是否启用日志
+  log_mode: true
+  # 慢查询阈值 (毫秒)
+  slow_threshold: 200
+
+# Redis 配置
+redis:
+  # 主机地址
+  host: localhost
+  # 端口
+  port: 6379
+  # 密码
+  password: redis123
+  # 数据库索引
+  db: 0
+  # 连接池大小
+  pool_size: 100
+  # 最小空闲连接数
+  min_idle_conns: 10
+  # 连接超时 (秒)
+  dial_timeout: 5
+  # 读取超时 (秒)
+  read_timeout: 3
+  # 写入超时 (秒)
+  write_timeout: 3
+
+# MQTT 配置
+mqtt:
+  # Broker 地址
+  broker: tcp://localhost:1883
+  # 客户端 ID 前缀
+  client_id_prefix: smart-locker-
+  # 用户名
+  username: ""
+  # 密码
+  password: ""
+  # 保持连接时间 (秒)
+  keep_alive: 60
+  # 自动重连
+  auto_reconnect: true
+  # 连接超时 (秒)
+  connect_timeout: 10
+  # 消息 QoS 级别: 0, 1, 2
+  qos: 1
+  # 是否保留消息
+  retained: false
+  # 主题前缀
+  topic_prefix: smart-locker/
+
+# JWT 配置
+jwt:
+  # 密钥 (生产环境必须更换)
+  secret: your-super-secret-key-change-in-production
+  # 访问令牌有效期 (小时)
+  access_token_expire: 168  # 7天
+  # 刷新令牌有效期 (小时)
+  refresh_token_expire: 720  # 30天
+  # 签发者
+  issuer: smart-locker
+
+# 加密配置
+crypto:
+  # AES-256-GCM 密钥 (32字节，Base64编码)
+  aes_key: your-32-bytes-aes-key-base64-encoded==
+  # 密码哈希成本
+  bcrypt_cost: 10
+
+# 短信服务配置 (阿里云)
+sms:
+  # 服务商: aliyun, tencent
+  provider: aliyun
+  # Access Key ID
+  access_key_id: your-access-key-id
+  # Access Key Secret
+  access_key_secret: your-access-key-secret
+  # 签名名称
+  sign_name: 爱上杜美人
+  # 模板 ID
+  template_id: SMS_123456789
+  # 验证码有效期 (分钟)
+  code_expire: 5
+  # 发送间隔 (秒)
+  send_interval: 60
+  # 每日发送限制
+  daily_limit: 10
+
+# 微信配置
+wechat:
+  # 小程序 App ID
+  app_id: your-wechat-app-id
+  # 小程序 App Secret
+  app_secret: your-wechat-app-secret
+  # 支付商户号
+  mch_id: your-wechat-mch-id
+  # 支付 API v3 密钥
+  api_v3_key: your-wechat-api-v3-key
+  # 商户证书序列号
+  serial_no: your-wechat-serial-no
+  # 商户私钥路径
+  private_key_path: ./certs/wechat/apiclient_key.pem
+  # 支付回调地址
+  notify_url: https://your-domain.com/api/v1/payment/wechat/callback
+
+# 支付宝配置
+alipay:
+  # App ID
+  app_id: your-alipay-app-id
+  # 应用私钥路径
+  private_key_path: ./certs/alipay/app_private_key.pem
+  # 支付宝公钥路径
+  alipay_public_key_path: ./certs/alipay/alipay_public_key.pem
+  # 是否沙箱环境
+  is_sandbox: false
+  # 支付回调地址
+  notify_url: https://your-domain.com/api/v1/payment/alipay/callback
+
+# 对象存储配置 (阿里云 OSS)
+oss:
+  # 服务商: aliyun, tencent
+  provider: aliyun
+  # Endpoint
+  endpoint: oss-cn-hangzhou.aliyuncs.com
+  # Access Key ID
+  access_key_id: your-access-key-id
+  # Access Key Secret
+  access_key_secret: your-access-key-secret
+  # Bucket 名称
+  bucket: your-bucket-name
+  # 自定义域名
+  custom_domain: https://cdn.your-domain.com
+  # 上传目录
+  upload_dir: uploads/
+
+# 日志配置
+logger:
+  # 日志级别: debug, info, warn, error
+  level: debug
+  # 日志格式: json, console
+  format: console
+  # 输出位置: stdout, file
+  output: stdout
+  # 日志文件路径
+  file_path: ./logs/app.log
+  # 最大文件大小 (MB)
+  max_size: 100
+  # 保留文件数量
+  max_backups: 10
+  # 保留天数
+  max_age: 30
+  # 是否压缩
+  compress: true
+  # 是否显示调用位置
+  caller: true
+
+# 监控配置
+metrics:
+  # 是否启用
+  enabled: true
+  # Prometheus 端口
+  port: 9100
+  # 路径
+  path: /metrics
+
+# 链路追踪配置
+tracing:
+  # 是否启用
+  enabled: true
+  # 服务名称
+  service_name: smart-locker-backend
+  # Jaeger 采集器地址
+  endpoint: http://localhost:14268/api/traces
+  # 采样率 (0.0 - 1.0)
+  sample_rate: 1.0
+
+# 限流配置
+ratelimit:
+  # 是否启用
+  enabled: true
+  # 每秒请求数
+  requests_per_second: 100
+  # 突发请求数
+  burst: 200
+
+# CORS 配置
+cors:
+  # 允许的来源
+  allowed_origins:
+    - http://localhost:3000
+    - http://localhost:8080
+    - https://your-domain.com
+  # 允许的方法
+  allowed_methods:
+    - GET
+    - POST
+    - PUT
+    - PATCH
+    - DELETE
+    - OPTIONS
+  # 允许的请求头
+  allowed_headers:
+    - Origin
+    - Content-Type
+    - Accept
+    - Authorization
+    - X-Request-ID
+  # 暴露的响应头
+  exposed_headers:
+    - X-Request-ID
+  # 是否允许携带凭证
+  allow_credentials: true
+  # 预检请求缓存时间 (秒)
+  max_age: 86400
+
+# 业务配置
+business:
+  # 租借配置
+  rental:
+    # 默认押金金额
+    default_deposit: 99.00
+    # 超时自动购买阈值 (小时)
+    auto_purchase_hours: 24
+    # 超时检查间隔 (分钟)
+    timeout_check_interval: 5
+
+  # 分销配置
+  distribution:
+    # 一级分销比例
+    level1_rate: 0.10
+    # 二级分销比例
+    level2_rate: 0.05
+    # 最大分销层级
+    max_level: 2
+    # 最低提现金额
+    min_withdraw_amount: 100.00
+
+  # 会员配置
+  member:
+    # 消费积分比例 (每消费1元获得积分)
+    points_rate: 1
+    # 积分抵扣比例 (多少积分抵扣1元)
+    points_to_money: 100

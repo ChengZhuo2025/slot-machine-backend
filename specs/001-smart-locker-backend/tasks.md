@@ -31,14 +31,14 @@
 
 **Purpose**: 项目基础结构和开发环境配置
 
-- [ ] T001 创建项目目录结构，按 plan.md 中的结构创建所有目录
-- [ ] T002 初始化 Go Module，创建 `go.mod` 文件
-- [ ] T003 [P] 添加核心依赖到 `go.mod`：gin, gorm, viper, jwt, redis, mqtt
-- [ ] T004 [P] 创建 Makefile 定义常用命令（build, run, test, lint, migrate）
-- [ ] T005 [P] 创建 `.gitignore` 文件
-- [ ] T006 [P] 配置 golangci-lint，创建 `.golangci.yml`
-- [ ] T007 [P] 创建 Docker Compose 开发环境配置 `deployments/docker/docker-compose.yml`
-- [ ] T008 创建配置文件模板 `configs/config.example.yaml`
+- [x] T001 创建项目目录结构，按 plan.md 中的结构创建所有目录
+- [x] T002 初始化 Go Module，创建 `go.mod` 文件
+- [x] T003 [P] 添加核心依赖到 `go.mod`：gin, gorm, viper, jwt, redis, mqtt
+- [x] T004 [P] 创建 Makefile 定义常用命令（build, run, test, lint, migrate）
+- [x] T005 [P] 创建 `.gitignore` 文件
+- [x] T006 [P] 配置 golangci-lint，创建 `.golangci.yml`
+- [x] T007 [P] 创建 Docker Compose 开发环境配置 `deployments/docker/docker-compose.yml`
+- [x] T008 创建配置文件模板 `configs/config.example.yaml`
 
 ---
 

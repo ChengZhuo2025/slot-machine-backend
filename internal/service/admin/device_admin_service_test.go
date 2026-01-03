@@ -583,3 +583,68 @@ func TestDeviceAdminService_toDeviceInfo(t *testing.T) {
 	assert.Equal(t, &signalStrength, info.SignalStrength)
 	assert.Equal(t, &batteryLevel, info.BatteryLevel)
 }
+
+func TestDeviceAdminService_RemoteUnlock_Success(t *testing.T) {
+	service, db, _ := setupDeviceAdminService(t)
+	ctx := context.Background()
+
+	venue := createTestVenue(t, db)
+	device := createTestDevice(t, db, "DEV_UNLOCK", venue)
+
+	err := service.RemoteUnlock(ctx, device.ID, 1001)
+	require.NoError(t, err)
+
+	var updated models.Device
+	require.NoError(t, db.First(&updated, device.ID).Error)
+	assert.Equal(t, int8(models.DeviceUnlocked), updated.LockStatus)
+
+	var logs []models.DeviceLog
+	require.NoError(t, db.Where("device_id = ? AND type = ?", device.ID, models.DeviceLogTypeUnlock).Find(&logs).Error)
+	require.Len(t, logs, 1)
+	require.NotNil(t, logs[0].OperatorType)
+	assert.Equal(t, models.DeviceLogOperatorAdmin, *logs[0].OperatorType)
+}
+
+func TestDeviceAdminService_RemoteUnlock_DeviceOffline(t *testing.T) {
+	service, db, _ := setupDeviceAdminService(t)
+	ctx := context.Background()
+
+	venue := createTestVenue(t, db)
+	device := createTestDevice(t, db, "DEV_UNLOCK_OFF", venue)
+	require.NoError(t, db.Model(device).Update("online_status", models.DeviceOffline).Error)
+
+	err := service.RemoteUnlock(ctx, device.ID, 1001)
+	assert.ErrorIs(t, err, ErrDeviceOffline)
+
+	var logs []models.DeviceLog
+	require.NoError(t, db.Where("device_id = ? AND type = ?", device.ID, models.DeviceLogTypeUnlock).Find(&logs).Error)
+	assert.Len(t, logs, 0)
+}
+
+func TestDeviceAdminService_RemoteLock_Success(t *testing.T) {
+	service, db, _ := setupDeviceAdminService(t)
+	ctx := context.Background()
+
+	venue := createTestVenue(t, db)
+	device := createTestDevice(t, db, "DEV_LOCK", venue)
+	require.NoError(t, db.Model(device).Update("lock_status", models.DeviceUnlocked).Error)
+
+	err := service.RemoteLock(ctx, device.ID, 1001)
+	require.NoError(t, err)
+
+	var updated models.Device
+	require.NoError(t, db.First(&updated, device.ID).Error)
+	assert.Equal(t, int8(models.DeviceLocked), updated.LockStatus)
+
+	var logs []models.DeviceLog
+	require.NoError(t, db.Where("device_id = ? AND type = ?", device.ID, models.DeviceLogTypeLock).Find(&logs).Error)
+	require.Len(t, logs, 1)
+}
+
+func TestDeviceAdminService_RemoteLock_DeviceNotFound(t *testing.T) {
+	service, _, _ := setupDeviceAdminService(t)
+	ctx := context.Background()
+
+	err := service.RemoteLock(ctx, 99999, 1001)
+	assert.ErrorIs(t, err, ErrDeviceNotFound)
+}

@@ -84,6 +84,8 @@ func TestOperationLogger_LogsAdminWriteOperations_WithActionMapping(t *testing.T
 
 	admin.POST("/devices", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"code": 0}) })
 	admin.PUT("/devices/:id/status", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"code": 0}) })
+	admin.POST("/devices/:id/unlock", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"code": 0}) })
+	admin.POST("/devices/:id/lock", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"code": 0}) })
 
 	body, _ := json.Marshal(map[string]interface{}{"device_no": "D001"})
 	req, _ := http.NewRequest("POST", "/api/admin/devices", bytes.NewBuffer(body))
@@ -107,5 +109,21 @@ func TestOperationLogger_LogsAdminWriteOperations_WithActionMapping(t *testing.T
 
 	log2 := waitForOperationLog(t, db, "module = ? AND action = ? AND target_id = ?", "device", "update_status", 123)
 	assert.Equal(t, int64(1), log2.AdminID)
+
+	req3, _ := http.NewRequest("POST", "/api/admin/devices/456/unlock", nil)
+	w3 := httptest.NewRecorder()
+	r.ServeHTTP(w3, req3)
+	require.Equal(t, http.StatusOK, w3.Code)
+
+	log3 := waitForOperationLog(t, db, "module = ? AND action = ? AND target_id = ?", "device", "remote_unlock", 456)
+	assert.Equal(t, int64(1), log3.AdminID)
+
+	req4, _ := http.NewRequest("POST", "/api/admin/devices/456/lock", nil)
+	w4 := httptest.NewRecorder()
+	r.ServeHTTP(w4, req4)
+	require.Equal(t, http.StatusOK, w4.Code)
+
+	log4 := waitForOperationLog(t, db, "module = ? AND action = ? AND target_id = ?", "device", "remote_lock", 456)
+	assert.Equal(t, int64(1), log4.AdminID)
 }
 

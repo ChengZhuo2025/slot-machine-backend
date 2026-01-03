@@ -376,6 +376,7 @@ func TestDeviceAPI_List_Success(t *testing.T) {
 	assert.Equal(t, float64(3), data["total"])
 }
 
+
 func TestDeviceAPI_List_WithFilters(t *testing.T) {
 	router, db, jwtManager := setupDeviceAPIRouter(t)
 
@@ -545,6 +546,7 @@ func TestDeviceAPI_GetStatistics_Success(t *testing.T) {
 	assert.Equal(t, float64(3), data["total"])
 }
 
+
 func TestDeviceAPI_GetLogs_Success(t *testing.T) {
 	router, db, jwtManager := setupDeviceAPIRouter(t)
 
@@ -578,6 +580,7 @@ func TestDeviceAPI_GetLogs_Success(t *testing.T) {
 	data := resp["data"].(map[string]interface{})
 	assert.Equal(t, float64(3), data["total"])
 }
+
 
 func TestDeviceAPI_CreateMaintenance_Success(t *testing.T) {
 	router, db, jwtManager := setupDeviceAPIRouter(t)
@@ -771,3 +774,78 @@ func TestDeviceAPI_ListMaintenance_Success(t *testing.T) {
 	data := resp["data"].(map[string]interface{})
 	assert.Equal(t, float64(3), data["total"])
 }
+
+func TestDeviceAPI_RemoteUnlock_Success(t *testing.T) {
+	router, db, jwtManager := setupDeviceAPIRouter(t)
+
+	token := createDeviceAPITestAdmin(t, db, jwtManager, "unlock_admin")
+	venue := createDeviceAPITestVenue(t, db)
+	device := createDeviceAPITestDevice(t, db, "DEV_API_UNLOCK", venue.ID)
+
+	req, _ := http.NewRequest("POST", "/api/v1/admin/devices/"+strconv.FormatInt(device.ID, 10)+"/unlock", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var resp map[string]interface{}
+	json.Unmarshal(w.Body.Bytes(), &resp)
+	assert.Equal(t, float64(0), resp["code"])
+
+	var updated models.Device
+	require.NoError(t, db.First(&updated, device.ID).Error)
+	assert.Equal(t, int8(models.DeviceUnlocked), updated.LockStatus)
+
+	var logs []models.DeviceLog
+	require.NoError(t, db.Where("device_id = ? AND type = ?", device.ID, models.DeviceLogTypeUnlock).Find(&logs).Error)
+	assert.Len(t, logs, 1)
+}
+
+func TestDeviceAPI_RemoteUnlock_DeviceOffline(t *testing.T) {
+	router, db, jwtManager := setupDeviceAPIRouter(t)
+
+	token := createDeviceAPITestAdmin(t, db, jwtManager, "unlock_offline_admin")
+	venue := createDeviceAPITestVenue(t, db)
+	device := createDeviceAPITestDevice(t, db, "DEV_API_UNLOCK_OFF", venue.ID)
+	require.NoError(t, db.Model(device).Update("online_status", models.DeviceOffline).Error)
+
+	req, _ := http.NewRequest("POST", "/api/v1/admin/devices/"+strconv.FormatInt(device.ID, 10)+"/unlock", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+
+	var updated models.Device
+	require.NoError(t, db.First(&updated, device.ID).Error)
+	assert.Equal(t, int8(models.DeviceLocked), updated.LockStatus)
+}
+
+func TestDeviceAPI_RemoteLock_Success(t *testing.T) {
+	router, db, jwtManager := setupDeviceAPIRouter(t)
+
+	token := createDeviceAPITestAdmin(t, db, jwtManager, "lock_admin")
+	venue := createDeviceAPITestVenue(t, db)
+	device := createDeviceAPITestDevice(t, db, "DEV_API_LOCK", venue.ID)
+	require.NoError(t, db.Model(device).Update("lock_status", models.DeviceUnlocked).Error)
+
+	req, _ := http.NewRequest("POST", "/api/v1/admin/devices/"+strconv.FormatInt(device.ID, 10)+"/lock", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var updated models.Device
+	require.NoError(t, db.First(&updated, device.ID).Error)
+	assert.Equal(t, int8(models.DeviceLocked), updated.LockStatus)
+
+	var logs []models.DeviceLog
+	require.NoError(t, db.Where("device_id = ? AND type = ?", device.ID, models.DeviceLogTypeLock).Find(&logs).Error)
+	assert.Len(t, logs, 1)
+}
+

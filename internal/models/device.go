@@ -152,3 +152,27 @@ const (
 	MaintenanceStatusInProgress = 0 // 进行中
 	MaintenanceStatusCompleted  = 1 // 已完成
 )
+
+// DeviceAlert 设备告警
+type DeviceAlert struct {
+	ID         int64      `gorm:"primaryKey;autoIncrement" json:"id"`
+	DeviceID   int64      `gorm:"index;not null" json:"device_id"`
+	Type       string     `gorm:"type:varchar(30);not null" json:"type"`
+	Level      string     `gorm:"type:varchar(10);not null" json:"level"`
+	Title      string     `gorm:"type:varchar(100);not null" json:"title"`
+	Content    string     `gorm:"type:text;not null" json:"content"`
+	IsResolved bool       `gorm:"not null;default:false" json:"is_resolved"`
+	ResolvedBy *int64     `json:"resolved_by,omitempty"`
+	ResolvedAt *time.Time `json:"resolved_at,omitempty"`
+	CreatedAt  time.Time  `gorm:"autoCreateTime;index" json:"created_at"`
+	UpdatedAt  time.Time  `gorm:"autoUpdateTime" json:"updated_at"`
+
+	// 关联
+	Device   *Device `gorm:"foreignKey:DeviceID" json:"device,omitempty"`
+	Resolver *Admin  `gorm:"foreignKey:ResolvedBy" json:"resolver,omitempty"`
+}
+
+// TableName 表名
+func (DeviceAlert) TableName() string {
+	return "device_alerts"
+}

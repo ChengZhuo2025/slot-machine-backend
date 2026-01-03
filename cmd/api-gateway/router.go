@@ -12,14 +12,18 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/dumeirei/smart-locker-backend/internal/common/config"
+	"github.com/dumeirei/smart-locker-backend/internal/common/crypto"
 	"github.com/dumeirei/smart-locker-backend/internal/common/jwt"
+	"github.com/dumeirei/smart-locker-backend/internal/common/middleware"
+	adminHandler "github.com/dumeirei/smart-locker-backend/internal/handler/admin"
 	authHandler "github.com/dumeirei/smart-locker-backend/internal/handler/auth"
 	deviceHandler "github.com/dumeirei/smart-locker-backend/internal/handler/device"
 	paymentHandler "github.com/dumeirei/smart-locker-backend/internal/handler/payment"
 	rentalHandler "github.com/dumeirei/smart-locker-backend/internal/handler/rental"
 	userHandler "github.com/dumeirei/smart-locker-backend/internal/handler/user"
-	"github.com/dumeirei/smart-locker-backend/internal/middleware"
+	userMiddleware "github.com/dumeirei/smart-locker-backend/internal/middleware"
 	"github.com/dumeirei/smart-locker-backend/internal/repository"
+	adminService "github.com/dumeirei/smart-locker-backend/internal/service/admin"
 	authService "github.com/dumeirei/smart-locker-backend/internal/service/auth"
 	deviceService "github.com/dumeirei/smart-locker-backend/internal/service/device"
 	paymentService "github.com/dumeirei/smart-locker-backend/internal/service/payment"
@@ -82,11 +86,11 @@ func setupRouter(
 	paymentH := paymentHandler.NewHandler(paymentSvc)
 
 	// 全局中间件
-	r.Use(middleware.Recovery(logger))
-	r.Use(middleware.RequestID())
-	r.Use(middleware.RealIP())
-	r.Use(middleware.CORS(nil))
-	r.Use(middleware.AccessLog(logger))
+	r.Use(userMiddleware.Recovery(logger))
+	r.Use(userMiddleware.RequestID())
+	r.Use(userMiddleware.RealIP())
+	r.Use(userMiddleware.CORS(nil))
+	r.Use(userMiddleware.AccessLog(logger))
 
 	// 健康检查（不需要认证）
 	r.GET("/health", healthHandler)
@@ -122,7 +126,7 @@ func setupRouter(
 
 		// 用户端接口（需要用户认证）
 		user := v1.Group("")
-		user.Use(middleware.UserAuth(jwtManager))
+		user.Use(userMiddleware.UserAuth(jwtManager))
 		{
 			// 认证保护路由
 			authH.RegisterProtectedRoutes(user)
@@ -193,41 +197,62 @@ func setupRouter(
 	// 管理后台 API
 	admin := r.Group("/api/admin")
 	{
-		// 管理员登录（公开）
-		admin.POST("/login", placeholderHandler("管理员登录"))
+		// 初始化管理员相关仓储
+		adminRepo := repository.NewAdminRepository(db)
+		roleRepo := repository.NewRoleRepository(db)
+		permissionRepo := repository.NewPermissionRepository(db)
+		merchantRepo := repository.NewMerchantRepository(db)
+		deviceLogRepo := repository.NewDeviceLogRepository(db)
+		deviceMaintenanceRepo := repository.NewDeviceMaintenanceRepository(db)
+		deviceAlertRepo := repository.NewDeviceAlertRepository(db)
+		operationLogRepo := repository.NewOperationLogRepository(db)
+
+		// 初始化 AES 加密器（用于敏感数据加密）
+		aesEncryptor, _ := crypto.NewAES(cfg.Crypto.AESKey)
+
+		// 初始化管理员服务
+		adminAuthSvc := adminService.NewAdminAuthService(adminRepo, jwtManager)
+		_ = adminService.NewPermissionService(roleRepo, permissionRepo, adminRepo)
+		deviceAdminSvc := adminService.NewDeviceAdminService(deviceRepo, deviceLogRepo, deviceMaintenanceRepo, venueRepo, nil)
+		venueAdminSvc := adminService.NewVenueAdminService(venueRepo, merchantRepo, deviceRepo)
+		merchantAdminSvc := adminService.NewMerchantAdminService(merchantRepo, aesEncryptor)
+		_ = adminService.NewDeviceAlertService(deviceRepo, deviceLogRepo, deviceAlertRepo) // 告警服务（后续集成使用）
+
+		// 初始化管理员处理器
+		adminAuthH := adminHandler.NewAuthHandler(adminAuthSvc)
+		deviceAdminH := adminHandler.NewDeviceHandler(deviceAdminSvc)
+		venueAdminH := adminHandler.NewVenueHandler(venueAdminSvc)
+		merchantAdminH := adminHandler.NewMerchantHandler(merchantAdminSvc)
+
+		// 操作日志中间件
+		operationLogger := middleware.NewOperationLogger(operationLogRepo)
+
+		// 管理员认证路由（公开）
+		adminAuthH.RegisterRoutes(admin)
 
 		// 需要管理员认证
 		adminAuth := admin.Group("")
-		adminAuth.Use(middleware.AdminAuth(jwtManager))
+		adminAuth.Use(userMiddleware.AdminAuth(jwtManager))
+		adminAuth.Use(operationLogger.Log())
 		{
-			// 管理员信息
-			adminAuth.GET("/profile", placeholderHandler("获取管理员信息"))
-			adminAuth.PUT("/profile", placeholderHandler("更新管理员信息"))
-			adminAuth.PUT("/password", placeholderHandler("修改密码"))
+			// 认证保护路由
+			adminAuthH.RegisterProtectedRoutes(adminAuth)
+
+			// 设备管理
+			deviceAdminH.RegisterRoutes(adminAuth)
+
+			// 场地管理
+			venueAdminH.RegisterRoutes(adminAuth)
+
+			// 商户管理
+			merchantAdminH.RegisterRoutes(adminAuth)
+
+			// 以下为尚未实现的接口占位
 
 			// 用户管理
 			adminAuth.GET("/users", placeholderHandler("获取用户列表"))
 			adminAuth.GET("/users/:id", placeholderHandler("获取用户详情"))
 			adminAuth.PUT("/users/:id/status", placeholderHandler("更新用户状态"))
-
-			// 设备管理
-			adminAuth.GET("/devices", placeholderHandler("获取设备列表"))
-			adminAuth.POST("/devices", placeholderHandler("添加设备"))
-			adminAuth.GET("/devices/:id", placeholderHandler("获取设备详情"))
-			adminAuth.PUT("/devices/:id", placeholderHandler("更新设备"))
-			adminAuth.DELETE("/devices/:id", placeholderHandler("删除设备"))
-			adminAuth.POST("/devices/:id/unlock", placeholderHandler("远程开锁"))
-
-			// 场地管理
-			adminAuth.GET("/venues", placeholderHandler("获取场地列表"))
-			adminAuth.POST("/venues", placeholderHandler("添加场地"))
-			adminAuth.PUT("/venues/:id", placeholderHandler("更新场地"))
-			adminAuth.DELETE("/venues/:id", placeholderHandler("删除场地"))
-
-			// 商户管理
-			adminAuth.GET("/merchants", placeholderHandler("获取商户列表"))
-			adminAuth.POST("/merchants", placeholderHandler("添加商户"))
-			adminAuth.PUT("/merchants/:id", placeholderHandler("更新商户"))
 
 			// 订单管理
 			adminAuth.GET("/orders", placeholderHandler("获取订单列表"))

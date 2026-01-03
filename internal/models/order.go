@@ -6,35 +6,35 @@ import (
 
 // Order 订单模型
 type Order struct {
-	ID              int64      `gorm:"primaryKey;autoIncrement" json:"id"`
-	OrderNo         string     `gorm:"type:varchar(64);uniqueIndex;not null" json:"order_no"`
-	UserID          int64      `gorm:"index;not null" json:"user_id"`
-	Type            string     `gorm:"type:varchar(20);not null" json:"type"`
-	Status          int8       `gorm:"type:smallint;not null;default:0" json:"status"`
-	TotalAmount     float64    `gorm:"type:decimal(12,2);not null" json:"total_amount"`
-	DiscountAmount  float64    `gorm:"type:decimal(12,2);not null;default:0" json:"discount_amount"`
-	ActualAmount    float64    `gorm:"type:decimal(12,2);not null" json:"actual_amount"`
-	CouponID        *int64     `json:"coupon_id,omitempty"`
-	AddressID       *int64     `json:"address_id,omitempty"`
-	ShippingFee     float64    `gorm:"type:decimal(10,2);not null;default:0" json:"shipping_fee"`
-	ShippingNo      *string    `gorm:"type:varchar(64)" json:"shipping_no,omitempty"`
-	ShippingCompany *string    `gorm:"type:varchar(50)" json:"shipping_company,omitempty"`
-	Remark          *string    `gorm:"type:varchar(255)" json:"remark,omitempty"`
-	PaidAt          *time.Time `json:"paid_at,omitempty"`
-	ShippedAt       *time.Time `json:"shipped_at,omitempty"`
-	CompletedAt     *time.Time `json:"completed_at,omitempty"`
-	CancelledAt     *time.Time `json:"cancelled_at,omitempty"`
-	CancelReason    *string    `gorm:"type:varchar(255)" json:"cancel_reason,omitempty"`
-	ExpiredAt       *time.Time `json:"expired_at,omitempty"`
-	CreatedAt       time.Time  `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt       time.Time  `gorm:"autoUpdateTime" json:"updated_at"`
+	ID             int64      `gorm:"primaryKey;autoIncrement" json:"id"`
+	OrderNo        string     `gorm:"column:order_no;type:varchar(64);uniqueIndex;not null" json:"order_no"`
+	UserID         int64      `gorm:"column:user_id;index;not null" json:"user_id"`
+	Type           string     `gorm:"column:type;type:varchar(20);not null" json:"type"`
+	OriginalAmount float64    `gorm:"column:original_amount;type:decimal(12,2);not null" json:"original_amount"`
+	DiscountAmount float64    `gorm:"column:discount_amount;type:decimal(12,2);not null;default:0" json:"discount_amount"`
+	ActualAmount   float64    `gorm:"column:actual_amount;type:decimal(12,2);not null" json:"actual_amount"`
+	DepositAmount  float64    `gorm:"column:deposit_amount;type:decimal(12,2);not null;default:0" json:"deposit_amount"`
+	Status         string     `gorm:"column:status;type:varchar(20);not null" json:"status"`
+	CouponID       *int64     `gorm:"column:coupon_id" json:"coupon_id,omitempty"`
+	Remark         *string    `gorm:"column:remark;type:varchar(255)" json:"remark,omitempty"`
+	AddressID      *int64     `gorm:"column:address_id" json:"address_id,omitempty"`
+	ExpressCompany *string    `gorm:"column:express_company;type:varchar(50)" json:"express_company,omitempty"`
+	ExpressNo      *string    `gorm:"column:express_no;type:varchar(64)" json:"express_no,omitempty"`
+	ShippedAt      *time.Time `gorm:"column:shipped_at" json:"shipped_at,omitempty"`
+	ReceivedAt     *time.Time `gorm:"column:received_at" json:"received_at,omitempty"`
+	PaidAt         *time.Time `gorm:"column:paid_at" json:"paid_at,omitempty"`
+	CompletedAt    *time.Time `gorm:"column:completed_at" json:"completed_at,omitempty"`
+	CancelledAt    *time.Time `gorm:"column:cancelled_at" json:"cancelled_at,omitempty"`
+	CancelReason   *string    `gorm:"column:cancel_reason;type:varchar(255)" json:"cancel_reason,omitempty"`
+	CreatedAt      time.Time  `gorm:"column:created_at;autoCreateTime" json:"created_at"`
+	UpdatedAt      time.Time  `gorm:"column:updated_at;autoUpdateTime" json:"updated_at"`
 
 	// 关联
-	User      *User       `gorm:"foreignKey:UserID" json:"user,omitempty"`
-	Coupon    *Coupon     `gorm:"foreignKey:CouponID" json:"coupon,omitempty"`
-	Address   *Address    `gorm:"foreignKey:AddressID" json:"address,omitempty"`
-	Items     []OrderItem `gorm:"foreignKey:OrderID" json:"items,omitempty"`
-	Payments  []Payment   `gorm:"foreignKey:OrderID" json:"payments,omitempty"`
+	User     *User       `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	Coupon   *Coupon     `gorm:"foreignKey:CouponID" json:"coupon,omitempty"`
+	Address  *Address    `gorm:"foreignKey:AddressID" json:"address,omitempty"`
+	Items    []OrderItem `gorm:"foreignKey:OrderID" json:"items,omitempty"`
+	Payments []Payment   `gorm:"foreignKey:OrderID" json:"payments,omitempty"`
 }
 
 // TableName 表名
@@ -51,14 +51,14 @@ const (
 
 // OrderStatus 订单状态
 const (
-	OrderStatusPending    = 0 // 待支付
-	OrderStatusPaid       = 1 // 已支付
-	OrderStatusShipping   = 2 // 配送中
-	OrderStatusDelivered  = 3 // 已送达
-	OrderStatusCompleted  = 4 // 已完成
-	OrderStatusCancelled  = 5 // 已取消
-	OrderStatusRefunding  = 6 // 退款中
-	OrderStatusRefunded   = 7 // 已退款
+	OrderStatusPending   = "pending"   // 待支付
+	OrderStatusPaid      = "paid"      // 已支付
+	OrderStatusShipping  = "shipping"  // 配送中
+	OrderStatusDelivered = "delivered" // 已送达
+	OrderStatusCompleted = "completed" // 已完成
+	OrderStatusCancelled = "cancelled" // 已取消
+	OrderStatusRefunding = "refunding" // 退款中
+	OrderStatusRefunded  = "refunded"  // 已退款
 )
 
 // OrderItem 订单项
@@ -87,31 +87,28 @@ func (OrderItem) TableName() string {
 
 // Rental 租借订单
 type Rental struct {
-	ID             int64      `gorm:"primaryKey;autoIncrement" json:"id"`
-	RentalNo       string     `gorm:"type:varchar(64);uniqueIndex;not null" json:"rental_no"`
-	UserID         int64      `gorm:"index;not null" json:"user_id"`
-	DeviceID       int64      `gorm:"index;not null" json:"device_id"`
-	SlotNo         *int       `json:"slot_no,omitempty"`
-	PricingID      int64      `gorm:"not null" json:"pricing_id"`
-	Status         int8       `gorm:"type:smallint;not null;default:0" json:"status"`
-	StartTime      *time.Time `json:"start_time,omitempty"`
-	EndTime        *time.Time `json:"end_time,omitempty"`
-	Duration       *int       `json:"duration,omitempty"`
-	UnitPrice      float64    `gorm:"type:decimal(10,2);not null" json:"unit_price"`
-	DepositAmount  float64    `gorm:"type:decimal(10,2);not null;default:0" json:"deposit_amount"`
-	RentalAmount   float64    `gorm:"type:decimal(10,2);not null;default:0" json:"rental_amount"`
-	DiscountAmount float64    `gorm:"type:decimal(10,2);not null;default:0" json:"discount_amount"`
-	ActualAmount   float64    `gorm:"type:decimal(10,2);not null;default:0" json:"actual_amount"`
-	RefundAmount   float64    `gorm:"type:decimal(10,2);not null;default:0" json:"refund_amount"`
-	PaidAt         *time.Time `json:"paid_at,omitempty"`
-	ReturnedAt     *time.Time `json:"returned_at,omitempty"`
-	CreatedAt      time.Time  `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt      time.Time  `gorm:"autoUpdateTime" json:"updated_at"`
+	ID                int64      `gorm:"primaryKey;autoIncrement" json:"id"`
+	OrderID           int64      `gorm:"column:order_id;uniqueIndex;not null" json:"order_id"`
+	UserID            int64      `gorm:"column:user_id;index;not null" json:"user_id"`
+	DeviceID          int64      `gorm:"column:device_id;index;not null" json:"device_id"`
+	DurationHours     int        `gorm:"column:duration_hours;not null" json:"duration_hours"`
+	RentalFee         float64    `gorm:"column:rental_fee;type:decimal(10,2);not null" json:"rental_fee"`
+	Deposit           float64    `gorm:"column:deposit;type:decimal(10,2);not null" json:"deposit"`
+	OvertimeRate      float64    `gorm:"column:overtime_rate;type:decimal(10,2);not null" json:"overtime_rate"`
+	OvertimeFee       float64    `gorm:"column:overtime_fee;type:decimal(10,2);not null;default:0" json:"overtime_fee"`
+	Status            string     `gorm:"column:status;type:varchar(20);not null" json:"status"`
+	UnlockedAt        *time.Time `gorm:"column:unlocked_at" json:"unlocked_at,omitempty"`
+	ExpectedReturnAt  *time.Time `gorm:"column:expected_return_at" json:"expected_return_at,omitempty"`
+	ReturnedAt        *time.Time `gorm:"column:returned_at" json:"returned_at,omitempty"`
+	IsPurchased       bool       `gorm:"column:is_purchased;not null;default:false" json:"is_purchased"`
+	PurchasedAt       *time.Time `gorm:"column:purchased_at" json:"purchased_at,omitempty"`
+	CreatedAt         time.Time  `gorm:"column:created_at;autoCreateTime" json:"created_at"`
+	UpdatedAt         time.Time  `gorm:"column:updated_at;autoUpdateTime" json:"updated_at"`
 
 	// 关联
-	User    *User          `gorm:"foreignKey:UserID" json:"user,omitempty"`
-	Device  *Device        `gorm:"foreignKey:DeviceID" json:"device,omitempty"`
-	Pricing *RentalPricing `gorm:"foreignKey:PricingID" json:"pricing,omitempty"`
+	Order  *Order  `gorm:"foreignKey:OrderID" json:"order,omitempty"`
+	User   *User   `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	Device *Device `gorm:"foreignKey:DeviceID" json:"device,omitempty"`
 }
 
 // TableName 表名
@@ -119,50 +116,35 @@ func (Rental) TableName() string {
 	return "rentals"
 }
 
-// RentalStatus 租借状态
+// RentalStatus 租借状态(字符串)
 const (
-	RentalStatusPending   = 0 // 待支付
-	RentalStatusPaid      = 1 // 已支付(待取货)
-	RentalStatusInUse     = 2 // 使用中
-	RentalStatusReturned  = 3 // 已归还
-	RentalStatusCompleted = 4 // 已完成
-	RentalStatusCancelled = 5 // 已取消
-	RentalStatusOverdue   = 6 // 超时未还
+	RentalStatusPending   = "pending"    // 待支付
+	RentalStatusPaid      = "paid"       // 已支付(待取货)
+	RentalStatusInUse     = "in_use"     // 使用中
+	RentalStatusReturned  = "returned"   // 已归还
+	RentalStatusCompleted = "completed"  // 已完成
+	RentalStatusCancelled = "cancelled"  // 已取消
+	RentalStatusRefunding = "refunding"  // 退款中
+	RentalStatusRefunded  = "refunded"   // 已退款
 )
 
 // RentalPricing 租借定价
 type RentalPricing struct {
-	ID           int64     `gorm:"primaryKey;autoIncrement" json:"id"`
-	DeviceID     int64     `gorm:"index;not null" json:"device_id"`
-	Name         string    `gorm:"type:varchar(50);not null" json:"name"`
-	Duration     int       `gorm:"not null" json:"duration"`
-	DurationUnit string    `gorm:"type:varchar(10);not null;default:'hour'" json:"duration_unit"`
-	Price        float64   `gorm:"type:decimal(10,2);not null" json:"price"`
-	OriginalPrice *float64 `gorm:"type:decimal(10,2)" json:"original_price,omitempty"`
-	Deposit      float64   `gorm:"type:decimal(10,2);not null;default:0" json:"deposit"`
-	IsDefault    bool      `gorm:"not null;default:false" json:"is_default"`
-	Sort         int       `gorm:"not null;default:0" json:"sort"`
-	Status       int8      `gorm:"type:smallint;not null;default:1" json:"status"`
-	CreatedAt    time.Time `gorm:"autoCreateTime" json:"created_at"`
+	ID            int64     `gorm:"primaryKey;autoIncrement" json:"id"`
+	VenueID       *int64    `gorm:"column:venue_id;index" json:"venue_id,omitempty"`
+	DurationHours int       `gorm:"column:duration_hours;not null" json:"duration_hours"`
+	Price         float64   `gorm:"type:decimal(10,2);not null" json:"price"`
+	Deposit       float64   `gorm:"type:decimal(10,2);not null" json:"deposit"`
+	OvertimeRate  float64   `gorm:"column:overtime_rate;type:decimal(10,2);not null" json:"overtime_rate"`
+	IsActive      bool      `gorm:"column:is_active;not null;default:true" json:"is_active"`
+	CreatedAt     time.Time `gorm:"column:created_at;autoCreateTime" json:"created_at"`
+	UpdatedAt     time.Time `gorm:"column:updated_at;autoUpdateTime" json:"updated_at"`
 
 	// 关联
-	Device *Device `gorm:"foreignKey:DeviceID" json:"device,omitempty"`
+	Venue *Venue `gorm:"foreignKey:VenueID" json:"venue,omitempty"`
 }
 
 // TableName 表名
 func (RentalPricing) TableName() string {
 	return "rental_pricings"
 }
-
-// DurationUnit 时长单位
-const (
-	DurationUnitMinute = "minute" // 分钟
-	DurationUnitHour   = "hour"   // 小时
-	DurationUnitDay    = "day"    // 天
-)
-
-// RentalPricingStatus 定价状态
-const (
-	RentalPricingStatusDisabled = 0 // 禁用
-	RentalPricingStatusActive   = 1 // 启用
-)

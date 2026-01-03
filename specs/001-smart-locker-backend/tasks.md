@@ -202,51 +202,51 @@
 
 ### 管理员认证
 
-- [ ] T093 [US2] 实现管理员 Repository `internal/repository/admin_repo.go`
-- [ ] T094 [US2] 实现管理员登录服务 `internal/service/admin/admin_auth_service.go`
-- [ ] T095 [US2] 实现管理员认证 API Handler `internal/handler/admin/auth_handler.go`
+- [x] T093 [US2] 实现管理员 Repository `internal/repository/admin_repo.go`
+- [x] T094 [US2] 实现管理员登录服务 `internal/service/admin/admin_auth_service.go`
+- [x] T095 [US2] 实现管理员认证 API Handler `internal/handler/admin/auth_handler.go`
 
 ### 权限管理
 
-- [ ] T096 [US2] 实现角色权限 Repository `internal/repository/role_repo.go`
-- [ ] T097 [US2] 实现权限服务 `internal/service/admin/permission_service.go`
+- [x] T096 [US2] 实现角色权限 Repository `internal/repository/role_repo.go`
+- [x] T097 [US2] 实现权限服务 `internal/service/admin/permission_service.go`
 
 ### 设备管理（管理端）
 
-- [ ] T098 [P] [US2] 定义 DeviceLog/DeviceMaintenance 模型 `internal/models/device_log.go`
-- [ ] T099 [US2] 实现设备日志 Repository `internal/repository/device_log_repo.go`
-- [ ] T100 [US2] 实现设备管理服务（CRUD/远程控制）`internal/service/admin/device_admin_service.go`
-- [ ] T101 [US2] 实现设备管理 API Handler `internal/handler/admin/device_handler.go`
+- [x] T098 [P] [US2] 定义 DeviceLog/DeviceMaintenance 模型 `internal/models/device_log.go`
+- [x] T099 [US2] 实现设备日志 Repository `internal/repository/device_log_repo.go`
+- [x] T100 [US2] 实现设备管理服务（CRUD/远程控制）`internal/service/admin/device_admin_service.go`
+- [x] T101 [US2] 实现设备管理 API Handler `internal/handler/admin/device_handler.go`
 
 ### 场地管理
 
-- [ ] T102 [US2] 实现场地管理服务 `internal/service/admin/venue_admin_service.go`
-- [ ] T103 [US2] 实现场地管理 API Handler `internal/handler/admin/venue_handler.go`
+- [x] T102 [US2] 实现场地管理服务 `internal/service/admin/venue_admin_service.go`
+- [x] T103 [US2] 实现场地管理 API Handler `internal/handler/admin/venue_handler.go`
 
 ### 商户管理
 
-- [ ] T104 [US2] 实现商户 Repository `internal/repository/merchant_repo.go`
-- [ ] T105 [US2] 实现商户管理服务 `internal/service/admin/merchant_admin_service.go`
-- [ ] T106 [US2] 实现商户管理 API Handler `internal/handler/admin/merchant_handler.go`
+- [x] T104 [US2] 实现商户 Repository `internal/repository/merchant_repo.go`
+- [x] T105 [US2] 实现商户管理服务 `internal/service/admin/merchant_admin_service.go`
+- [x] T106 [US2] 实现商户管理 API Handler `internal/handler/admin/merchant_handler.go`
 
 ### 二维码生成
 
-- [ ] T107 [US2] 实现二维码生成工具 `pkg/qrcode/generator.go`
-- [ ] T108 [US2] 实现设备二维码生成逻辑 `internal/service/device/qrcode_service.go`
+- [x] T107 [US2] 实现二维码生成工具 `pkg/qrcode/generator.go`
+- [x] T108 [US2] 实现设备二维码生成逻辑 `internal/service/device/qrcode_service.go`
 
 ### 设备告警
 
-- [ ] T109 [US2] 实现设备异常告警服务 `internal/service/device/alert_service.go`
+- [x] T109 [US2] 实现设备异常告警服务 `internal/service/device/alert_service.go`
 
 ### 操作日志
 
-- [ ] T110 [P] [US2] 定义 OperationLog 模型 `internal/models/operation_log.go`
-- [ ] T111 [US2] 实现操作日志 Repository `internal/repository/operation_log_repo.go`
-- [ ] T112 [US2] 实现操作日志中间件 `internal/common/middleware/operation_log.go`
+- [x] T110 [P] [US2] 定义 OperationLog 模型 `internal/models/operation_log.go`
+- [x] T111 [US2] 实现操作日志 Repository `internal/repository/operation_log_repo.go`
+- [x] T112 [US2] 实现操作日志中间件 `internal/common/middleware/operation_log.go`
 
 ### 路由注册
 
-- [ ] T113 [US2] 注册 User Story 2 所有管理端路由
+- [x] T113 [US2] 注册 User Story 2 所有管理端路由
 
 **Checkpoint**: User Story 2 完成，管理员可监控和管理设备
 

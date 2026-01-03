@@ -63,14 +63,11 @@ type VenueInfo struct {
 
 // PricingInfo 定价信息
 type PricingInfo struct {
-	ID            int64    `json:"id"`
-	Name          string   `json:"name"`
-	Duration      int      `json:"duration"`
-	DurationUnit  string   `json:"duration_unit"`
-	Price         float64  `json:"price"`
-	OriginalPrice *float64 `json:"original_price,omitempty"`
-	Deposit       float64  `json:"deposit"`
-	IsDefault     bool     `json:"is_default"`
+	ID            int64   `json:"id"`
+	DurationHours int     `json:"duration_hours"`
+	Price         float64 `json:"price"`
+	Deposit       float64 `json:"deposit"`
+	OvertimeRate  float64 `json:"overtime_rate"`
 }
 
 // GetDeviceByQRCode 根据二维码获取设备信息
@@ -175,19 +172,16 @@ func (s *DeviceService) GetPricing(ctx context.Context, pricingID int64) (*Prici
 		return nil, errors.ErrDatabaseError.WithError(err)
 	}
 
-	if pricing.Status != models.RentalPricingStatusActive {
+	if !pricing.IsActive {
 		return nil, errors.ErrPricingNotFound
 	}
 
 	return &PricingInfo{
 		ID:            pricing.ID,
-		Name:          pricing.Name,
-		Duration:      pricing.Duration,
-		DurationUnit:  pricing.DurationUnit,
+		DurationHours: pricing.DurationHours,
 		Price:         pricing.Price,
-		OriginalPrice: pricing.OriginalPrice,
 		Deposit:       pricing.Deposit,
-		IsDefault:     pricing.IsDefault,
+		OvertimeRate:  pricing.OvertimeRate,
 	}, nil
 }
 
@@ -202,13 +196,10 @@ func (s *DeviceService) GetDevicePricings(ctx context.Context, deviceID int64) (
 	for i, p := range pricings {
 		result[i] = PricingInfo{
 			ID:            p.ID,
-			Name:          p.Name,
-			Duration:      p.Duration,
-			DurationUnit:  p.DurationUnit,
+			DurationHours: p.DurationHours,
 			Price:         p.Price,
-			OriginalPrice: p.OriginalPrice,
 			Deposit:       p.Deposit,
-			IsDefault:     p.IsDefault,
+			OvertimeRate:  p.OvertimeRate,
 		}
 	}
 
@@ -368,13 +359,10 @@ func (s *DeviceService) toDeviceInfo(device *models.Device, pricings []*models.R
 		for i, p := range pricings {
 			info.Pricings[i] = PricingInfo{
 				ID:            p.ID,
-				Name:          p.Name,
-				Duration:      p.Duration,
-				DurationUnit:  p.DurationUnit,
+				DurationHours: p.DurationHours,
 				Price:         p.Price,
-				OriginalPrice: p.OriginalPrice,
 				Deposit:       p.Deposit,
-				IsDefault:     p.IsDefault,
+				OvertimeRate:  p.OvertimeRate,
 			}
 		}
 	}

@@ -248,12 +248,9 @@ func (h *Handler) ListRentals(c *gin.Context) {
 	pagination.PageSize, _ = strconv.Atoi(c.DefaultQuery("page_size", "10"))
 	pagination.Normalize()
 
-	var status *int8
+	var status *string
 	if statusStr := c.Query("status"); statusStr != "" {
-		if s, err := strconv.Atoi(statusStr); err == nil {
-			st := int8(s)
-			status = &st
-		}
+		status = &statusStr
 	}
 
 	rentals, total, err := h.rentalService.ListRentals(

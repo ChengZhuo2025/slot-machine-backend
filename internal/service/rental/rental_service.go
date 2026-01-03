@@ -53,22 +53,21 @@ type CreateRentalRequest struct {
 
 // RentalInfo 租借信息
 type RentalInfo struct {
-	ID             int64                    `json:"id"`
-	RentalNo       string                   `json:"rental_no"`
-	Status         int8                     `json:"status"`
-	StatusName     string                   `json:"status_name"`
-	Device         *deviceService.DeviceInfo `json:"device,omitempty"`
-	Pricing        *deviceService.PricingInfo `json:"pricing,omitempty"`
-	StartTime      *time.Time               `json:"start_time,omitempty"`
-	EndTime        *time.Time               `json:"end_time,omitempty"`
-	Duration       *int                     `json:"duration,omitempty"`
-	UnitPrice      float64                  `json:"unit_price"`
-	DepositAmount  float64                  `json:"deposit_amount"`
-	RentalAmount   float64                  `json:"rental_amount"`
-	DiscountAmount float64                  `json:"discount_amount"`
-	ActualAmount   float64                  `json:"actual_amount"`
-	RefundAmount   float64                  `json:"refund_amount"`
-	CreatedAt      time.Time                `json:"created_at"`
+	ID               int64                     `json:"id"`
+	OrderID          int64                     `json:"order_id"`
+	Status           string                    `json:"status"`
+	StatusName       string                    `json:"status_name"`
+	Device           *deviceService.DeviceInfo  `json:"device,omitempty"`
+	DurationHours    int                       `json:"duration_hours"`
+	RentalFee        float64                   `json:"rental_fee"`
+	Deposit          float64                   `json:"deposit"`
+	OvertimeRate     float64                   `json:"overtime_rate"`
+	OvertimeFee      float64                   `json:"overtime_fee"`
+	UnlockedAt       *time.Time                `json:"unlocked_at,omitempty"`
+	ExpectedReturnAt *time.Time                `json:"expected_return_at,omitempty"`
+	ReturnedAt       *time.Time                `json:"returned_at,omitempty"`
+	IsPurchased      bool                      `json:"is_purchased"`
+	CreatedAt        time.Time                 `json:"created_at"`
 }
 
 // CreateRental 创建租借订单
@@ -96,46 +95,54 @@ func (s *RentalService) CreateRental(ctx context.Context, userID int64, req *Cre
 		return nil, errors.ErrDatabaseError.WithError(err)
 	}
 
-	if pricing.DeviceID != req.DeviceID {
-		return nil, errors.ErrInvalidParams.WithMessage("定价方案不属于该设备")
-	}
-
-	if pricing.Status != models.RentalPricingStatusActive {
+	if !pricing.IsActive {
 		return nil, errors.ErrPricingNotFound
 	}
 
-	// 检查用户余额是否足够支付押金
+	// 计算总金额
 	totalAmount := pricing.Price + pricing.Deposit
-	sufficient, err := s.walletService.CheckBalance(ctx, userID, totalAmount)
-	if err != nil {
-		return nil, errors.ErrDatabaseError.WithError(err)
-	}
-	if !sufficient {
-		return nil, errors.ErrBalanceInsufficient
-	}
 
-	// 创建租借订单
-	rentalNo := utils.GenerateOrderNo("R")
-	rental := &models.Rental{
-		RentalNo:      rentalNo,
-		UserID:        userID,
-		DeviceID:      req.DeviceID,
-		PricingID:     req.PricingID,
-		Status:        models.RentalStatusPending,
-		UnitPrice:     pricing.Price,
-		DepositAmount: pricing.Deposit,
-		RentalAmount:  pricing.Price,
-		ActualAmount:  totalAmount,
-	}
+	// 使用事务创建Order和Rental
+	var rental *models.Rental
+	var order *models.Order
 
-	// 使用事务
 	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		// 创建租借订单
+		// 1. 创建Order记录
+		orderNo := utils.GenerateOrderNo("O")
+		order = &models.Order{
+			OrderNo:        orderNo,
+			UserID:         userID,
+			Type:           "rental",
+			OriginalAmount: totalAmount,
+			DiscountAmount: 0,
+			ActualAmount:   totalAmount,
+			Status:         models.OrderStatusPending,
+		}
+
+		if err := tx.Create(order).Error; err != nil {
+			return err
+		}
+
+		// 2. 创建Rental记录
+		expectedReturn := time.Now().Add(time.Duration(pricing.DurationHours) * time.Hour)
+		rental = &models.Rental{
+			OrderID:          order.ID,
+			UserID:           userID,
+			DeviceID:         req.DeviceID,
+			DurationHours:    pricing.DurationHours,
+			RentalFee:        pricing.Price,
+			Deposit:          pricing.Deposit,
+			OvertimeRate:     pricing.OvertimeRate,
+			OvertimeFee:      0,
+			Status:           models.RentalStatusPending,
+			ExpectedReturnAt: &expectedReturn,
+		}
+
 		if err := tx.Create(rental).Error; err != nil {
 			return err
 		}
 
-		// 减少设备可用槽位（预占）
+		// 3. 减少设备可用槽位（预占）
 		result := tx.Model(&models.Device{}).
 			Where("id = ? AND available_slots > 0", req.DeviceID).
 			UpdateColumn("available_slots", gorm.Expr("available_slots - 1"))
@@ -179,26 +186,35 @@ func (s *RentalService) PayRental(ctx context.Context, userID int64, rentalID in
 			return errors.ErrRentalStatusError
 		}
 
-		// 冻结押金 + 扣除租金
-		if rental.DepositAmount > 0 {
-			if err := s.walletService.FreezeDeposit(ctx, userID, rental.DepositAmount, rental.RentalNo); err != nil {
+		// TODO: 对接钱包服务 - 冻结押金 + 扣除租金
+		// 临时注释,等钱包服务适配新字段后再启用
+		/*
+		if rental.Deposit > 0 {
+			orderNo := fmt.Sprintf("R%d", rental.OrderID)
+			if err := s.walletService.FreezeDeposit(ctx, userID, rental.Deposit, orderNo); err != nil {
 				return err
 			}
 		}
 
-		if rental.RentalAmount > 0 {
-			if err := s.walletService.Consume(ctx, userID, rental.RentalAmount, rental.RentalNo); err != nil {
+		if rental.RentalFee > 0 {
+			orderNo := fmt.Sprintf("R%d", rental.OrderID)
+			if err := s.walletService.Consume(ctx, userID, rental.RentalFee, orderNo); err != nil {
 				return err
 			}
 		}
+		*/
 
 		// 更新订单状态
-		now := time.Now()
 		updates := map[string]interface{}{
-			"status":  models.RentalStatusPaid,
-			"paid_at": now,
+			"status": models.RentalStatusPaid,
 		}
 		if err := tx.Model(rental).Updates(updates).Error; err != nil {
+			return errors.ErrDatabaseError.WithError(err)
+		}
+
+		// 同时更新Order状态
+		if err := tx.Model(&models.Order{}).Where("id = ?", rental.OrderID).
+			Update("status", models.OrderStatusPaid).Error; err != nil {
 			return errors.ErrDatabaseError.WithError(err)
 		}
 
@@ -225,45 +241,29 @@ func (s *RentalService) StartRental(ctx context.Context, userID int64, rentalID 
 			return errors.ErrRentalStatusError
 		}
 
-		// 获取设备信息
-		device, err := s.deviceRepo.GetByID(ctx, rental.DeviceID)
+		// 获取设备信息(用于后续MQTT命令)
+		_, err = s.deviceRepo.GetByID(ctx, rental.DeviceID)
 		if err != nil {
 			return errors.ErrDeviceNotFound
 		}
 
-		// 发送开锁命令
+		// TODO: 发送开锁命令 (MQTT服务集成)
+		// 临时注释,等MQTT服务完善后启用
+		/*
 		if s.mqttService != nil {
-			_, err := s.mqttService.SendUnlockCommand(ctx, device.DeviceNo, rental.SlotNo)
+			_, err := s.mqttService.SendUnlockCommand(ctx, device.DeviceNo, nil)
 			if err != nil {
 				return errors.ErrUnlockFailed.WithError(err)
 			}
 		}
-
-		// 获取定价信息计算结束时间
-		pricing, _ := s.deviceRepo.GetPricingByID(ctx, rental.PricingID)
+		*/
 
 		now := time.Now()
-		var endTime time.Time
-		if pricing != nil {
-			switch pricing.DurationUnit {
-			case models.DurationUnitMinute:
-				endTime = now.Add(time.Duration(pricing.Duration) * time.Minute)
-			case models.DurationUnitHour:
-				endTime = now.Add(time.Duration(pricing.Duration) * time.Hour)
-			case models.DurationUnitDay:
-				endTime = now.AddDate(0, 0, pricing.Duration)
-			default:
-				endTime = now.Add(time.Duration(pricing.Duration) * time.Hour)
-			}
-		} else {
-			endTime = now.Add(24 * time.Hour) // 默认 24 小时
-		}
 
-		// 更新订单状态
+		// 更新租借状态
 		updates := map[string]interface{}{
-			"status":     models.RentalStatusInUse,
-			"start_time": now,
-			"end_time":   endTime,
+			"status":      models.RentalStatusInUse,
+			"unlocked_at": now,
 		}
 		if err := tx.Model(rental).Updates(updates).Error; err != nil {
 			return errors.ErrDatabaseError.WithError(err)
@@ -300,33 +300,26 @@ func (s *RentalService) ReturnRental(ctx context.Context, userID int64, rentalID
 			return errors.ErrRentalStatusError
 		}
 
-		// 获取设备信息
-		device, err := s.deviceRepo.GetByID(ctx, rental.DeviceID)
-		if err != nil {
-			return errors.ErrDeviceNotFound
-		}
+		// TODO: MQTT开锁命令(归还时)
+		now := time.Now()
 
-		// 发送开锁命令（用于归还）
-		if s.mqttService != nil {
-			_, err := s.mqttService.SendUnlockCommand(ctx, device.DeviceNo, rental.SlotNo)
-			if err != nil {
-				return errors.ErrUnlockFailed.WithError(err)
+		// 计算超时费用
+		var overtimeFee float64
+		if rental.ExpectedReturnAt != nil && now.After(*rental.ExpectedReturnAt) {
+			// 超时,计算超时费用
+			overtimeHours := int(now.Sub(*rental.ExpectedReturnAt).Hours()) + 1
+			overtimeFee = float64(overtimeHours) * rental.OvertimeRate
+			// 超时费用不能超过押金
+			if overtimeFee > rental.Deposit {
+				overtimeFee = rental.Deposit
 			}
 		}
 
-		now := time.Now()
-
-		// 计算实际使用时长（分钟）
-		var duration int
-		if rental.StartTime != nil {
-			duration = int(now.Sub(*rental.StartTime).Minutes())
-		}
-
-		// 更新订单状态
+		// 更新租借状态
 		updates := map[string]interface{}{
-			"status":      models.RentalStatusReturned,
-			"returned_at": now,
-			"duration":    duration,
+			"status":       models.RentalStatusReturned,
+			"returned_at":  now,
+			"overtime_fee": overtimeFee,
 		}
 		if err := tx.Model(rental).Updates(updates).Error; err != nil {
 			return errors.ErrDatabaseError.WithError(err)
@@ -340,6 +333,8 @@ func (s *RentalService) ReturnRental(ctx context.Context, userID int64, rentalID
 		}).Error; err != nil {
 			return errors.ErrDatabaseError.WithError(err)
 		}
+
+		// TODO: 钱包服务 - 退还押金或扣除超时费
 
 		return nil
 	})
@@ -360,46 +355,19 @@ func (s *RentalService) CompleteRental(ctx context.Context, rentalID int64) erro
 			return errors.ErrRentalStatusError
 		}
 
-		// 检查是否超时，计算额外费用
-		var overdueAmount float64
-		if rental.EndTime != nil && rental.ReturnedAt != nil {
-			if rental.ReturnedAt.After(*rental.EndTime) {
-				// 超时，从押金中扣除超时费用
-				overdueMinutes := rental.ReturnedAt.Sub(*rental.EndTime).Minutes()
-				pricing, _ := s.deviceRepo.GetPricingByID(ctx, rental.PricingID)
-				if pricing != nil {
-					// 按小时计算超时费用
-					overdueHours := int(overdueMinutes/60) + 1
-					overdueAmount = float64(overdueHours) * pricing.Price
-					if overdueAmount > rental.DepositAmount {
-						overdueAmount = rental.DepositAmount
-					}
-				}
-			}
-		}
-
-		// 结算押金
-		refundAmount := rental.DepositAmount - overdueAmount
-		if refundAmount > 0 {
-			// 退还押金
-			if err := s.walletService.UnfreezeDeposit(ctx, rental.UserID, refundAmount, rental.RentalNo); err != nil {
-				return err
-			}
-		}
-		if overdueAmount > 0 {
-			// 扣除超时费用
-			if err := s.walletService.DeductFrozenToConsume(ctx, rental.UserID, overdueAmount, rental.RentalNo, "超时费用"); err != nil {
-				return err
-			}
-		}
+		// TODO: 结算逻辑 - 钱包服务退还押金或扣除超时费
 
 		// 更新订单状态
 		updates := map[string]interface{}{
-			"status":        models.RentalStatusCompleted,
-			"refund_amount": refundAmount,
-			"actual_amount": rental.RentalAmount + overdueAmount,
+			"status": models.RentalStatusCompleted,
 		}
 		if err := tx.Model(rental).Updates(updates).Error; err != nil {
+			return errors.ErrDatabaseError.WithError(err)
+		}
+
+		// 更新Order状态
+		if err := tx.Model(&models.Order{}).Where("id = ?", rental.OrderID).
+			Update("status", models.OrderStatusCompleted).Error; err != nil {
 			return errors.ErrDatabaseError.WithError(err)
 		}
 
@@ -426,7 +394,7 @@ func (s *RentalService) CancelRental(ctx context.Context, userID int64, rentalID
 			return errors.ErrRentalStatusError.WithMessage("只有待支付的订单可以取消")
 		}
 
-		// 更新订单状态
+		// 更新租借状态
 		if err := tx.Model(rental).Update("status", models.RentalStatusCancelled).Error; err != nil {
 			return errors.ErrDatabaseError.WithError(err)
 		}
@@ -456,11 +424,11 @@ func (s *RentalService) GetRental(ctx context.Context, userID int64, rentalID in
 		return nil, errors.ErrPermissionDenied
 	}
 
-	return s.toRentalInfo(rental, rental.Device, rental.Pricing), nil
+	return s.toRentalInfo(rental, rental.Device, nil), nil
 }
 
 // ListRentals 获取用户租借列表
-func (s *RentalService) ListRentals(ctx context.Context, userID int64, offset, limit int, status *int8) ([]*RentalInfo, int64, error) {
+func (s *RentalService) ListRentals(ctx context.Context, userID int64, offset, limit int, status *string) ([]*RentalInfo, int64, error) {
 	rentals, total, err := s.rentalRepo.ListByUser(ctx, userID, offset, limit, status)
 	if err != nil {
 		return nil, 0, errors.ErrDatabaseError.WithError(err)
@@ -468,29 +436,29 @@ func (s *RentalService) ListRentals(ctx context.Context, userID int64, offset, l
 
 	result := make([]*RentalInfo, len(rentals))
 	for i, r := range rentals {
-		result[i] = s.toRentalInfo(r, r.Device, r.Pricing)
+		result[i] = s.toRentalInfo(r, r.Device, nil)
 	}
 
 	return result, total, nil
 }
 
 // toRentalInfo 转换为租借信息
-func (s *RentalService) toRentalInfo(rental *models.Rental, device *models.Device, pricing *models.RentalPricing) *RentalInfo {
+func (s *RentalService) toRentalInfo(rental *models.Rental, device *models.Device, _ *models.RentalPricing) *RentalInfo {
 	info := &RentalInfo{
-		ID:             rental.ID,
-		RentalNo:       rental.RentalNo,
-		Status:         rental.Status,
-		StatusName:     s.getStatusName(rental.Status),
-		StartTime:      rental.StartTime,
-		EndTime:        rental.EndTime,
-		Duration:       rental.Duration,
-		UnitPrice:      rental.UnitPrice,
-		DepositAmount:  rental.DepositAmount,
-		RentalAmount:   rental.RentalAmount,
-		DiscountAmount: rental.DiscountAmount,
-		ActualAmount:   rental.ActualAmount,
-		RefundAmount:   rental.RefundAmount,
-		CreatedAt:      rental.CreatedAt,
+		ID:               rental.ID,
+		OrderID:          rental.OrderID,
+		Status:           rental.Status,
+		StatusName:       s.getStatusName(rental.Status),
+		DurationHours:    rental.DurationHours,
+		RentalFee:        rental.RentalFee,
+		Deposit:          rental.Deposit,
+		OvertimeRate:     rental.OvertimeRate,
+		OvertimeFee:      rental.OvertimeFee,
+		UnlockedAt:       rental.UnlockedAt,
+		ExpectedReturnAt: rental.ExpectedReturnAt,
+		ReturnedAt:       rental.ReturnedAt,
+		IsPurchased:      rental.IsPurchased,
+		CreatedAt:        rental.CreatedAt,
 	}
 
 	if device != nil {
@@ -504,22 +472,11 @@ func (s *RentalService) toRentalInfo(rental *models.Rental, device *models.Devic
 		}
 	}
 
-	if pricing != nil {
-		info.Pricing = &deviceService.PricingInfo{
-			ID:           pricing.ID,
-			Name:         pricing.Name,
-			Duration:     pricing.Duration,
-			DurationUnit: pricing.DurationUnit,
-			Price:        pricing.Price,
-			Deposit:      pricing.Deposit,
-		}
-	}
-
 	return info
 }
 
 // getStatusName 获取状态名称
-func (s *RentalService) getStatusName(status int8) string {
+func (s *RentalService) getStatusName(status string) string {
 	switch status {
 	case models.RentalStatusPending:
 		return "待支付"
@@ -533,8 +490,10 @@ func (s *RentalService) getStatusName(status int8) string {
 		return "已完成"
 	case models.RentalStatusCancelled:
 		return "已取消"
-	case models.RentalStatusOverdue:
-		return "超时未还"
+	case models.RentalStatusRefunding:
+		return "退款中"
+	case models.RentalStatusRefunded:
+		return "已退款"
 	default:
 		return "未知"
 	}

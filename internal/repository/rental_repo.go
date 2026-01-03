@@ -41,7 +41,6 @@ func (r *RentalRepository) GetByIDWithRelations(ctx context.Context, id int64) (
 	err := r.db.WithContext(ctx).
 		Preload("Device").
 		Preload("Device.Venue").
-		Preload("Pricing").
 		First(&rental, id).Error
 	if err != nil {
 		return nil, err
@@ -90,7 +89,7 @@ func (r *RentalRepository) UpdateStatus(ctx context.Context, id int64, status in
 }
 
 // ListByUser 获取用户的租借列表
-func (r *RentalRepository) ListByUser(ctx context.Context, userID int64, offset, limit int, status *int8) ([]*models.Rental, int64, error) {
+func (r *RentalRepository) ListByUser(ctx context.Context, userID int64, offset, limit int, status *string) ([]*models.Rental, int64, error) {
 	var rentals []*models.Rental
 	var total int64
 
@@ -104,7 +103,7 @@ func (r *RentalRepository) ListByUser(ctx context.Context, userID int64, offset,
 		return nil, 0, err
 	}
 
-	if err := query.Preload("Device").Preload("Pricing").
+	if err := query.Preload("Device").
 		Order("id DESC").Offset(offset).Limit(limit).
 		Find(&rentals).Error; err != nil {
 		return nil, 0, err
@@ -136,7 +135,7 @@ func (r *RentalRepository) GetCurrentByDevice(ctx context.Context, deviceID int6
 	var rental models.Rental
 	err := r.db.WithContext(ctx).
 		Where("device_id = ?", deviceID).
-		Where("status IN ?", []int8{
+		Where("status IN ?", []string{
 			models.RentalStatusPaid,
 			models.RentalStatusInUse,
 		}).
@@ -152,7 +151,7 @@ func (r *RentalRepository) GetActiveByUser(ctx context.Context, userID int64) (*
 	var rental models.Rental
 	err := r.db.WithContext(ctx).
 		Where("user_id = ?", userID).
-		Where("status IN ?", []int8{
+		Where("status IN ?", []string{
 			models.RentalStatusPending,
 			models.RentalStatusPaid,
 			models.RentalStatusInUse,
@@ -169,7 +168,7 @@ func (r *RentalRepository) HasActiveRental(ctx context.Context, userID int64) (b
 	var count int64
 	err := r.db.WithContext(ctx).Model(&models.Rental{}).
 		Where("user_id = ?", userID).
-		Where("status IN ?", []int8{
+		Where("status IN ?", []string{
 			models.RentalStatusPending,
 			models.RentalStatusPaid,
 			models.RentalStatusInUse,
@@ -191,11 +190,8 @@ func (r *RentalRepository) List(ctx context.Context, offset, limit int, filters 
 	if deviceID, ok := filters["device_id"].(int64); ok && deviceID > 0 {
 		query = query.Where("device_id = ?", deviceID)
 	}
-	if status, ok := filters["status"].(int8); ok {
+	if status, ok := filters["status"].(string); ok && status != "" {
 		query = query.Where("status = ?", status)
-	}
-	if rentalNo, ok := filters["rental_no"].(string); ok && rentalNo != "" {
-		query = query.Where("rental_no LIKE ?", "%"+rentalNo+"%")
 	}
 	if startDate, ok := filters["start_date"].(time.Time); ok {
 		query = query.Where("created_at >= ?", startDate)

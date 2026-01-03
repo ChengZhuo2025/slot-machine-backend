@@ -54,6 +54,11 @@ func SuccessPage(c *gin.Context, list interface{}, total int64, page, pageSize i
 	})
 }
 
+// SuccessWithPage 分页成功响应（别名）
+func SuccessWithPage(c *gin.Context, list interface{}, total int64, page, pageSize int) {
+	SuccessPage(c, list, total, page, pageSize)
+}
+
 // Error 错误响应
 func Error(c *gin.Context, code int, message string) {
 	c.JSON(http.StatusOK, Response{

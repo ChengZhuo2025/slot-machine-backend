@@ -199,3 +199,29 @@ func (r *VenueRepository) ExistsByName(ctx context.Context, merchantID int64, na
 func (r *VenueRepository) Delete(ctx context.Context, id int64) error {
 	return r.db.WithContext(ctx).Delete(&models.Venue{}, id).Error
 }
+
+// GetByIDWithMerchant 根据 ID 获取场地（包含商户）
+func (r *VenueRepository) GetByIDWithMerchant(ctx context.Context, id int64) (*models.Venue, error) {
+	var venue models.Venue
+	err := r.db.WithContext(ctx).Preload("Merchant").First(&venue, id).Error
+	if err != nil {
+		return nil, err
+	}
+	return &venue, nil
+}
+
+// CountDevices 统计场地下的设备数量（包括所有状态）
+func (r *VenueRepository) CountDevices(ctx context.Context, venueID int64) (int64, error) {
+	var count int64
+	err := r.db.WithContext(ctx).Model(&models.Device{}).
+		Where("venue_id = ?", venueID).
+		Count(&count).Error
+	return count, err
+}
+
+// ListByMerchantSimple 获取商户下的场地列表（简单版，无状态过滤）
+func (r *VenueRepository) ListByMerchantSimple(ctx context.Context, merchantID int64) ([]*models.Venue, error) {
+	var venues []*models.Venue
+	err := r.db.WithContext(ctx).Where("merchant_id = ?", merchantID).Order("id DESC").Find(&venues).Error
+	return venues, err
+}

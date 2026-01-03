@@ -2,7 +2,7 @@
 //
 //	@title						爱上杜美人智能开锁管理系统 API
 //	@version					1.0
-//	@description				智能充电宝租借、酒店预订、商城、分销等多业务场景的后端服务
+//	@description				智能柜成人用品租借、酒店预订、商城、分销等多业务场景的后端服务
 //	@termsOfService				https://example.com/terms/
 //	@contact.name				API Support
 //	@contact.url				https://example.com/support

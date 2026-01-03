@@ -223,11 +223,17 @@ func (r *DeviceRepository) ListLogs(ctx context.Context, deviceID int64, offset,
 
 // GetPricingsByDevice 获取设备的定价列表
 func (r *DeviceRepository) GetPricingsByDevice(ctx context.Context, deviceID int64) ([]*models.RentalPricing, error) {
+	// 先获取设备信息得到venue_id
+	device, err := r.GetByID(ctx, deviceID)
+	if err != nil {
+		return nil, err
+	}
+
 	var pricings []*models.RentalPricing
-	err := r.db.WithContext(ctx).
-		Where("device_id = ?", deviceID).
-		Where("status = ?", models.RentalPricingStatusActive).
-		Order("sort ASC, id ASC").
+	err = r.db.WithContext(ctx).
+		Where("venue_id = ?", device.VenueID).
+		Where("is_active = ?", true).
+		Order("duration_hours ASC, id ASC").
 		Find(&pricings).Error
 	return pricings, err
 }
@@ -244,11 +250,17 @@ func (r *DeviceRepository) GetPricingByID(ctx context.Context, id int64) (*model
 
 // GetDefaultPricing 获取默认定价
 func (r *DeviceRepository) GetDefaultPricing(ctx context.Context, deviceID int64) (*models.RentalPricing, error) {
+	// 先获取设备信息得到venue_id
+	device, err := r.GetByID(ctx, deviceID)
+	if err != nil {
+		return nil, err
+	}
+
 	var pricing models.RentalPricing
-	err := r.db.WithContext(ctx).
-		Where("device_id = ?", deviceID).
-		Where("is_default = ?", true).
-		Where("status = ?", models.RentalPricingStatusActive).
+	err = r.db.WithContext(ctx).
+		Where("venue_id = ?", device.VenueID).
+		Where("is_active = ?", true).
+		Order("duration_hours ASC").
 		First(&pricing).Error
 	if err != nil {
 		return nil, err
@@ -286,4 +298,9 @@ func (r *DeviceRepository) DecrementAvailableSlots(ctx context.Context, id int64
 		return gorm.ErrRecordNotFound
 	}
 	return nil
+}
+
+// UpdateQRCode 更新设备二维码
+func (r *DeviceRepository) UpdateQRCode(ctx context.Context, id int64, qrCode string) error {
+	return r.db.WithContext(ctx).Model(&models.Device{}).Where("id = ?", id).Update("qr_code", qrCode).Error
 }

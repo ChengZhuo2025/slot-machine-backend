@@ -158,22 +158,28 @@ func (l *OperationLogger) logOperation(c *gin.Context, requestBody []byte) {
 	}
 
 	// 获取路由配置
-	routeKey := c.Request.Method + " " + c.FullPath()
+	path := c.FullPath()
+	routeKey := c.Request.Method + " " + path
 	config, ok := moduleActionMap[routeKey]
+	if !ok && strings.HasPrefix(path, "/api/") {
+		// 兼容路由组前缀差异：Gin full path 可能包含 /api 前缀
+		altKey := c.Request.Method + " " + strings.TrimPrefix(path, "/api")
+		config, ok = moduleActionMap[altKey]
+	}
 	if !ok {
 		// 尝试获取通用配置
 		config = l.getDefaultConfig(c)
 	}
 
 	// 获取管理员 ID
-	adminID, exists := c.Get("admin_id")
-	if !exists {
+	adminID, ok := l.getAdminID(c)
+	if !ok {
 		return
 	}
 
 	// 构建日志记录
 	log := &models.OperationLog{
-		AdminID:   adminID.(int64),
+		AdminID:   adminID,
 		Module:    config.Module,
 		Action:    config.Action,
 		IP:        c.ClientIP(),
@@ -209,6 +215,27 @@ func (l *OperationLogger) logOperation(c *gin.Context, requestBody []byte) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	_ = l.repo.Create(ctx, log)
+}
+
+func (l *OperationLogger) getAdminID(c *gin.Context) (int64, bool) {
+	// 优先使用明确的 admin_id
+	if v, ok := c.Get("admin_id"); ok {
+		if id, ok := v.(int64); ok {
+			return id, true
+		}
+	}
+
+	// 兼容内部 JWT 中间件：AdminAuth 仅设置 user_id / user_type
+	userType, _ := c.Get("user_type")
+	if userTypeStr, ok := userType.(string); ok && userTypeStr == "admin" {
+		if v, ok := c.Get("user_id"); ok {
+			if id, ok := v.(int64); ok {
+				return id, true
+			}
+		}
+	}
+
+	return 0, false
 }
 
 // getDefaultConfig 获取默认配置

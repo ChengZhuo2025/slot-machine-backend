@@ -1,0 +1,231 @@
+# =====================================================
+# golangci-lint 配置文件
+# 爱上杜美人智能开锁管理系统后端服务
+# =====================================================
+
+run:
+  # 超时时间
+  timeout: 5m
+  # 要分析的目录
+  modules-download-mode: readonly
+  # 跳过的目录
+  skip-dirs:
+    - vendor
+    - third_party
+    - testdata
+    - examples
+    - docs
+    - api/openapi
+  # 跳过的文件
+  skip-files:
+    - ".*_test.go$"
+    - "mock_*.go"
+    - ".*_mock.go"
+
+output:
+  # 输出格式
+  formats:
+    - format: colored-line-number
+  # 打印行号
+  print-issued-lines: true
+  print-linter-name: true
+  # 按严重性分组
+  sort-results: true
+
+linters:
+  enable:
+    # 默认启用的 linters
+    - errcheck      # 检查未处理的错误
+    - gosimple      # 简化代码建议
+    - govet         # Go vet 检查
+    - ineffassign   # 检查无效的赋值
+    - staticcheck   # 静态分析
+    - unused        # 检查未使用的代码
+
+    # 额外启用的 linters
+    - bodyclose     # 检查 HTTP response body 是否关闭
+    - contextcheck  # 检查 context 使用
+    - dupl          # 检查重复代码
+    - errname       # 检查错误命名规范
+    - errorlint     # 检查错误处理
+    - exhaustive    # 检查 switch 语句是否穷尽
+    - exportloopref # 检查循环变量导出问题
+    - gci           # 导入排序
+    - gochecknoinits # 检查 init 函数使用
+    - goconst       # 检查可以定义为常量的重复字符串
+    - gocritic      # Go 代码审查
+    - gocyclo       # 检查圈复杂度
+    - godot         # 检查注释是否以句号结尾
+    - gofmt         # 检查格式化
+    - goimports     # 检查导入排序
+    - goprintffuncname # 检查 printf 函数命名
+    - gosec         # 安全检查
+    - misspell      # 拼写检查
+    - nakedret      # 检查裸返回
+    - nilerr        # 检查 nil 错误返回
+    - noctx         # 检查 HTTP 请求没有 context
+    - prealloc      # 检查切片预分配
+    - predeclared   # 检查预声明标识符重定义
+    - revive        # 代码风格检查
+    - rowserrcheck  # 检查 rows.Err()
+    - sqlclosecheck # 检查 SQL rows 关闭
+    - stylecheck    # 风格检查
+    - tparallel     # 检查测试并行
+    - unconvert     # 检查不必要的类型转换
+    - unparam       # 检查未使用的函数参数
+    - whitespace    # 检查空白
+
+  disable:
+    - depguard      # 依赖守卫（根据项目需要配置）
+    - funlen        # 函数长度（太严格）
+    - gochecknoglobals # 全局变量检查（项目需要一些全局变量）
+    - lll           # 行长度（使用编辑器设置）
+    - wsl           # 空行风格（太严格）
+    - varnamelen    # 变量名长度（太严格）
+    - nlreturn      # 返回前空行（太严格）
+    - wrapcheck     # 错误包装检查（项目自定义错误处理）
+
+linters-settings:
+  errcheck:
+    # 检查类型断言
+    check-type-assertions: true
+    # 检查空白标识符
+    check-blank: true
+    # 排除的函数
+    exclude-functions:
+      - io.Copy
+      - io.WriteString
+      - (io.Closer).Close
+      - (*os.File).Close
+      - (net/http.ResponseWriter).Write
+
+  govet:
+    enable-all: true
+    disable:
+      - fieldalignment # 字段对齐（可能影响可读性）
+
+  gocyclo:
+    # 最大圈复杂度
+    min-complexity: 15
+
+  dupl:
+    # 最小重复代码行数
+    threshold: 100
+
+  goconst:
+    # 最小重复次数
+    min-len: 3
+    min-occurrences: 3
+
+  goimports:
+    # 本地导入前缀
+    local-prefixes: github.com/dumeirei/smart-locker-backend
+
+  gci:
+    sections:
+      - standard                                     # 标准库
+      - default                                      # 第三方库
+      - prefix(github.com/dumeirei/smart-locker-backend) # 本项目
+
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - experimental
+      - opinionated
+      - performance
+      - style
+    disabled-checks:
+      - whyNoLint
+      - paramTypeCombine
+      - unnamedResult
+      - hugeParam
+
+  gosec:
+    excludes:
+      - G104 # 忽略未检查错误
+      - G304 # 文件路径问题（根据业务需要）
+    config:
+      global:
+        audit: true
+
+  revive:
+    rules:
+      - name: blank-imports
+      - name: context-as-argument
+      - name: context-keys-type
+      - name: dot-imports
+      - name: error-return
+      - name: error-strings
+      - name: error-naming
+      - name: exported
+      - name: if-return
+      - name: increment-decrement
+      - name: var-naming
+      - name: var-declaration
+      - name: package-comments
+      - name: range
+      - name: receiver-naming
+      - name: time-naming
+      - name: unexported-return
+      - name: indent-error-flow
+      - name: errorf
+      - name: empty-block
+      - name: superfluous-else
+      - name: unused-parameter
+      - name: unreachable-code
+      - name: redefines-builtin-id
+
+  stylecheck:
+    checks:
+      - "all"
+      - "-ST1000" # 包注释
+      - "-ST1003" # 下划线命名
+
+  nakedret:
+    # 超过此行数的函数不允许裸返回
+    max-func-lines: 30
+
+  misspell:
+    locale: US
+
+issues:
+  # 排除规则
+  exclude-rules:
+    # 测试文件中放宽规则
+    - path: _test\.go
+      linters:
+        - dupl
+        - gosec
+        - gocritic
+        - errcheck
+        - goconst
+
+    # 生成的文件
+    - path: ".*_gen\\.go"
+      linters:
+        - all
+
+    # main.go 允许更多灵活性
+    - path: cmd/.*/main\.go
+      linters:
+        - gochecknoinits
+
+    # 模型文件中允许更长的结构体
+    - path: internal/models/
+      linters:
+        - dupl
+
+  # 最大相同问题数量
+  max-same-issues: 50
+  # 不排除默认规则
+  exclude-use-default: false
+
+severity:
+  default-severity: warning
+  rules:
+    - linters:
+        - gosec
+      severity: error
+    - linters:
+        - errcheck
+      severity: error

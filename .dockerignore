@@ -1,0 +1,78 @@
+# =====================================================
+# Docker Build 忽略文件
+# 爱上杜美人智能开锁管理系统后端服务
+# =====================================================
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# 开发配置
+.claude/
+.specify/
+.vscode/
+.idea/
+
+# 文档
+*.md
+!README.md
+docs/
+specs/
+
+# 测试
+tests/
+*_test.go
+coverage.*
+*.test
+
+# 本地配置
+configs/config.yaml
+configs/config.local.yaml
+configs/config.dev.yaml
+configs/config.prod.yaml
+.env*
+
+# 构建产物
+build/
+bin/
+dist/
+
+# 日志
+logs/
+*.log
+
+# 临时文件
+tmp/
+temp/
+*.tmp
+
+# 证书 (构建时单独处理)
+certs/
+*.pem
+*.key
+*.crt
+
+# 数据目录
+data/
+uploads/
+
+# Docker 相关
+Dockerfile*
+docker-compose*.yml
+.docker-env
+
+# Kubernetes 配置
+deployments/k8s/
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# 依赖缓存
+vendor/
+
+# IDE/编辑器
+*.swp
+*.swo
+*~

@@ -1,0 +1,175 @@
+# =====================================================
+# Docker Compose 开发环境配置
+# 爱上杜美人智能开锁管理系统后端服务
+# =====================================================
+
+services:
+  # PostgreSQL 数据库
+  postgres:
+    image: postgres:15-alpine
+    container_name: smart_locker_postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: smart_locker
+      TZ: Asia/Shanghai
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - smart_locker_network
+
+  # Redis 缓存
+  redis:
+    image: redis:7-alpine
+    container_name: smart_locker_redis
+    command: redis-server --appendonly yes --requirepass redis123
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "redis123", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - smart_locker_network
+
+  # EMQX MQTT Broker
+  emqx:
+    image: emqx/emqx:5.5
+    container_name: smart_locker_emqx
+    environment:
+      EMQX_NAME: smart_locker
+      EMQX_HOST: 127.0.0.1
+      EMQX_DASHBOARD__DEFAULT_PASSWORD: admin123
+      EMQX_ALLOW_ANONYMOUS: "false"
+    ports:
+      - "1883:1883"    # MQTT TCP
+      - "8083:8083"    # MQTT WebSocket
+      - "8084:8084"    # MQTT WebSocket SSL
+      - "8883:8883"    # MQTT SSL
+      - "18083:18083"  # Dashboard
+    volumes:
+      - emqx_data:/opt/emqx/data
+      - emqx_log:/opt/emqx/log
+    healthcheck:
+      test: ["CMD", "emqx_ctl", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - smart_locker_network
+
+  # Adminer 数据库管理工具 (可选)
+  adminer:
+    image: adminer:latest
+    container_name: smart_locker_adminer
+    ports:
+      - "8080:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+    depends_on:
+      - postgres
+    networks:
+      - smart_locker_network
+    profiles:
+      - tools
+
+  # Redis Commander (可选)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: smart_locker_redis_commander
+    environment:
+      REDIS_HOSTS: local:redis:6379:0:redis123
+    ports:
+      - "8081:8081"
+    depends_on:
+      - redis
+    networks:
+      - smart_locker_network
+    profiles:
+      - tools
+
+  # Prometheus 监控 (可选)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: smart_locker_prometheus
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    networks:
+      - smart_locker_network
+    profiles:
+      - monitoring
+
+  # Grafana 可视化 (可选)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: smart_locker_grafana
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin123
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - smart_locker_network
+    profiles:
+      - monitoring
+
+  # Jaeger 分布式追踪 (可选)
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: smart_locker_jaeger
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "6831:6831/udp"   # Jaeger thrift compact
+      - "6832:6832/udp"   # Jaeger thrift binary
+      - "5778:5778"       # Config
+      - "16686:16686"     # Web UI
+      - "4317:4317"       # OTLP gRPC
+      - "4318:4318"       # OTLP HTTP
+      - "14250:14250"     # Model proto
+      - "14268:14268"     # Jaeger thrift HTTP
+      - "14269:14269"     # Admin port
+    networks:
+      - smart_locker_network
+    profiles:
+      - monitoring
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  emqx_data:
+    driver: local
+  emqx_log:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  smart_locker_network:
+    driver: bridge

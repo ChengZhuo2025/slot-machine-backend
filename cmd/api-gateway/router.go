@@ -23,8 +23,8 @@ import (
 	paymentService "github.com/dumeirei/smart-locker-backend/internal/service/payment"
 	rentalService "github.com/dumeirei/smart-locker-backend/internal/service/rental"
 	userService "github.com/dumeirei/smart-locker-backend/internal/service/user"
-	"smart-locker-backend/pkg/sms"
-	"smart-locker-backend/pkg/wechatpay"
+	"github.com/dumeirei/smart-locker-backend/pkg/sms"
+	"github.com/dumeirei/smart-locker-backend/pkg/wechatpay"
 )
 
 // setupRouter 设置路由
@@ -38,8 +38,8 @@ func setupRouter(
 	// 创建 JWT 管理器
 	jwtManager := jwt.NewManager(&jwt.Config{
 		Secret:            cfg.JWT.Secret,
-		AccessExpireTime:  time.Duration(cfg.JWT.AccessExpire) * time.Second,
-		RefreshExpireTime: time.Duration(cfg.JWT.RefreshExpire) * time.Second,
+		AccessExpireTime:  cfg.JWT.AccessTokenDuration(),
+		RefreshExpireTime: cfg.JWT.RefreshTokenDuration(),
 		Issuer:            cfg.JWT.Issuer,
 	})
 
@@ -52,18 +52,16 @@ func setupRouter(
 	refundRepo := repository.NewRefundRepository(db)
 
 	// 初始化外部服务客户端
-	smsClient := sms.NewMockClient() // 开发环境使用 Mock，生产环境使用阿里云
+	smsClient := sms.NewMockClient(cfg.SMS.SignName) // 开发环境使用 Mock，生产环境使用阿里云
 	wechatPayClient, _ := wechatpay.NewClient(&wechatpay.Config{})
 
 	// 初始化服务
-	codeService := authService.NewCodeService(redisClient, smsClient, &authService.CodeConfig{
-		CodeLength:   6,
-		ExpireTime:   5 * time.Minute,
-		SendInterval: 60 * time.Second,
-		DailyLimit:   10,
+	codeService := authService.NewCodeService(redisClient, smsClient, &authService.CodeServiceConfig{
+		CodeLength: 6,
+		ExpireIn:   5 * time.Minute,
 	})
-	authSvc := authService.NewAuthService(db, jwtManager, userRepo, codeService)
-	wechatSvc := authService.NewWechatService(db, jwtManager, userRepo, &authService.WechatConfig{})
+	authSvc := authService.NewAuthService(db, userRepo, jwtManager, codeService)
+	wechatSvc := authService.NewWechatService(&authService.WechatConfig{}, db, userRepo, jwtManager)
 
 	userSvc := userService.NewUserService(db, userRepo)
 	walletSvc := userService.NewWalletService(db, userRepo)

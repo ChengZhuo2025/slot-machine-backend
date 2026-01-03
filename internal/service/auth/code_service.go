@@ -9,7 +9,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/dumeirei/smart-locker-backend/internal/common/utils"
-	"smart-locker-backend/pkg/sms"
+	"github.com/dumeirei/smart-locker-backend/pkg/sms"
 )
 
 // CodeService 验证码服务

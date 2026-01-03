@@ -53,14 +53,27 @@ git clone <repository-url>
 cd backend
 ```
 
-### 2. 启动依赖服务
+### 2. 安装 Go 依赖
+
+```bash
+# 下载并安装所有依赖包
+go mod download
+
+# 整理依赖（清理未使用的依赖，添加缺失的依赖）
+go mod tidy
+
+# 验证依赖完整性
+go mod verify
+```
+
+### 3. 启动依赖服务
 
 ```bash
 # 启动 PostgreSQL、Redis、EMQX
 docker-compose -f deployments/docker/docker-compose.yml up -d postgres redis emqx
 ```
 
-### 3. 配置环境变量
+### 4. 配置环境变量
 
 ```bash
 # 复制配置文件
@@ -70,7 +83,7 @@ cp configs/config.example.yaml configs/config.yaml
 vim configs/config.yaml
 ```
 
-### 4. 初始化数据库
+### 5. 初始化数据库
 
 ```bash
 # 执行数据库迁移
@@ -80,7 +93,7 @@ make migrate
 make seed
 ```
 
-### 5. 运行服务
+### 6. 运行服务
 
 ```bash
 # 开发模式
@@ -90,7 +103,7 @@ make run
 go run cmd/api-gateway/main.go
 ```
 
-### 6. 验证服务
+### 7. 验证服务
 
 ```bash
 # 健康检查

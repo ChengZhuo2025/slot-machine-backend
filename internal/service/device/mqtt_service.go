@@ -7,7 +7,7 @@ import (
 
 	"github.com/dumeirei/smart-locker-backend/internal/models"
 	"github.com/dumeirei/smart-locker-backend/internal/repository"
-	"smart-locker-backend/pkg/mqtt"
+	"github.com/dumeirei/smart-locker-backend/pkg/mqtt"
 )
 
 // MQTTService 设备 MQTT 服务

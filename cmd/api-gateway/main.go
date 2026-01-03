@@ -28,12 +28,13 @@ func main() {
 	}
 
 	// 初始化日志
-	log, err := logger.New(&cfg.Log)
-	if err != nil {
+	if err := logger.Init(&cfg.Logger); err != nil {
 		fmt.Printf("Failed to init logger: %v\n", err)
 		os.Exit(1)
 	}
-	defer log.Sync()
+	defer logger.Sync()
+
+	log := logger.GetLogger()
 
 	log.Info("Starting Smart Locker Backend",
 		zap.String("version", "1.0.0"),
@@ -41,14 +42,14 @@ func main() {
 	)
 
 	// 初始化数据库连接
-	db, err := database.NewPostgres(&cfg.Database)
+	db, err := database.Init(&cfg.Database)
 	if err != nil {
 		log.Fatal("Failed to connect to database", zap.Error(err))
 	}
 	log.Info("Database connected successfully")
 
 	// 初始化 Redis 连接
-	redisClient, err := cache.NewRedis(&cfg.Redis)
+	redisClient, err := cache.Init(&cfg.Redis)
 	if err != nil {
 		log.Fatal("Failed to connect to Redis", zap.Error(err))
 	}
@@ -76,7 +77,6 @@ func main() {
 		Handler:      engine,
 		ReadTimeout:  time.Duration(cfg.Server.ReadTimeout) * time.Second,
 		WriteTimeout: time.Duration(cfg.Server.WriteTimeout) * time.Second,
-		IdleTimeout:  time.Duration(cfg.Server.IdleTimeout) * time.Second,
 	}
 
 	// 在 goroutine 中启动服务器

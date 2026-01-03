@@ -12,7 +12,7 @@ import (
 	"github.com/dumeirei/smart-locker-backend/internal/common/utils"
 	"github.com/dumeirei/smart-locker-backend/internal/models"
 	"github.com/dumeirei/smart-locker-backend/internal/repository"
-	"smart-locker-backend/pkg/wechatpay"
+	"github.com/dumeirei/smart-locker-backend/pkg/wechatpay"
 )
 
 // PaymentService 支付服务

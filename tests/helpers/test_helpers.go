@@ -139,33 +139,29 @@ func NewTestDevice(venueID int64) *models.Device {
 }
 
 // NewTestRentalPricing 创建测试租借定价
-func NewTestRentalPricing(deviceID int64, duration int, price, deposit float64) *models.RentalPricing {
+func NewTestRentalPricing(venueID *int64, durationHours int, price, deposit float64) *models.RentalPricing {
 	return &models.RentalPricing{
-		DeviceID:     deviceID,
-		Name:         fmt.Sprintf("%d小时租借", duration),
-		Duration:     duration,
-		DurationUnit: models.DurationUnitHour,
-		Price:        price,
-		Deposit:      deposit,
-		Status:       models.RentalPricingStatusActive,
+		VenueID:       venueID,
+		DurationHours: durationHours,
+		Price:         price,
+		Deposit:       deposit,
+		OvertimeRate:  1.5,
+		IsActive:      true,
 	}
 }
 
 // NewTestRental 创建测试租借订单
-func NewTestRental(userID, deviceID, pricingID int64, status int8) *models.Rental {
-	rentalNo := fmt.Sprintf("R%s%06d", time.Now().Format("20060102150405"), rand.Intn(1000000))
-	slotNo := 1
+func NewTestRental(orderID, userID, deviceID int64, durationHours int, status string) *models.Rental {
 	return &models.Rental{
-		RentalNo:      rentalNo,
+		OrderID:       orderID,
 		UserID:        userID,
 		DeviceID:      deviceID,
-		PricingID:     pricingID,
-		SlotNo:        &slotNo,
+		DurationHours: durationHours,
+		RentalFee:     10.0,
+		Deposit:       50.0,
+		OvertimeRate:  1.5,
+		OvertimeFee:   0.0,
 		Status:        status,
-		UnitPrice:     10.0,
-		DepositAmount: 50.0,
-		RentalAmount:  10.0,
-		ActualAmount:  60.0,
 	}
 }
 

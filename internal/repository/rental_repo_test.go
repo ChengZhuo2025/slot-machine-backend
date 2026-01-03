@@ -29,6 +29,7 @@ func setupRentalTestDB(t *testing.T) *gorm.DB {
 		&models.Venue{},
 		&models.Device{},
 		&models.RentalPricing{},
+		&models.Order{},
 		&models.Rental{},
 	)
 	require.NoError(t, err)
@@ -99,13 +100,12 @@ func createRentalTestData(t *testing.T, db *gorm.DB) (user *models.User, device 
 
 	// 创建定价
 	pricing = &models.RentalPricing{
-		DeviceID:     device.ID,
-		Name:         "1小时租借",
-		Duration:     1,
-		DurationUnit: models.DurationUnitHour,
-		Price:        10.0,
-		Deposit:      50.0,
-		Status:       models.RentalPricingStatusActive,
+		VenueID:       &venue.ID,
+		DurationHours:  1,
+		Price:         10.0,
+		Deposit:       50.0,
+		OvertimeRate:  1.5,
+		IsActive:      true,
 	}
 	db.Create(pricing)
 
@@ -119,16 +119,29 @@ func TestRentalRepository_Create(t *testing.T) {
 
 	user, device, pricing := createRentalTestData(t, db)
 
-	slotNo := 1
+	// 创建Order
+	order := &models.Order{
+		OrderNo:        "R20240101001",
+		UserID:         user.ID,
+		Type:           models.OrderTypeRental,
+		OriginalAmount: pricing.Price + pricing.Deposit,
+		DiscountAmount: 0.0,
+		ActualAmount:   pricing.Price + pricing.Deposit,
+		DepositAmount:  pricing.Deposit,
+		Status:         models.OrderStatusPending,
+	}
+	db.Create(order)
+
 	rental := &models.Rental{
-		RentalNo:      "R20240101001",
+		OrderID:       order.ID,
 		UserID:        user.ID,
 		DeviceID:      device.ID,
-		PricingID:     pricing.ID,
-		SlotNo:        &slotNo,
+		DurationHours: 1,
+		RentalFee:     pricing.Price,
+		Deposit:       pricing.Deposit,
+		OvertimeRate:  pricing.OvertimeRate,
+		OvertimeFee:   0.0,
 		Status:        models.RentalStatusPending,
-		UnitPrice:     pricing.Price,
-		DepositAmount: pricing.Deposit,
 	}
 
 	err := repo.Create(ctx, rental)
@@ -143,23 +156,41 @@ func TestRentalRepository_GetByID(t *testing.T) {
 
 	user, device, pricing := createRentalTestData(t, db)
 
-	slotNo := 1
+	// 创建Order
+	order := &models.Order{
+		OrderNo:        "R20240101002",
+		UserID:         user.ID,
+		Type:           models.OrderTypeRental,
+		OriginalAmount: pricing.Price + pricing.Deposit,
+		DiscountAmount: 0.0,
+		ActualAmount:   pricing.Price + pricing.Deposit,
+		DepositAmount:  pricing.Deposit,
+		Status:         models.OrderStatusPending,
+	}
+	db.Create(order)
+
 	rental := &models.Rental{
-		RentalNo:      "R20240101002",
+		OrderID:       order.ID,
 		UserID:        user.ID,
 		DeviceID:      device.ID,
-		PricingID:     pricing.ID,
-		SlotNo:        &slotNo,
+		DurationHours: 1,
+		RentalFee:     pricing.Price,
+		Deposit:       pricing.Deposit,
+		OvertimeRate:  pricing.OvertimeRate,
+		OvertimeFee:   0.0,
 		Status:        models.RentalStatusPending,
-		UnitPrice:     pricing.Price,
-		DepositAmount: pricing.Deposit,
 	}
 	db.Create(rental)
 
 	t.Run("获取存在的租借", func(t *testing.T) {
 		found, err := repo.GetByID(ctx, rental.ID)
 		require.NoError(t, err)
-		assert.Equal(t, rental.RentalNo, found.RentalNo)
+		// 通过Order查询OrderNo
+		var order models.Order
+		db.Where("id = ?", found.OrderID).First(&order)
+		var originalOrder models.Order
+		db.Where("id = ?", rental.OrderID).First(&originalOrder)
+		assert.Equal(t, originalOrder.OrderNo, order.OrderNo)
 	})
 
 	t.Run("获取不存在的租借", func(t *testing.T) {
@@ -175,21 +206,34 @@ func TestRentalRepository_GetByRentalNo(t *testing.T) {
 
 	user, device, pricing := createRentalTestData(t, db)
 
-	slotNo := 1
+	// 创建Order
+	order := &models.Order{
+		OrderNo:        "R20240101003",
+		UserID:         user.ID,
+		Type:           models.OrderTypeRental,
+		OriginalAmount: pricing.Price + pricing.Deposit,
+		DiscountAmount: 0.0,
+		ActualAmount:   pricing.Price + pricing.Deposit,
+		DepositAmount:  pricing.Deposit,
+		Status:         models.OrderStatusPending,
+	}
+	db.Create(order)
+
 	rental := &models.Rental{
-		RentalNo:      "R20240101003",
+		OrderID:       order.ID,
 		UserID:        user.ID,
 		DeviceID:      device.ID,
-		PricingID:     pricing.ID,
-		SlotNo:        &slotNo,
+		DurationHours: 1,
+		RentalFee:     pricing.Price,
+		Deposit:       pricing.Deposit,
+		OvertimeRate:  pricing.OvertimeRate,
+		OvertimeFee:   0.0,
 		Status:        models.RentalStatusPending,
-		UnitPrice:     pricing.Price,
-		DepositAmount: pricing.Deposit,
 	}
 	db.Create(rental)
 
 	t.Run("根据订单号获取租借", func(t *testing.T) {
-		found, err := repo.GetByRentalNo(ctx, rental.RentalNo)
+		found, err := repo.GetByRentalNo(ctx, order.OrderNo)
 		require.NoError(t, err)
 		assert.Equal(t, rental.ID, found.ID)
 	})
@@ -207,16 +251,29 @@ func TestRentalRepository_Update(t *testing.T) {
 
 	user, device, pricing := createRentalTestData(t, db)
 
-	slotNo := 1
+	// 创建Order
+	order := &models.Order{
+		OrderNo:        "R20240101004",
+		UserID:         user.ID,
+		Type:           models.OrderTypeRental,
+		OriginalAmount: pricing.Price + pricing.Deposit,
+		DiscountAmount: 0.0,
+		ActualAmount:   pricing.Price + pricing.Deposit,
+		DepositAmount:  pricing.Deposit,
+		Status:         models.OrderStatusPending,
+	}
+	db.Create(order)
+
 	rental := &models.Rental{
-		RentalNo:      "R20240101004",
+		OrderID:       order.ID,
 		UserID:        user.ID,
 		DeviceID:      device.ID,
-		PricingID:     pricing.ID,
-		SlotNo:        &slotNo,
+		DurationHours: 1,
+		RentalFee:     pricing.Price,
+		Deposit:       pricing.Deposit,
+		OvertimeRate:  pricing.OvertimeRate,
+		OvertimeFee:   0.0,
 		Status:        models.RentalStatusPending,
-		UnitPrice:     pricing.Price,
-		DepositAmount: pricing.Deposit,
 	}
 	db.Create(rental)
 
@@ -226,7 +283,7 @@ func TestRentalRepository_Update(t *testing.T) {
 
 	var found models.Rental
 	db.First(&found, rental.ID)
-	assert.Equal(t, int8(models.RentalStatusPaid), found.Status)
+	assert.Equal(t, models.RentalStatusPaid, found.Status)
 }
 
 func TestRentalRepository_UpdateFields(t *testing.T) {
@@ -236,30 +293,43 @@ func TestRentalRepository_UpdateFields(t *testing.T) {
 
 	user, device, pricing := createRentalTestData(t, db)
 
-	slotNo := 1
+	// 创建Order
+	order := &models.Order{
+		OrderNo:        "R20240101005",
+		UserID:         user.ID,
+		Type:           models.OrderTypeRental,
+		OriginalAmount: pricing.Price + pricing.Deposit,
+		DiscountAmount: 0.0,
+		ActualAmount:   pricing.Price + pricing.Deposit,
+		DepositAmount:  pricing.Deposit,
+		Status:         models.OrderStatusPending,
+	}
+	db.Create(order)
+
 	rental := &models.Rental{
-		RentalNo:      "R20240101005",
+		OrderID:       order.ID,
 		UserID:        user.ID,
 		DeviceID:      device.ID,
-		PricingID:     pricing.ID,
-		SlotNo:        &slotNo,
+		DurationHours: 1,
+		RentalFee:     pricing.Price,
+		Deposit:       pricing.Deposit,
+		OvertimeRate:  pricing.OvertimeRate,
+		OvertimeFee:   0.0,
 		Status:        models.RentalStatusPending,
-		UnitPrice:     pricing.Price,
-		DepositAmount: pricing.Deposit,
 	}
 	db.Create(rental)
 
 	now := time.Now()
 	err := repo.UpdateFields(ctx, rental.ID, map[string]interface{}{
-		"status":  models.RentalStatusPaid,
-		"paid_at": now,
+		"status":     models.RentalStatusPaid,
+		"unlocked_at": &now,
 	})
 	require.NoError(t, err)
 
 	var found models.Rental
 	db.First(&found, rental.ID)
-	assert.Equal(t, int8(models.RentalStatusPaid), found.Status)
-	assert.NotNil(t, found.PaidAt)
+	assert.Equal(t, models.RentalStatusPaid, found.Status)
+	assert.NotNil(t, found.UnlockedAt)
 }
 
 func TestRentalRepository_UpdateStatus(t *testing.T) {
@@ -269,16 +339,29 @@ func TestRentalRepository_UpdateStatus(t *testing.T) {
 
 	user, device, pricing := createRentalTestData(t, db)
 
-	slotNo := 1
+	// 创建Order
+	order := &models.Order{
+		OrderNo:        "R20240101006",
+		UserID:         user.ID,
+		Type:           models.OrderTypeRental,
+		OriginalAmount: pricing.Price + pricing.Deposit,
+		DiscountAmount: 0.0,
+		ActualAmount:   pricing.Price + pricing.Deposit,
+		DepositAmount:  pricing.Deposit,
+		Status:         models.OrderStatusPending,
+	}
+	db.Create(order)
+
 	rental := &models.Rental{
-		RentalNo:      "R20240101006",
+		OrderID:       order.ID,
 		UserID:        user.ID,
 		DeviceID:      device.ID,
-		PricingID:     pricing.ID,
-		SlotNo:        &slotNo,
+		DurationHours: 1,
+		RentalFee:     pricing.Price,
+		Deposit:       pricing.Deposit,
+		OvertimeRate:  pricing.OvertimeRate,
+		OvertimeFee:   0.0,
 		Status:        models.RentalStatusPending,
-		UnitPrice:     pricing.Price,
-		DepositAmount: pricing.Deposit,
 	}
 	db.Create(rental)
 
@@ -287,7 +370,7 @@ func TestRentalRepository_UpdateStatus(t *testing.T) {
 
 	var found models.Rental
 	db.First(&found, rental.ID)
-	assert.Equal(t, int8(models.RentalStatusCancelled), found.Status)
+	assert.Equal(t, models.RentalStatusCancelled, found.Status)
 }
 
 func TestRentalRepository_ListByUser(t *testing.T) {
@@ -298,17 +381,30 @@ func TestRentalRepository_ListByUser(t *testing.T) {
 	user, device, pricing := createRentalTestData(t, db)
 
 	// 创建多个租借
-	slotNo := 1
 	for i := 0; i < 5; i++ {
+		// 先创建Order
+		order := &models.Order{
+			OrderNo:        "R2024010100" + string(rune('7'+i)),
+			UserID:         user.ID,
+			Type:           models.OrderTypeRental,
+			OriginalAmount: pricing.Price + pricing.Deposit,
+			DiscountAmount: 0.0,
+			ActualAmount:   pricing.Price + pricing.Deposit,
+			DepositAmount:  pricing.Deposit,
+			Status:         models.OrderStatusPending,
+		}
+		db.Create(order)
+
 		rental := &models.Rental{
-			RentalNo:      "R2024010100" + string(rune('7'+i)),
+			OrderID:       order.ID,
 			UserID:        user.ID,
 			DeviceID:      device.ID,
-			PricingID:     pricing.ID,
-			SlotNo:        &slotNo,
+			DurationHours: 1,
+			RentalFee:     pricing.Price,
+			Deposit:       pricing.Deposit,
+			OvertimeRate:  pricing.OvertimeRate,
+			OvertimeFee:   0.0,
 			Status:        models.RentalStatusPending,
-			UnitPrice:     pricing.Price,
-			DepositAmount: pricing.Deposit,
 		}
 		db.Create(rental)
 	}
@@ -321,7 +417,7 @@ func TestRentalRepository_ListByUser(t *testing.T) {
 	})
 
 	t.Run("按状态筛选", func(t *testing.T) {
-		status := int8(models.RentalStatusPending)
+		status := models.RentalStatusPending
 		rentals, total, err := repo.ListByUser(ctx, user.ID, 0, 10, &status)
 		require.NoError(t, err)
 		assert.Equal(t, int64(5), total)
@@ -350,16 +446,29 @@ func TestRentalRepository_HasActiveRental(t *testing.T) {
 	})
 
 	t.Run("有进行中租借", func(t *testing.T) {
-		slotNo := 1
+		// 先创建Order
+		order := &models.Order{
+			OrderNo:        "R20240101012",
+			UserID:         user.ID,
+			Type:           models.OrderTypeRental,
+			OriginalAmount: pricing.Price + pricing.Deposit,
+			DiscountAmount: 0.0,
+			ActualAmount:   pricing.Price + pricing.Deposit,
+			DepositAmount:  pricing.Deposit,
+			Status:         models.OrderStatusPending,
+		}
+		db.Create(order)
+
 		rental := &models.Rental{
-			RentalNo:      "R20240101012",
+			OrderID:       order.ID,
 			UserID:        user.ID,
 			DeviceID:      device.ID,
-			PricingID:     pricing.ID,
-			SlotNo:        &slotNo,
+			DurationHours: 1,
+			RentalFee:     pricing.Price,
+			Deposit:       pricing.Deposit,
+			OvertimeRate:  pricing.OvertimeRate,
+			OvertimeFee:   0.0,
 			Status:        models.RentalStatusInUse,
-			UnitPrice:     pricing.Price,
-			DepositAmount: pricing.Deposit,
 		}
 		db.Create(rental)
 
@@ -376,16 +485,29 @@ func TestRentalRepository_GetActiveByUser(t *testing.T) {
 
 	user, device, pricing := createRentalTestData(t, db)
 
-	slotNo := 1
+	// 先创建Order
+	order := &models.Order{
+		OrderNo:        "R20240101013",
+		UserID:         user.ID,
+		Type:           models.OrderTypeRental,
+		OriginalAmount: pricing.Price + pricing.Deposit,
+		DiscountAmount: 0.0,
+		ActualAmount:   pricing.Price + pricing.Deposit,
+		DepositAmount:  pricing.Deposit,
+		Status:         models.OrderStatusPending,
+	}
+	db.Create(order)
+
 	rental := &models.Rental{
-		RentalNo:      "R20240101013",
+		OrderID:       order.ID,
 		UserID:        user.ID,
 		DeviceID:      device.ID,
-		PricingID:     pricing.ID,
-		SlotNo:        &slotNo,
+		DurationHours: 1,
+		RentalFee:     pricing.Price,
+		Deposit:       pricing.Deposit,
+		OvertimeRate:  pricing.OvertimeRate,
+		OvertimeFee:   0.0,
 		Status:        models.RentalStatusPaid,
-		UnitPrice:     pricing.Price,
-		DepositAmount: pricing.Deposit,
 	}
 	db.Create(rental)
 
@@ -401,16 +523,29 @@ func TestRentalRepository_GetCurrentByDevice(t *testing.T) {
 
 	user, device, pricing := createRentalTestData(t, db)
 
-	slotNo := 1
+	// 先创建Order
+	order := &models.Order{
+		OrderNo:        "R20240101014",
+		UserID:         user.ID,
+		Type:           models.OrderTypeRental,
+		OriginalAmount: pricing.Price + pricing.Deposit,
+		DiscountAmount: 0.0,
+		ActualAmount:   pricing.Price + pricing.Deposit,
+		DepositAmount:  pricing.Deposit,
+		Status:         models.OrderStatusPending,
+	}
+	db.Create(order)
+
 	rental := &models.Rental{
-		RentalNo:      "R20240101014",
+		OrderID:       order.ID,
 		UserID:        user.ID,
 		DeviceID:      device.ID,
-		PricingID:     pricing.ID,
-		SlotNo:        &slotNo,
+		DurationHours: 1,
+		RentalFee:     pricing.Price,
+		Deposit:       pricing.Deposit,
+		OvertimeRate:  pricing.OvertimeRate,
+		OvertimeFee:   0.0,
 		Status:        models.RentalStatusInUse,
-		UnitPrice:     pricing.Price,
-		DepositAmount: pricing.Deposit,
 	}
 	db.Create(rental)
 
@@ -427,16 +562,29 @@ func TestRentalRepository_GetExpiredPending(t *testing.T) {
 	user, device, pricing := createRentalTestData(t, db)
 
 	// 创建过期的待支付订单（通过直接修改数据库记录）
-	slotNo := 1
+	// 先创建Order
+	order := &models.Order{
+		OrderNo:        "R20240101015",
+		UserID:         user.ID,
+		Type:           models.OrderTypeRental,
+		OriginalAmount: pricing.Price + pricing.Deposit,
+		DiscountAmount: 0.0,
+		ActualAmount:   pricing.Price + pricing.Deposit,
+		DepositAmount:  pricing.Deposit,
+		Status:         models.OrderStatusPending,
+	}
+	db.Create(order)
+
 	rental := &models.Rental{
-		RentalNo:      "R20240101015",
+		OrderID:       order.ID,
 		UserID:        user.ID,
 		DeviceID:      device.ID,
-		PricingID:     pricing.ID,
-		SlotNo:        &slotNo,
+		DurationHours: 1,
+		RentalFee:     pricing.Price,
+		Deposit:       pricing.Deposit,
+		OvertimeRate:  pricing.OvertimeRate,
+		OvertimeFee:   0.0,
 		Status:        models.RentalStatusPending,
-		UnitPrice:     pricing.Price,
-		DepositAmount: pricing.Deposit,
 	}
 	db.Create(rental)
 
@@ -456,22 +604,33 @@ func TestRentalRepository_GetOverdue(t *testing.T) {
 	user, device, pricing := createRentalTestData(t, db)
 
 	// 创建超时的租借
-	slotNo := 1
 	now := time.Now()
-	startTime := now.Add(-2 * time.Hour)
-	endTime := now.Add(-1 * time.Hour) // 已过期
-	rental := &models.Rental{
-		RentalNo:      "R20240101016",
-		UserID:        user.ID,
-		DeviceID:      device.ID,
-		PricingID:     pricing.ID,
-		SlotNo:        &slotNo,
-		Status:        models.RentalStatusInUse,
-		UnitPrice:     pricing.Price,
-		DepositAmount: pricing.Deposit,
-		StartTime:     &startTime,
-		EndTime:       &endTime,
+	// 先创建Order
+	order := &models.Order{
+		OrderNo:        "R20240101016",
+		UserID:         user.ID,
+		Type:           models.OrderTypeRental,
+		OriginalAmount: pricing.Price + pricing.Deposit,
+		DiscountAmount: 0.0,
+		ActualAmount:   pricing.Price + pricing.Deposit,
+		DepositAmount:  pricing.Deposit,
+		Status:         models.OrderStatusPending,
 	}
+	db.Create(order)
+
+	rental := &models.Rental{
+		OrderID:           order.ID,
+		UserID:            user.ID,
+		DeviceID:          device.ID,
+		DurationHours:     1,
+		RentalFee:         pricing.Price,
+		Deposit:           pricing.Deposit,
+		OvertimeRate:      pricing.OvertimeRate,
+		OvertimeFee:       0.0,
+		Status:            models.RentalStatusInUse,
+	}
+	expectedReturnAt := now.Add(-1 * time.Hour) // 已过期
+	db.Model(rental).Update("expected_return_at", &expectedReturnAt)
 	db.Create(rental)
 
 	rentals, err := repo.GetOverdue(ctx, 10)
@@ -487,24 +646,37 @@ func TestRentalRepository_CountByStatus(t *testing.T) {
 	user, device, pricing := createRentalTestData(t, db)
 
 	// 创建不同状态的租借
-	statuses := []int8{
+	statuses := []string{
 		models.RentalStatusPending,
 		models.RentalStatusPaid,
 		models.RentalStatusInUse,
 		models.RentalStatusCompleted,
 	}
 
-	slotNo := 1
 	for i, status := range statuses {
+		// 先创建Order
+		order := &models.Order{
+			OrderNo:        "R2024010101" + string(rune('7'+i)),
+			UserID:         user.ID,
+			Type:           models.OrderTypeRental,
+			OriginalAmount: pricing.Price + pricing.Deposit,
+			DiscountAmount: 0.0,
+			ActualAmount:   pricing.Price + pricing.Deposit,
+			DepositAmount:  pricing.Deposit,
+			Status:         models.OrderStatusPending,
+		}
+		db.Create(order)
+
 		rental := &models.Rental{
-			RentalNo:      "R2024010101" + string(rune('7'+i)),
+			OrderID:       order.ID,
 			UserID:        user.ID,
 			DeviceID:      device.ID,
-			PricingID:     pricing.ID,
-			SlotNo:        &slotNo,
+			DurationHours: 1,
+			RentalFee:     pricing.Price,
+			Deposit:       pricing.Deposit,
+			OvertimeRate:  pricing.OvertimeRate,
+			OvertimeFee:   0.0,
 			Status:        status,
-			UnitPrice:     pricing.Price,
-			DepositAmount: pricing.Deposit,
 		}
 		db.Create(rental)
 	}
@@ -525,17 +697,30 @@ func TestRentalRepository_List(t *testing.T) {
 	user, device, pricing := createRentalTestData(t, db)
 
 	// 创建多个租借
-	slotNo := 1
 	for i := 0; i < 5; i++ {
+		// 先创建Order
+		order := &models.Order{
+			OrderNo:        "R2024010102" + string(rune('0'+i)),
+			UserID:         user.ID,
+			Type:           models.OrderTypeRental,
+			OriginalAmount: pricing.Price + pricing.Deposit,
+			DiscountAmount: 0.0,
+			ActualAmount:   pricing.Price + pricing.Deposit,
+			DepositAmount:  pricing.Deposit,
+			Status:         models.OrderStatusPending,
+		}
+		db.Create(order)
+
 		rental := &models.Rental{
-			RentalNo:      "R2024010102" + string(rune('0'+i)),
+			OrderID:       order.ID,
 			UserID:        user.ID,
 			DeviceID:      device.ID,
-			PricingID:     pricing.ID,
-			SlotNo:        &slotNo,
+			DurationHours: 1,
+			RentalFee:     pricing.Price,
+			Deposit:       pricing.Deposit,
+			OvertimeRate:  pricing.OvertimeRate,
+			OvertimeFee:   0.0,
 			Status:        models.RentalStatusPending,
-			UnitPrice:     pricing.Price,
-			DepositAmount: pricing.Deposit,
 		}
 		db.Create(rental)
 	}

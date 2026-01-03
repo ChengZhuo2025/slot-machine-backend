@@ -121,6 +121,7 @@ const (
 	RentalStatusPending   = "pending"    // 待支付
 	RentalStatusPaid      = "paid"       // 已支付(待取货)
 	RentalStatusInUse     = "in_use"     // 使用中
+	RentalStatusOverdue   = "overdue"    // 超时未还
 	RentalStatusReturned  = "returned"   // 已归还
 	RentalStatusCompleted = "completed"  // 已完成
 	RentalStatusCancelled = "cancelled"  // 已取消

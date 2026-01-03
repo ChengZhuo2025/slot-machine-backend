@@ -28,9 +28,10 @@ func setupPaymentIntegrationDB(t *testing.T) *gorm.DB {
 		&models.User{},
 		&models.UserWallet{},
 		&models.MemberLevel{},
+		&models.Order{},
+		&models.Rental{},
 		&models.Payment{},
 		&models.Refund{},
-		&models.Rental{},
 	)
 	require.NoError(t, err)
 
@@ -82,28 +83,38 @@ func TestPaymentFlow_BalancePayment(t *testing.T) {
 	ctx := context.Background()
 
 	// 创建租借订单
-	slotNo := 1
+	order := &models.Order{
+		OrderNo:        "R20240101001",
+		UserID:         user.ID,
+		Type:           models.OrderTypeRental,
+		OriginalAmount: 60.0,
+		DiscountAmount: 0.0,
+		ActualAmount:   60.0,
+		DepositAmount:  50.0,
+		Status:         models.OrderStatusPending,
+	}
+	db.Create(order)
+	
 	rental := &models.Rental{
-		RentalNo:      "R20240101001",
+		OrderID:       order.ID,
 		UserID:        user.ID,
 		DeviceID:      1,
-		PricingID:     1,
-		SlotNo:        &slotNo,
+		DurationHours: 1,
+		RentalFee:     10.0,
+		Deposit:       50.0,
+		OvertimeRate:  1.5,
+		OvertimeFee:   0.0,
 		Status:        models.RentalStatusPending,
-		UnitPrice:     10.0,
-		DepositAmount: 50.0,
-		RentalAmount:  10.0,
-		ActualAmount:  60.0,
 	}
 	db.Create(rental)
 
 	// 1. 创建支付订单
 	t.Run("步骤1: 创建支付订单", func(t *testing.T) {
 		req := &paymentService.CreatePaymentRequest{
-			OrderID:        rental.ID,
-			OrderNo:        rental.RentalNo,
+			OrderID:        order.ID,
+			OrderNo:        order.OrderNo,
 			OrderType:      "rental",
-			Amount:         rental.ActualAmount,
+			Amount:         order.ActualAmount,
 			PaymentMethod:  models.PaymentMethodBalance,
 			PaymentChannel: models.PaymentChannelMiniProgram,
 			Description:    "租借订单支付",
@@ -118,12 +129,12 @@ func TestPaymentFlow_BalancePayment(t *testing.T) {
 		var payment models.Payment
 		db.Where("payment_no = ?", resp.PaymentNo).First(&payment)
 		assert.Equal(t, int8(models.PaymentStatusPending), payment.Status)
-		assert.Equal(t, rental.ActualAmount, payment.Amount)
+		assert.Equal(t, order.ActualAmount, payment.Amount)
 	})
 
 	// 获取创建的支付记录
 	var payment models.Payment
-	db.Where("order_no = ?", rental.RentalNo).First(&payment)
+	db.Where("order_no = ?", order.OrderNo).First(&payment)
 
 	// 2. 查询支付状态
 	t.Run("步骤2: 查询支付状态", func(t *testing.T) {
@@ -239,23 +250,36 @@ func TestPaymentFlow_MultiplePayments(t *testing.T) {
 
 	// 创建多个支付订单
 	for i := 0; i < 5; i++ {
+		order := &models.Order{
+			OrderNo:        "R2024010100" + string(rune('3'+i)),
+			UserID:         user.ID,
+			Type:           models.OrderTypeRental,
+			OriginalAmount: 60.0,
+			DiscountAmount: 0.0,
+			ActualAmount:   60.0,
+			DepositAmount:  50.0,
+			Status:         models.OrderStatusPending,
+		}
+		db.Create(order)
+		
 		rental := &models.Rental{
-			RentalNo:      "R2024010100" + string(rune('3'+i)),
+			OrderID:       order.ID,
 			UserID:        user.ID,
 			DeviceID:      1,
-			PricingID:     1,
+			DurationHours: 1,
+			RentalFee:     10.0,
+			Deposit:       50.0,
+			OvertimeRate:  1.5,
+			OvertimeFee:   0.0,
 			Status:        models.RentalStatusPending,
-			UnitPrice:     10.0,
-			DepositAmount: 50.0,
-			ActualAmount:  60.0,
 		}
 		db.Create(rental)
 
 		req := &paymentService.CreatePaymentRequest{
-			OrderID:        rental.ID,
-			OrderNo:        rental.RentalNo,
+			OrderID:        order.ID,
+			OrderNo:        order.OrderNo,
 			OrderType:      "rental",
-			Amount:         rental.ActualAmount,
+			Amount:         order.ActualAmount,
 			PaymentMethod:  models.PaymentMethodBalance,
 			PaymentChannel: models.PaymentChannelMiniProgram,
 		}

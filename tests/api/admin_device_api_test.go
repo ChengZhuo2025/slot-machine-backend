@@ -123,7 +123,7 @@ func createDeviceAPITestAdmin(t *testing.T, db *gorm.DB, jwtManager *jwt.Manager
 	err = db.Create(admin).Error
 	require.NoError(t, err)
 
-	tokenPair, err := jwtManager.GenerateTokenPair(admin.ID, jwt.UserTypeAdmin)
+	tokenPair, err := jwtManager.GenerateTokenPair(admin.ID, jwt.UserTypeAdmin, role.Code)
 	require.NoError(t, err)
 
 	return tokenPair.AccessToken

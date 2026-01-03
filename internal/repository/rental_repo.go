@@ -51,7 +51,10 @@ func (r *RentalRepository) GetByIDWithRelations(ctx context.Context, id int64) (
 // GetByRentalNo 根据订单号获取租借订单
 func (r *RentalRepository) GetByRentalNo(ctx context.Context, rentalNo string) (*models.Rental, error) {
 	var rental models.Rental
-	err := r.db.WithContext(ctx).Where("rental_no = ?", rentalNo).First(&rental).Error
+	err := r.db.WithContext(ctx).
+		Joins("JOIN orders ON rentals.order_id = orders.id").
+		Where("orders.order_no = ?", rentalNo).
+		First(&rental).Error
 	if err != nil {
 		return nil, err
 	}
@@ -64,8 +67,8 @@ func (r *RentalRepository) GetByRentalNoWithRelations(ctx context.Context, renta
 	err := r.db.WithContext(ctx).
 		Preload("Device").
 		Preload("Device.Venue").
-		Preload("Pricing").
-		Where("rental_no = ?", rentalNo).
+		Joins("JOIN orders ON rentals.order_id = orders.id").
+		Where("orders.order_no = ?", rentalNo).
 		First(&rental).Error
 	if err != nil {
 		return nil, err
@@ -84,7 +87,7 @@ func (r *RentalRepository) UpdateFields(ctx context.Context, id int64, fields ma
 }
 
 // UpdateStatus 更新租借状态
-func (r *RentalRepository) UpdateStatus(ctx context.Context, id int64, status int8) error {
+func (r *RentalRepository) UpdateStatus(ctx context.Context, id int64, status string) error {
 	return r.db.WithContext(ctx).Model(&models.Rental{}).Where("id = ?", id).Update("status", status).Error
 }
 
@@ -138,6 +141,7 @@ func (r *RentalRepository) GetCurrentByDevice(ctx context.Context, deviceID int6
 		Where("status IN ?", []string{
 			models.RentalStatusPaid,
 			models.RentalStatusInUse,
+			models.RentalStatusOverdue,
 		}).
 		First(&rental).Error
 	if err != nil {
@@ -155,6 +159,7 @@ func (r *RentalRepository) GetActiveByUser(ctx context.Context, userID int64) (*
 			models.RentalStatusPending,
 			models.RentalStatusPaid,
 			models.RentalStatusInUse,
+			models.RentalStatusOverdue,
 		}).
 		First(&rental).Error
 	if err != nil {
@@ -172,6 +177,7 @@ func (r *RentalRepository) HasActiveRental(ctx context.Context, userID int64) (b
 			models.RentalStatusPending,
 			models.RentalStatusPaid,
 			models.RentalStatusInUse,
+			models.RentalStatusOverdue,
 		}).
 		Count(&count).Error
 	return count > 0, err
@@ -230,16 +236,16 @@ func (r *RentalRepository) GetOverdue(ctx context.Context, limit int) ([]*models
 	now := time.Now()
 	err := r.db.WithContext(ctx).
 		Where("status = ?", models.RentalStatusInUse).
-		Where("end_time < ?", now).
+		Where("expected_return_at < ?", now).
 		Limit(limit).
 		Find(&rentals).Error
 	return rentals, err
 }
 
 // CountByStatus 统计各状态租借数量
-func (r *RentalRepository) CountByStatus(ctx context.Context) (map[int8]int64, error) {
+func (r *RentalRepository) CountByStatus(ctx context.Context) (map[string]int64, error) {
 	type Result struct {
-		Status int8
+		Status string
 		Count  int64
 	}
 
@@ -252,7 +258,7 @@ func (r *RentalRepository) CountByStatus(ctx context.Context) (map[int8]int64, e
 		return nil, err
 	}
 
-	counts := make(map[int8]int64)
+	counts := make(map[string]int64)
 	for _, r := range results {
 		counts[r.Status] = r.Count
 	}

@@ -55,6 +55,7 @@ type CreateRentalRequest struct {
 type RentalInfo struct {
 	ID               int64                     `json:"id"`
 	OrderID          int64                     `json:"order_id"`
+	OrderNo          string                    `json:"order_no"`
 	Status           string                    `json:"status"`
 	StatusName       string                    `json:"status_name"`
 	Device           *deviceService.DeviceInfo  `json:"device,omitempty"`
@@ -444,6 +445,12 @@ func (s *RentalService) ListRentals(ctx context.Context, userID int64, offset, l
 
 // toRentalInfo 转换为租借信息
 func (s *RentalService) toRentalInfo(rental *models.Rental, device *models.Device, _ *models.RentalPricing) *RentalInfo {
+	// 获取Order信息
+	var order models.Order
+	if rental.OrderID > 0 {
+		s.db.Where("id = ?", rental.OrderID).First(&order)
+	}
+
 	info := &RentalInfo{
 		ID:               rental.ID,
 		OrderID:          rental.OrderID,
@@ -459,6 +466,11 @@ func (s *RentalService) toRentalInfo(rental *models.Rental, device *models.Devic
 		ReturnedAt:       rental.ReturnedAt,
 		IsPurchased:      rental.IsPurchased,
 		CreatedAt:        rental.CreatedAt,
+	}
+
+	// 如果有Order，添加OrderNo
+	if rental.OrderID > 0 {
+		info.OrderNo = order.OrderNo
 	}
 
 	if device != nil {

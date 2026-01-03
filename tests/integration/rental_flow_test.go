@@ -35,7 +35,10 @@ func setupRentalIntegrationDB(t *testing.T) *gorm.DB {
 		&models.Device{},
 		&models.DeviceLog{},
 		&models.RentalPricing{},
+		&models.Order{},
 		&models.Rental{},
+		&models.Payment{},
+		&models.Refund{},
 		&models.WalletTransaction{},
 	)
 	require.NoError(t, err)
@@ -116,14 +119,12 @@ func setupRentalTestEnvironment(t *testing.T, db *gorm.DB) (*rentalService.Renta
 
 	// 创建定价
 	pricing := &models.RentalPricing{
-		DeviceID:     device.ID,
-		Name:         "1小时租借",
-		Duration:     1,
-		DurationUnit: models.DurationUnitHour,
-		Price:        10.0,
-		Deposit:      50.0,
-		IsDefault:    true,
-		Status:       models.RentalPricingStatusActive,
+		VenueID:       &venue.ID,
+		DurationHours: 1,
+		Price:         10.0,
+		Deposit:       50.0,
+		OvertimeRate:  1.5,
+		IsActive:      true,
 	}
 	db.Create(pricing)
 
@@ -155,8 +156,12 @@ func TestRentalFlow_CompleteProcess(t *testing.T) {
 		rentalInfo, err := svc.CreateRental(ctx, user.ID, req)
 		require.NoError(t, err)
 		assert.NotNil(t, rentalInfo)
-		assert.Equal(t, int8(models.RentalStatusPending), rentalInfo.Status)
-		assert.NotEmpty(t, rentalInfo.RentalNo)
+		assert.Equal(t, models.RentalStatusPending, rentalInfo.Status)
+		
+		// 检查OrderNo
+		var order models.Order
+		db.Where("id = ?", rentalInfo.OrderID).First(&order)
+		assert.NotEmpty(t, order.OrderNo)
 
 		// 验证设备槽位已减少
 		var updatedDevice models.Device
@@ -175,8 +180,11 @@ func TestRentalFlow_CompleteProcess(t *testing.T) {
 
 		// 验证订单状态
 		db.First(&rental, rental.ID)
-		assert.Equal(t, int8(models.RentalStatusPaid), rental.Status)
-		assert.NotNil(t, rental.PaidAt)
+		assert.Equal(t, models.RentalStatusPaid, rental.Status)
+		// 检查Order状态
+		var order models.Order
+		db.Where("id = ?", rental.OrderID).First(&order)
+		assert.NotNil(t, order.PaidAt)
 
 		// 验证钱包余额变化
 		var wallet models.UserWallet
@@ -192,9 +200,9 @@ func TestRentalFlow_CompleteProcess(t *testing.T) {
 
 		// 验证订单状态
 		db.First(&rental, rental.ID)
-		assert.Equal(t, int8(models.RentalStatusInUse), rental.Status)
-		assert.NotNil(t, rental.StartTime)
-		assert.NotNil(t, rental.EndTime)
+		assert.Equal(t, models.RentalStatusInUse, rental.Status)
+		assert.NotNil(t, rental.UnlockedAt)
+		assert.NotNil(t, rental.ExpectedReturnAt)
 
 		// 验证设备状态
 		var updatedDevice models.Device
@@ -209,9 +217,8 @@ func TestRentalFlow_CompleteProcess(t *testing.T) {
 
 		// 验证订单状态
 		db.First(&rental, rental.ID)
-		assert.Equal(t, int8(models.RentalStatusReturned), rental.Status)
+		assert.Equal(t, models.RentalStatusReturned, rental.Status)
 		assert.NotNil(t, rental.ReturnedAt)
-		assert.NotNil(t, rental.Duration)
 
 		// 验证设备状态恢复
 		var updatedDevice models.Device
@@ -227,8 +234,11 @@ func TestRentalFlow_CompleteProcess(t *testing.T) {
 
 		// 验证订单状态
 		db.First(&rental, rental.ID)
-		assert.Equal(t, int8(models.RentalStatusCompleted), rental.Status)
-		assert.Equal(t, pricing.Deposit, rental.RefundAmount) // 押金全额退还（未超时）
+		assert.Equal(t, models.RentalStatusCompleted, rental.Status)
+		// 检查Refund记录（押金全额退还）
+		var refund models.Refund
+		db.Where("order_id = ?", rental.OrderID).First(&refund)
+		assert.Equal(t, pricing.Deposit, refund.Amount)
 
 		// 验证钱包余额 - 押金已退还
 		var wallet models.UserWallet
@@ -264,7 +274,7 @@ func TestRentalFlow_CancelPendingOrder(t *testing.T) {
 	// 验证订单状态
 	var rental models.Rental
 	db.First(&rental, rentalInfo.ID)
-	assert.Equal(t, int8(models.RentalStatusCancelled), rental.Status)
+	assert.Equal(t, models.RentalStatusCancelled, rental.Status)
 
 	// 验证设备槽位恢复
 	db.First(&updatedDevice, device.ID)
@@ -306,13 +316,12 @@ func TestRentalFlow_PreventDuplicateActiveRental(t *testing.T) {
 	db.Create(device2)
 
 	pricing2 := &models.RentalPricing{
-		DeviceID:     device2.ID,
-		Name:         "1小时租借",
-		Duration:     1,
-		DurationUnit: models.DurationUnitHour,
-		Price:        10.0,
-		Deposit:      50.0,
-		Status:       models.RentalPricingStatusActive,
+		VenueID:      &device2.VenueID,
+		DurationHours: 1,
+		Price:         10.0,
+		Deposit:       50.0,
+		OvertimeRate:  1.5,
+		IsActive:      true,
 	}
 	db.Create(pricing2)
 
@@ -373,13 +382,12 @@ func TestRentalFlow_InsufficientBalance(t *testing.T) {
 	db.Create(device)
 
 	pricing := &models.RentalPricing{
-		DeviceID:     device.ID,
-		Name:         "1小时租借",
-		Duration:     1,
-		DurationUnit: models.DurationUnitHour,
-		Price:        10.0,
-		Deposit:      50.0, // 总计60，超过余额
-		Status:       models.RentalPricingStatusActive,
+		VenueID:       &venue.ID,
+		DurationHours:  1,
+		Price:         10.0,
+		Deposit:       50.0, // 总计60，超过余额
+		OvertimeRate:  1.5,
+		IsActive:      true,
 	}
 	db.Create(pricing)
 
@@ -452,37 +460,49 @@ func TestRentalFlow_OverdueRental(t *testing.T) {
 	db.Create(device)
 
 	pricing := &models.RentalPricing{
-		DeviceID:     device.ID,
-		Name:         "1小时租借",
-		Duration:     1,
-		DurationUnit: models.DurationUnitHour,
-		Price:        10.0,
-		Deposit:      50.0,
-		Status:       models.RentalPricingStatusActive,
+		VenueID:       &venue.ID,
+		DurationHours:  1,
+		Price:         10.0,
+		Deposit:       50.0,
+		OvertimeRate:  1.5,
+		IsActive:      true,
 	}
 	db.Create(pricing)
 
 	// 直接创建一个已归还但超时的订单
 	now := time.Now()
-	startTime := now.Add(-3 * time.Hour)
-	endTime := now.Add(-2 * time.Hour)     // 应该在2小时前归还
+	unlockedAt := now.Add(-3 * time.Hour)
+	expectedReturnAt := now.Add(-2 * time.Hour)     // 应该在2小时前归还
 	returnedAt := now.Add(-30 * time.Minute) // 实际30分钟前归还，超时1.5小时
-	slotNo := 1
+
+	// 先创建Order
+	order := &models.Order{
+		OrderNo:        "R20240101001",
+		UserID:         user.ID,
+		Type:           models.OrderTypeRental,
+		OriginalAmount:  pricing.Price + pricing.Deposit,
+		DiscountAmount: 0.0,
+		ActualAmount:   pricing.Price + pricing.Deposit,
+		DepositAmount:  pricing.Deposit,
+		Status:         models.OrderStatusCompleted,
+		PaidAt:        &unlockedAt,
+		CompletedAt:   &returnedAt,
+	}
+	db.Create(order)
 
 	rental := &models.Rental{
-		RentalNo:      "R20240101001",
-		UserID:        user.ID,
-		DeviceID:      device.ID,
-		PricingID:     pricing.ID,
-		SlotNo:        &slotNo,
-		Status:        models.RentalStatusReturned,
-		UnitPrice:     pricing.Price,
-		DepositAmount: pricing.Deposit,
-		RentalAmount:  pricing.Price,
-		ActualAmount:  pricing.Price + pricing.Deposit,
-		StartTime:     &startTime,
-		EndTime:       &endTime,
-		ReturnedAt:    &returnedAt,
+		OrderID:          order.ID,
+		UserID:           user.ID,
+		DeviceID:         device.ID,
+		DurationHours:     1,
+		RentalFee:        pricing.Price,
+		Deposit:          pricing.Deposit,
+		OvertimeRate:      1.5,
+		OvertimeFee:       20.0, // 超时费用
+		Status:           models.RentalStatusReturned,
+		UnlockedAt:       &unlockedAt,
+		ExpectedReturnAt: &expectedReturnAt,
+		ReturnedAt:       &returnedAt,
 	}
 	db.Create(rental)
 
@@ -509,5 +529,7 @@ func TestRentalFlow_OverdueRental(t *testing.T) {
 	// 超时费用应从押金扣除
 	// 超时约1.5小时，按小时计算应该扣除 2 小时的费用 = 20元
 	// 押金50元，扣除20元后应退还30元
-	assert.Less(t, rental.RefundAmount, pricing.Deposit)
+	var refund models.Refund
+	db.Where("order_id = ?", rental.OrderID).First(&refund)
+	assert.Less(t, refund.Amount, pricing.Deposit)
 }

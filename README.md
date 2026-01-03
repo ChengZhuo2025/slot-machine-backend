@@ -101,6 +101,10 @@ make run
 
 # 或直接运行
 go run cmd/api-gateway/main.go
+
+# 或先编译再运行
+go build -o bin/api-gateway cmd/api-gateway/
+bin/api-gateway
 ```
 
 ### 7. 验证服务

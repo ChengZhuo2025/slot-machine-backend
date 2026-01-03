@@ -1,4 +1,21 @@
 // Package main 是应用程序入口
+//
+//	@title						爱上杜美人智能开锁管理系统 API
+//	@version					1.0
+//	@description				智能充电宝租借、酒店预订、商城、分销等多业务场景的后端服务
+//	@termsOfService				https://example.com/terms/
+//	@contact.name				API Support
+//	@contact.url				https://example.com/support
+//	@contact.email				support@example.com
+//	@license.name				MIT
+//	@license.url				https://opensource.org/licenses/MIT
+//	@host						localhost:8000
+//	@BasePath					/api/v1
+//	@schemes					http https
+//	@securityDefinitions.apikey	BearerAuth
+//	@in							header
+//	@name						Authorization
+//	@description				Type "Bearer" followed by a space and JWT token.
 package main
 
 import (
@@ -13,6 +30,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 
+	_ "github.com/dumeirei/smart-locker-backend/docs" // 导入生成的 docs
 	"github.com/dumeirei/smart-locker-backend/internal/common/cache"
 	"github.com/dumeirei/smart-locker-backend/internal/common/config"
 	"github.com/dumeirei/smart-locker-backend/internal/common/database"

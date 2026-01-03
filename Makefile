@@ -60,11 +60,11 @@ build-all: ## Build all services
 
 run: ## Run the API gateway
 	@echo "Running API Gateway..."
-	$(GOCMD) run $(CMD_DIR)/api-gateway/main.go
+	$(GOCMD) run $(CMD_DIR)/api-gateway/*.go
 
 run-dev: docker-up ## Run in development mode with docker dependencies
 	@echo "Running in development mode..."
-	$(GOCMD) run $(CMD_DIR)/api-gateway/main.go
+	$(GOCMD) run $(CMD_DIR)/api-gateway/*.go
 
 # =========================================
 # Test

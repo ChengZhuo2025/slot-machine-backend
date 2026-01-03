@@ -6,6 +6,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 
@@ -90,6 +92,9 @@ func setupRouter(
 	r.GET("/health", healthHandler)
 	r.GET("/ping", pingHandler)
 	r.GET("/ready", readyHandler(db, redisClient))
+
+	// Swagger 文档
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// API v1 路由组
 	v1 := r.Group("/api/v1")

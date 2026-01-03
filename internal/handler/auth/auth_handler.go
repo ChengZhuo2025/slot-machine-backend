@@ -35,9 +35,9 @@ func NewHandler(
 // @Tags 认证
 // @Accept json
 // @Produce json
-// @Param request body SendSmsCodeRequest true "请求参数"
+// @Param request body authService.SendSmsCodeRequest true "请求参数"
 // @Success 200 {object} response.Response
-// @Router /api/v1/auth/sms/send [post]
+// @Router /auth/sms/send [post]
 func (h *Handler) SendSmsCode(c *gin.Context) {
 	var req authService.SendSmsCodeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -64,9 +64,9 @@ func (h *Handler) SendSmsCode(c *gin.Context) {
 // @Tags 认证
 // @Accept json
 // @Produce json
-// @Param request body SmsLoginRequest true "请求参数"
+// @Param request body authService.SmsLoginRequest true "请求参数"
 // @Success 200 {object} response.Response{data=authService.LoginResponse}
-// @Router /api/v1/auth/login/sms [post]
+// @Router /auth/login/sms [post]
 func (h *Handler) SmsLogin(c *gin.Context) {
 	var req authService.SmsLoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -92,9 +92,9 @@ func (h *Handler) SmsLogin(c *gin.Context) {
 // @Tags 认证
 // @Accept json
 // @Produce json
-// @Param request body WechatLoginRequest true "请求参数"
+// @Param request body authService.WechatLoginRequest true "请求参数"
 // @Success 200 {object} response.Response{data=authService.LoginResponse}
-// @Router /api/v1/auth/login/wechat [post]
+// @Router /auth/login/wechat [post]
 func (h *Handler) WechatLogin(c *gin.Context) {
 	var req authService.WechatLoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -127,7 +127,7 @@ type RefreshTokenRequest struct {
 // @Produce json
 // @Param request body RefreshTokenRequest true "请求参数"
 // @Success 200 {object} response.Response
-// @Router /api/v1/auth/refresh [post]
+// @Router /auth/refresh [post]
 func (h *Handler) RefreshToken(c *gin.Context) {
 	var req RefreshTokenRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -162,7 +162,7 @@ type BindPhoneRequest struct {
 // @Security Bearer
 // @Param request body BindPhoneRequest true "请求参数"
 // @Success 200 {object} response.Response
-// @Router /api/v1/auth/bind-phone [post]
+// @Router /auth/bind-phone [post]
 func (h *Handler) BindPhone(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	if userID == 0 {
@@ -194,7 +194,7 @@ func (h *Handler) BindPhone(c *gin.Context) {
 // @Produce json
 // @Security Bearer
 // @Success 200 {object} response.Response{data=authService.UserInfo}
-// @Router /api/v1/auth/me [get]
+// @Router /auth/me [get]
 func (h *Handler) GetCurrentUser(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	if userID == 0 {
@@ -230,7 +230,7 @@ func (h *Handler) GetCurrentUser(c *gin.Context) {
 // @Produce json
 // @Security Bearer
 // @Success 200 {object} response.Response
-// @Router /api/v1/auth/logout [post]
+// @Router /auth/logout [post]
 func (h *Handler) Logout(c *gin.Context) {
 	// TODO: 如果需要，可以将 token 加入黑名单
 	response.Success(c, nil)

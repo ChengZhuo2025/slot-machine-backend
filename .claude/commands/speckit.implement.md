@@ -49,9 +49,19 @@ You **MUST** consider the user input before proceeding (if not empty).
    - **REQUIRED**: Read tasks.md for the complete task list and execution plan
    - **REQUIRED**: Read plan.md for tech stack, architecture, and file structure
    - **IF EXISTS**: Read data-model.md for entities and relationships
+   - **IF EXISTS**: Read model-development-guide.md for Model development standards ⚠️ **CRITICAL for Go projects**
    - **IF EXISTS**: Read contracts/ for API specifications and test requirements
    - **IF EXISTS**: Read research.md for technical decisions and constraints
    - **IF EXISTS**: Read quickstart.md for integration scenarios
+
+   **⚠️ CRITICAL FOR MODEL DEVELOPMENT**:
+   - When implementing any Model/Entity class (Go models, Django models, SQLAlchemy models, etc.):
+     1. **MUST read data-model.md first** to understand table structure
+     2. **MUST read corresponding migration file** (e.g., `migrations/000XXX_create_xxx.up.sql`)
+     3. **MUST follow model-development-guide.md** if it exists (especially for Go/GORM projects)
+     4. **MUST verify field names match database exactly** using `column:` tags (Go) or equivalent
+     5. **MUST use string types for status fields** (not int/enum) for readability
+     6. **MUST write basic CRUD unit tests** immediately after creating Model
 
 4. **Project Setup Verification**:
    - **REQUIRED**: Create/verify ignore files based on actual project setup:

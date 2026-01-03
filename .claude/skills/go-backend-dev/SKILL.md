@@ -137,34 +137,73 @@ func (r *UserRepository) GetByID(ctx context.Context, id int64) (*models.User, e
 
 ### Model Definition
 
-Define GORM models in `internal/models/`:
+**CRITICAL**: Define GORM models in `internal/models/` following strict conventions.
+
+**⚠️ IMPORTANT RULES**:
+1. **ALL fields MUST have `column:` tag** - Never rely on GORM's automatic naming
+2. **Field names must match database column names exactly**
+3. **Status fields MUST use `string` type** (not int/int8) for readability
+4. **Always refer to migration files** for authoritative schema definitions
 
 ```go
 package models
 
-import (
-    "time"
-    "gorm.io/gorm"
-)
+import "time"
 
+// User model - ALWAYS refer to migrations/000001_init_users.up.sql
 type User struct {
-    ID              int64          `gorm:"primaryKey" json:"id"`
-    Phone           string         `gorm:"size:20;uniqueIndex" json:"phone"`
-    OpenID          *string        `gorm:"size:64;uniqueIndex" json:"openid,omitempty"`
-    Nickname        string         `gorm:"size:50;not null" json:"nickname"`
-    Avatar          *string        `gorm:"size:255" json:"avatar,omitempty"`
-    MemberLevelID   int64          `gorm:"default:1" json:"member_level_id"`
-    Points          int            `gorm:"default:0" json:"points"`
-    Status          int8           `gorm:"default:1" json:"status"`
-    CreatedAt       time.Time      `json:"created_at"`
-    UpdatedAt       time.Time      `json:"updated_at"`
-    DeletedAt       gorm.DeletedAt `gorm:"index" json:"-"`
+    // Primary key
+    ID int64 `gorm:"primaryKey;autoIncrement" json:"id"`
+
+    // Business fields - ALL must have column: tag
+    Phone           string     `gorm:"column:phone;type:varchar(20);uniqueIndex;not null" json:"phone"`
+    OpenID          *string    `gorm:"column:openid;type:varchar(64);uniqueIndex" json:"openid,omitempty"`
+    Unionid         *string    `gorm:"column:unionid;type:varchar(64)" json:"unionid,omitempty"`
+    Nickname        string     `gorm:"column:nickname;type:varchar(50);not null" json:"nickname"`
+    Avatar          *string    `gorm:"column:avatar;type:varchar(255)" json:"avatar,omitempty"`
+    Gender          int16      `gorm:"column:gender;type:smallint;default:0" json:"gender"`
+    Birthday        *time.Time `gorm:"column:birthday;type:date" json:"birthday,omitempty"`
+    MemberLevelID   int64      `gorm:"column:member_level_id;default:1" json:"member_level_id"`
+    Points          int        `gorm:"column:points;default:0" json:"points"`
+    IsVerified      bool       `gorm:"column:is_verified;not null;default:false" json:"is_verified"`
+    ReferrerID      *int64     `gorm:"column:referrer_id;index" json:"referrer_id,omitempty"`
+
+    // Status field - Use string type for readability (NOT int8!)
+    Status          string     `gorm:"column:status;type:varchar(20);not null" json:"status"`
+
+    // Timestamps
+    CreatedAt       time.Time  `gorm:"column:created_at;autoCreateTime" json:"created_at"`
+    UpdatedAt       time.Time  `gorm:"column:updated_at;autoUpdateTime" json:"updated_at"`
+    DeletedAt       *time.Time `gorm:"column:deleted_at;index" json:"deleted_at,omitempty"`
+
+    // Relations
+    Referrer *User `gorm:"foreignKey:ReferrerID" json:"referrer,omitempty"`
 }
 
 func (User) TableName() string {
     return "users"
 }
+
+// UserStatus constants - Use strings for clarity
+const (
+    UserStatusActive   = "active"
+    UserStatusInactive = "inactive"
+    UserStatusBanned   = "banned"
+)
 ```
+
+**Development Checklist** (MUST complete before PR):
+- [ ] Checked `specs/001-smart-locker-backend/data-model.md` for table definition
+- [ ] Checked corresponding migration file in `migrations/`
+- [ ] All fields have `column:` tags
+- [ ] Field types match database (VARCHAR→string, BIGINT→int64, BOOLEAN→bool, TIMESTAMP→time.Time)
+- [ ] Status fields use string type (not int/int8)
+- [ ] NOT NULL fields use value types, NULLABLE fields use pointer types
+- [ ] No extra fields that don't exist in database
+- [ ] No missing required fields from database
+- [ ] Wrote basic CRUD unit tests
+
+**Reference**: See `specs/001-smart-locker-backend/model-development-guide.md` for complete standards.
 
 ## Unified Response Format
 

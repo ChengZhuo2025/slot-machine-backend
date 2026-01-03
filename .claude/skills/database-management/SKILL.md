@@ -91,51 +91,99 @@ migrate -path migrations -database "$DB_URL" force 1
 
 ## GORM Model Definitions
 
-### Model with Hooks
+**⚠️ CRITICAL**: Always define models to match migration files EXACTLY.
+
+**MANDATORY RULES**:
+1. **ALL fields MUST have `column:` tag** to ensure correct mapping
+2. **Field names must match database column names**
+3. **Status fields MUST use `string` type** (not int/smallint) - improves readability and maintainability
+4. **Refer to `data-model.md` and migration files** before writing any Model
+
+### Model with Correct Field Mapping
 
 ```go
 package models
 
 import (
     "time"
-    "gorm.io/gorm"
-    "github.com/shopspring/decimal"
 )
 
+// Order model - Refer to migrations/000003_create_orders.up.sql and data-model.md
 type Order struct {
-    ID             int64           `gorm:"primaryKey"`
-    OrderNo        string          `gorm:"size:64;uniqueIndex;not null"`
-    UserID         int64           `gorm:"index;not null"`
-    Type           string          `gorm:"size:20;index;not null"`
-    OriginalAmount decimal.Decimal `gorm:"type:decimal(12,2);not null"`
-    DiscountAmount decimal.Decimal `gorm:"type:decimal(12,2);default:0"`
-    ActualAmount   decimal.Decimal `gorm:"type:decimal(12,2);not null"`
-    DepositAmount  decimal.Decimal `gorm:"type:decimal(12,2);default:0"`
-    Status         string          `gorm:"size:20;index;not null"`
-    CouponID       *int64          `gorm:"index"`
-    PaidAt         *time.Time
-    CompletedAt    *time.Time
-    CreatedAt      time.Time       `gorm:"index"`
-    UpdatedAt      time.Time
-    DeletedAt      gorm.DeletedAt  `gorm:"index"`
+    // Primary key
+    ID int64 `gorm:"primaryKey;autoIncrement" json:"id"`
+
+    // Business fields - ALL require column: tag
+    OrderNo        string     `gorm:"column:order_no;type:varchar(64);uniqueIndex;not null" json:"order_no"`
+    UserID         int64      `gorm:"column:user_id;index;not null" json:"user_id"`
+    Type           string     `gorm:"column:type;type:varchar(20);index;not null" json:"type"`
+    OriginalAmount float64    `gorm:"column:original_amount;type:decimal(12,2);not null" json:"original_amount"`
+    DiscountAmount float64    `gorm:"column:discount_amount;type:decimal(12,2);not null;default:0" json:"discount_amount"`
+    ActualAmount   float64    `gorm:"column:actual_amount;type:decimal(12,2);not null" json:"actual_amount"`
+    DepositAmount  float64    `gorm:"column:deposit_amount;type:decimal(12,2);not null;default:0" json:"deposit_amount"`
+
+    // Status field - Use string type for clarity (NOT int/smallint!)
+    Status         string     `gorm:"column:status;type:varchar(20);index;not null" json:"status"`
+
+    // Optional fields - Use pointer types for NULLABLE columns
+    CouponID       *int64     `gorm:"column:coupon_id;index" json:"coupon_id,omitempty"`
+    Remark         *string    `gorm:"column:remark;type:varchar(255)" json:"remark,omitempty"`
+
+    // Timestamps
+    PaidAt         *time.Time `gorm:"column:paid_at" json:"paid_at,omitempty"`
+    CompletedAt    *time.Time `gorm:"column:completed_at" json:"completed_at,omitempty"`
+    CreatedAt      time.Time  `gorm:"column:created_at;autoCreateTime;index" json:"created_at"`
+    UpdatedAt      time.Time  `gorm:"column:updated_at;autoUpdateTime" json:"updated_at"`
+    DeletedAt      *time.Time `gorm:"column:deleted_at;index" json:"deleted_at,omitempty"`
 
     // Relations
-    User      User        `gorm:"foreignKey:UserID"`
-    Items     []OrderItem `gorm:"foreignKey:OrderID"`
-    Payments  []Payment   `gorm:"foreignKey:OrderID"`
-}
-
-func (o *Order) BeforeCreate(tx *gorm.DB) error {
-    if o.OrderNo == "" {
-        o.OrderNo = generateOrderNo()
-    }
-    return nil
+    User      *User        `gorm:"foreignKey:UserID" json:"user,omitempty"`
+    Items     []OrderItem  `gorm:"foreignKey:OrderID" json:"items,omitempty"`
+    Payments  []Payment    `gorm:"foreignKey:OrderID" json:"payments,omitempty"`
 }
 
 func (Order) TableName() string {
     return "orders"
 }
+
+// OrderStatus constants - Use strings for readability
+const (
+    OrderStatusPending   = "pending"
+    OrderStatusPaid      = "paid"
+    OrderStatusShipping  = "shipping"
+    OrderStatusCompleted = "completed"
+    OrderStatusCancelled = "cancelled"
+    OrderStatusRefunded  = "refunded"
+)
 ```
+
+### Field Type Mapping Rules
+
+| PostgreSQL Type | Go Type | GORM Tag Example | Notes |
+|----------------|---------|------------------|-------|
+| BIGINT | `int64` | `gorm:"type:bigint"` | Primary keys, foreign keys |
+| INT | `int` | `gorm:"type:int"` | Counts, quantities |
+| SMALLINT | `int16` | `gorm:"type:smallint"` | Small numbers (NOT for status!) |
+| VARCHAR(n) | `string` | `gorm:"column:name;type:varchar(100)"` | Text fields |
+| TEXT | `string` | `gorm:"column:content;type:text"` | Long text |
+| DECIMAL(m,n) | `float64` | `gorm:"column:amount;type:decimal(12,2)"` | Money, prices |
+| BOOLEAN | `bool` | `gorm:"column:is_active;type:boolean"` | Flags |
+| TIMESTAMP (required) | `time.Time` | `gorm:"column:created_at"` | Required timestamps |
+| TIMESTAMP (nullable) | `*time.Time` | `gorm:"column:deleted_at"` | Optional timestamps |
+
+### Development Workflow
+
+**BEFORE writing any Model code**:
+
+1. **Read data-model.md**: Check `specs/001-smart-locker-backend/data-model.md` for table definition
+2. **Read migration file**: Open corresponding `migrations/000XXX_create_xxx.up.sql`
+3. **Copy column names**: Copy exact column names from CREATE TABLE statement
+4. **Add column: tags**: Every field must have `column:` tag
+5. **Match types**: Use correct Go type mapping (see table above)
+6. **Status as string**: Never use int/int8 for status fields
+7. **Test immediately**: Write basic CRUD test to verify Model works
+
+**Reference**: See `specs/001-smart-locker-backend/model-development-guide.md` for complete standards.
 
 ### Soft Delete
 

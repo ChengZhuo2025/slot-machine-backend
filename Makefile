@@ -198,9 +198,12 @@ generate: ## Run go generate
 	@echo "Running go generate..."
 	$(GOCMD) generate ./...
 
+# Swagger CLI (installed via: go install github.com/swaggo/swag/cmd/swag@v1.16.6)
+SWAG ?= $(shell go env GOPATH)/bin/swag
+
 swagger: ## Generate swagger documentation
 	@echo "Generating swagger documentation..."
-	swag init -g cmd/api-gateway/main.go -o api/openapi
+	$(SWAG) init --parseInternal --parseDependency --dir ./cmd/api-gateway,./internal/handler -g main.go -o docs
 
 # =========================================
 # Clean

@@ -559,7 +559,7 @@
 ### API 文档
 
 - [ ] T234 集成 Swagger 文档生成 `cmd/api-gateway/swagger.go`
-- [ ] T235 生成 OpenAPI 文档到 `api/openapi/`
+- [ ] T235 生成 OpenAPI 文档到 `docs/`
 
 ### 部署配置
 

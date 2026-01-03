@@ -15,7 +15,7 @@ run:
     - testdata
     - examples
     - docs
-    - api/openapi
+    - docs
   # 跳过的文件
   skip-files:
     - ".*_test.go$"

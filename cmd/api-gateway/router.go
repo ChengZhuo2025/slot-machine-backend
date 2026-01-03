@@ -98,7 +98,18 @@ func setupRouter(
 	r.GET("/ready", readyHandler(db, redisClient))
 
 	// Swagger 文档
-	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	// Swagger UI 实际读取的是 /swagger/doc.json。
+	// Gin 不允许同时注册 /swagger/index.html 与 /swagger/*any（会冲突），所以这里用单一路由
+	// /swagger/*any，在请求 index.html 时返回自定义页面，其余静态资源仍交给 gin-swagger。
+	swaggerHandler := ginSwagger.WrapHandler(swaggerFiles.Handler)
+	r.GET("/swagger/*any", func(c *gin.Context) {
+		any := c.Param("any")
+		if any == "" || any == "/" || any == "/index.html" {
+			renderSwaggerIndex(c)
+			return
+		}
+		swaggerHandler(c)
+	})
 
 	// API v1 路由组
 	v1 := r.Group("/api/v1")
@@ -353,6 +364,104 @@ func setupRouter(
 			"message": "接口不存在",
 		})
 	})
+}
+
+// placeholderHandler 占位处理器（待实现的接口）
+func renderSwaggerIndex(c *gin.Context) {
+	const html = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Swagger UI</title>
+  <link rel="stylesheet" type="text/css" href="./swagger-ui.css" />
+  <link rel="stylesheet" type="text/css" href="./index.css" />
+  <link rel="icon" type="image/png" href="./favicon-32x32.png" sizes="32x32" />
+  <link rel="icon" type="image/png" href="./favicon-16x16.png" sizes="16x16" />
+  <style>
+    .api-stats {
+      margin-left: auto;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 600;
+      opacity: .95;
+      white-space: nowrap;
+    }
+    .api-stats small { font-weight: 400; opacity: .85; }
+  </style>
+</head>
+
+<body>
+  <div class="swagger-ui">
+    <div class="topbar">
+      <div class="wrapper">
+        <div class="topbar-wrapper">
+          <a class="link" href="#">
+            <span>Swagger</span>
+          </a>
+          <div id="api-stats" class="api-stats">API 接口总数：加载中…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="swagger-ui"></div>
+
+  <script src="./swagger-ui-bundle.js" charset="UTF-8"></script>
+  <script src="./swagger-ui-standalone-preset.js" charset="UTF-8"></script>
+  <script>
+    async function updateApiStats() {
+      try {
+        // Swagger UI 默认读取 doc.json（相对路径：/swagger/doc.json）
+        const res = await fetch('doc.json', { cache: 'no-store' });
+        const spec = await res.json();
+
+        const methods = ['get','post','put','delete','patch','options','head'];
+        let ops = 0;
+        let pathCount = 0;
+
+        const paths = spec && spec.paths ? spec.paths : {};
+        for (const p in paths) {
+          if (!Object.prototype.hasOwnProperty.call(paths, p)) continue;
+          pathCount++;
+          const item = paths[p] || {};
+          for (const m of methods) {
+            if (item[m]) ops++;
+          }
+        }
+
+        const el = document.getElementById('api-stats');
+        if (el) {
+          el.innerHTML = 'API 接口总数：' + ops + ' <small>(paths：' + pathCount + ')</small>';
+        }
+      } catch (e) {
+        const el = document.getElementById('api-stats');
+        if (el) el.textContent = 'API 接口总数：统计失败';
+      }
+    }
+
+    window.onload = async function() {
+      await updateApiStats();
+
+      const ui = SwaggerUIBundle({
+        url: 'doc.json',
+        dom_id: '#swagger-ui',
+        deepLinking: true,
+        presets: [
+          SwaggerUIBundle.presets.apis,
+          SwaggerUIStandalonePreset
+        ],
+        layout: 'StandaloneLayout'
+      });
+
+      window.ui = ui;
+    };
+  </script>
+</body>
+</html>`
+
+	c.Header("Content-Type", "text/html; charset=utf-8")
+	c.String(200, html)
 }
 
 // placeholderHandler 占位处理器（待实现的接口）

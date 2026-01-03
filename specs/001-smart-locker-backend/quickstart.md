@@ -80,7 +80,7 @@ backend/
 │   ├── service/            # 业务逻辑层
 │   └── handler/            # HTTP 处理器
 ├── pkg/                    # 可复用包
-├── api/openapi/            # API 定义
+├── docs/                   # Swagger 文档（swag 生成，供 /swagger 使用）
 ├── migrations/             # 数据库迁移
 ├── configs/                # 配置文件
 ├── deployments/            # 部署配置

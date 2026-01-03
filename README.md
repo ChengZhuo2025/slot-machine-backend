@@ -163,7 +163,7 @@ backend/
 │   ├── qrcode/                   # 二维码生成
 │   └── response/                 # 统一响应格式
 │
-├── api/openapi/                  # OpenAPI 3.0 规范
+├── docs/                         # Swagger 文档（swag 生成，供 /swagger 使用）
 ├── migrations/                   # 数据库迁移
 ├── seeds/                        # 种子数据
 ├── configs/                      # 配置文件
@@ -229,6 +229,9 @@ make build
 
 # 运行
 make run
+
+# 重启后端（会重新编译，带上最新 docs）
+nohup make run
 
 # 运行测试
 make test

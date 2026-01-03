@@ -2,7 +2,10 @@
 package jwt
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -85,11 +88,17 @@ func (m *Manager) GenerateAccessToken(userID int64, userType, role string) (stri
 
 // generateToken 生成令牌
 func (m *Manager) generateToken(userID int64, userType, role string, expireAt time.Time) (string, error) {
+	tokenID, err := randomTokenID()
+	if err != nil {
+		tokenID = fmt.Sprintf("fallback-%d", time.Now().UnixNano())
+	}
+
 	claims := &Claims{
 		UserID:   userID,
 		UserType: userType,
 		Role:     role,
 		RegisteredClaims: jwt.RegisteredClaims{
+			ID:        tokenID,
 			Issuer:    m.config.Issuer,
 			Subject:   userType,
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -100,6 +109,14 @@ func (m *Manager) generateToken(userID int64, userType, role string, expireAt ti
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(m.config.Secret))
+}
+
+func randomTokenID() (string, error) {
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b[:]), nil
 }
 
 // ParseToken 解析令牌

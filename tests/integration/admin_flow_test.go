@@ -1,10 +1,15 @@
+//go:build integration
+// +build integration
+
 // Package integration 管理端流程集成测试
 package integration
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
+	"strings"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -21,10 +26,16 @@ import (
 
 // setupAdminIntegrationDB 创建管理端集成测试数据库
 func setupAdminIntegrationDB(t *testing.T) *gorm.DB {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{
+	dsn := fmt.Sprintf("file:%s?mode=memory&cache=shared", strings.ReplaceAll(t.Name(), "/", "_"))
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Silent),
 	})
 	require.NoError(t, err)
+
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+	sqlDB.SetMaxOpenConns(1)
+	sqlDB.SetMaxIdleConns(1)
 
 	err = db.AutoMigrate(
 		&models.Admin{},
@@ -180,6 +191,9 @@ func TestAdminFlow_LoginAndManageDevices(t *testing.T) {
 	assert.Equal(t, "DEV_INTEGRATION_001", device.DeviceNo)
 	assert.Equal(t, 10, device.SlotCount)
 	assert.Equal(t, 10, device.AvailableSlots)
+
+	// 模拟设备上线（心跳上报后变为在线）
+	db.Model(&models.Device{}).Where("id = ?", device.ID).Update("online_status", models.DeviceOnline)
 
 	// 6. 获取设备详情
 	deviceInfo, err := deviceService.GetDevice(ctx, device.ID)
@@ -663,8 +677,9 @@ func TestAdminFlow_MultipleDevicesWithFiltering(t *testing.T) {
 		NetworkType: "WiFi",
 	}, adminID)
 
-	// 设置设备2离线
-	db.Model(device2).Update("online_status", models.DeviceOffline)
+	// 模拟设备上线：device1/device3 在线，device2 离线
+	db.Model(&models.Device{}).Where("id IN ?", []int64{device1.ID, device3.ID}).Update("online_status", models.DeviceOnline)
+	db.Model(&models.Device{}).Where("id = ?", device2.ID).Update("online_status", models.DeviceOffline)
 
 	// 4. 按场地筛选
 	filters := map[string]interface{}{"venue_id": venue1.ID}
@@ -674,7 +689,7 @@ func TestAdminFlow_MultipleDevicesWithFiltering(t *testing.T) {
 	assert.Len(t, devices, 2)
 
 	// 5. 按在线状态筛选
-	filters = map[string]interface{}{"online_status": models.DeviceOnline}
+	filters = map[string]interface{}{"online_status": int8(models.DeviceOnline)}
 	devices, total, err = deviceService.ListDevices(ctx, 0, 10, filters)
 	require.NoError(t, err)
 	assert.Equal(t, int64(2), total) // device1 和 device3 在线

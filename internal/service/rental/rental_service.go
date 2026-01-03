@@ -103,6 +103,17 @@ func (s *RentalService) CreateRental(ctx context.Context, userID int64, req *Cre
 	// 计算总金额
 	totalAmount := pricing.Price + pricing.Deposit
 
+	// 检查余额是否足够（租金 + 押金）
+	if s.walletService != nil && totalAmount > 0 {
+		ok, err := s.walletService.CheckBalance(ctx, userID, totalAmount)
+		if err != nil {
+			return nil, err
+		}
+		if !ok {
+			return nil, errors.ErrBalanceInsufficient
+		}
+	}
+
 	// 使用事务创建Order和Rental
 	var rental *models.Rental
 	var order *models.Order
@@ -113,10 +124,11 @@ func (s *RentalService) CreateRental(ctx context.Context, userID int64, req *Cre
 		order = &models.Order{
 			OrderNo:        orderNo,
 			UserID:         userID,
-			Type:           "rental",
+			Type:           models.OrderTypeRental,
 			OriginalAmount: totalAmount,
 			DiscountAmount: 0,
 			ActualAmount:   totalAmount,
+			DepositAmount:  pricing.Deposit,
 			Status:         models.OrderStatusPending,
 		}
 
@@ -164,7 +176,12 @@ func (s *RentalService) CreateRental(ctx context.Context, userID int64, req *Cre
 		return nil, errors.ErrDatabaseError.WithError(err)
 	}
 
-	return s.toRentalInfo(rental, nil, nil), nil
+	info := s.toRentalInfo(rental, nil, nil)
+	if order != nil {
+		info.OrderID = order.ID
+		info.OrderNo = order.OrderNo
+	}
+	return info, nil
 }
 
 // PayRental 支付租借订单
@@ -187,23 +204,29 @@ func (s *RentalService) PayRental(ctx context.Context, userID int64, rentalID in
 			return errors.ErrRentalStatusError
 		}
 
-		// TODO: 对接钱包服务 - 冻结押金 + 扣除租金
-		// 临时注释,等钱包服务适配新字段后再启用
-		/*
-		if rental.Deposit > 0 {
-			orderNo := fmt.Sprintf("R%d", rental.OrderID)
-			if err := s.walletService.FreezeDeposit(ctx, userID, rental.Deposit, orderNo); err != nil {
-				return err
+		// 获取订单号用于钱包流水
+		var order models.Order
+		if err := tx.WithContext(ctx).First(&order, rental.OrderID).Error; err != nil {
+			if err == gorm.ErrRecordNotFound {
+				return errors.ErrOrderNotFound
 			}
+			return errors.ErrDatabaseError.WithError(err)
 		}
 
-		if rental.RentalFee > 0 {
-			orderNo := fmt.Sprintf("R%d", rental.OrderID)
-			if err := s.walletService.Consume(ctx, userID, rental.RentalFee, orderNo); err != nil {
-				return err
+		// 对接钱包服务 - 冻结押金 + 扣除租金（余额支付）
+		if s.walletService != nil {
+			orderNo := order.OrderNo
+			if rental.Deposit > 0 {
+				if err := s.walletService.FreezeDepositTx(ctx, tx, userID, rental.Deposit, orderNo); err != nil {
+					return err
+				}
+			}
+			if rental.RentalFee > 0 {
+				if err := s.walletService.ConsumeTx(ctx, tx, userID, rental.RentalFee, orderNo); err != nil {
+					return err
+				}
 			}
 		}
-		*/
 
 		// 更新订单状态
 		updates := map[string]interface{}{
@@ -214,8 +237,12 @@ func (s *RentalService) PayRental(ctx context.Context, userID int64, rentalID in
 		}
 
 		// 同时更新Order状态
+		now := time.Now()
 		if err := tx.Model(&models.Order{}).Where("id = ?", rental.OrderID).
-			Update("status", models.OrderStatusPaid).Error; err != nil {
+			Updates(map[string]interface{}{
+				"status":  models.OrderStatusPaid,
+				"paid_at": now,
+			}).Error; err != nil {
 			return errors.ErrDatabaseError.WithError(err)
 		}
 
@@ -242,10 +269,19 @@ func (s *RentalService) StartRental(ctx context.Context, userID int64, rentalID 
 			return errors.ErrRentalStatusError
 		}
 
-		// 获取设备信息(用于后续MQTT命令)
-		_, err = s.deviceRepo.GetByID(ctx, rental.DeviceID)
-		if err != nil {
-			return errors.ErrDeviceNotFound
+		// 获取设备信息(用于后续MQTT命令)，并确保设备仍可用
+		var device models.Device
+		if err := tx.WithContext(ctx).First(&device, rental.DeviceID).Error; err != nil {
+			if err == gorm.ErrRecordNotFound {
+				return errors.ErrDeviceNotFound
+			}
+			return errors.ErrDatabaseError.WithError(err)
+		}
+		if device.Status != models.DeviceStatusActive {
+			return errors.ErrDeviceDisabled
+		}
+		if device.OnlineStatus != models.DeviceOnline {
+			return errors.ErrDeviceOffline
 		}
 
 		// TODO: 发送开锁命令 (MQTT服务集成)
@@ -260,11 +296,13 @@ func (s *RentalService) StartRental(ctx context.Context, userID int64, rentalID 
 		*/
 
 		now := time.Now()
+		expectedReturn := now.Add(time.Duration(rental.DurationHours) * time.Hour)
 
 		// 更新租借状态
 		updates := map[string]interface{}{
-			"status":      models.RentalStatusInUse,
-			"unlocked_at": now,
+			"status":             models.RentalStatusInUse,
+			"unlocked_at":        now,
+			"expected_return_at": expectedReturn,
 		}
 		if err := tx.Model(rental).Updates(updates).Error; err != nil {
 			return errors.ErrDatabaseError.WithError(err)
@@ -356,7 +394,37 @@ func (s *RentalService) CompleteRental(ctx context.Context, rentalID int64) erro
 			return errors.ErrRentalStatusError
 		}
 
-		// TODO: 结算逻辑 - 钱包服务退还押金或扣除超时费
+		var order models.Order
+		if err := tx.WithContext(ctx).First(&order, rental.OrderID).Error; err != nil {
+			if err == gorm.ErrRecordNotFound {
+				return errors.ErrOrderNotFound
+			}
+			return errors.ErrDatabaseError.WithError(err)
+		}
+
+		// 结算逻辑：超时费用从押金扣除，其余押金退还
+		if s.walletService != nil && rental.Deposit > 0 {
+			overtimeFee := rental.OvertimeFee
+			if overtimeFee < 0 {
+				overtimeFee = 0
+			}
+			if overtimeFee > rental.Deposit {
+				overtimeFee = rental.Deposit
+			}
+
+			if overtimeFee > 0 {
+				if err := s.walletService.DeductFrozenToConsumeTx(ctx, tx, rental.UserID, overtimeFee, order.OrderNo, "租借超时费"); err != nil {
+					return err
+				}
+			}
+
+			refundAmount := rental.Deposit - overtimeFee
+			if refundAmount > 0 {
+				if err := s.walletService.UnfreezeDepositTx(ctx, tx, rental.UserID, refundAmount, order.OrderNo); err != nil {
+					return err
+				}
+			}
+		}
 
 		// 更新订单状态
 		updates := map[string]interface{}{
@@ -367,8 +435,12 @@ func (s *RentalService) CompleteRental(ctx context.Context, rentalID int64) erro
 		}
 
 		// 更新Order状态
+		now := time.Now()
 		if err := tx.Model(&models.Order{}).Where("id = ?", rental.OrderID).
-			Update("status", models.OrderStatusCompleted).Error; err != nil {
+			Updates(map[string]interface{}{
+				"status":       models.OrderStatusCompleted,
+				"completed_at": now,
+			}).Error; err != nil {
 			return errors.ErrDatabaseError.WithError(err)
 		}
 

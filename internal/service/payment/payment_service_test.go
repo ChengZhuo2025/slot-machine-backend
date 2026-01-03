@@ -107,7 +107,7 @@ func TestPaymentService_CreatePayment(t *testing.T) {
 		var payment models.Payment
 		svc.db.Where("payment_no = ?", resp.PaymentNo).First(&payment)
 		assert.Equal(t, req.Amount, payment.Amount)
-		assert.Equal(t, models.PaymentStatusPending, payment.Status)
+		assert.EqualValues(t, models.PaymentStatusPending, payment.Status)
 	})
 
 	t.Run("创建微信支付无客户端", func(t *testing.T) {
@@ -195,7 +195,7 @@ func TestPaymentService_CreateRefund(t *testing.T) {
 		var refund models.Refund
 		svc.db.Where("payment_no = ?", payment.PaymentNo).First(&refund)
 		assert.Equal(t, req.Amount, refund.Amount)
-		assert.Equal(t, models.RefundStatusPending, refund.Status)
+		assert.EqualValues(t, models.RefundStatusPending, refund.Status)
 	})
 
 	t.Run("退款金额超过支付金额", func(t *testing.T) {
@@ -280,7 +280,7 @@ func TestPaymentService_CloseExpiredPayments(t *testing.T) {
 		// 验证支付状态已关闭
 		var payment models.Payment
 		svc.db.First(&payment, expiredPayment.ID)
-		assert.Equal(t, models.PaymentStatusClosed, payment.Status)
+		assert.EqualValues(t, models.PaymentStatusClosed, payment.Status)
 	})
 }
 

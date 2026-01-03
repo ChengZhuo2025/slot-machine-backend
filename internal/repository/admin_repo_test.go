@@ -274,7 +274,7 @@ func TestAdminRepository_UpdateStatus(t *testing.T) {
 
 	var updated models.Admin
 	db.First(&updated, admin.ID)
-	assert.Equal(t, models.AdminStatusDisabled, updated.Status)
+	assert.EqualValues(t, models.AdminStatusDisabled, updated.Status)
 }
 
 func TestAdminRepository_UpdatePassword(t *testing.T) {

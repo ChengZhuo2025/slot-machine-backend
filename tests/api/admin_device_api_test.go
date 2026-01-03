@@ -1,12 +1,17 @@
+//go:build api
+// +build api
+
 // Package api 设备管理 API 测试
 package api
 
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -27,10 +32,16 @@ import (
 
 // setupDeviceAPITestDB 创建测试数据库
 func setupDeviceAPITestDB(t *testing.T) *gorm.DB {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{
+	dsn := fmt.Sprintf("file:%s?mode=memory&cache=shared", strings.ReplaceAll(t.Name(), "/", "_"))
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Silent),
 	})
 	require.NoError(t, err)
+
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+	sqlDB.SetMaxOpenConns(1)
+	sqlDB.SetMaxIdleConns(1)
 
 	err = db.AutoMigrate(
 		&models.Admin{},
@@ -474,7 +485,7 @@ func TestDeviceAPI_UpdateStatus_Success(t *testing.T) {
 	// 验证状态更新
 	var updatedDevice models.Device
 	db.First(&updatedDevice, device.ID)
-	assert.Equal(t, models.DeviceStatusMaintenance, updatedDevice.Status)
+	assert.EqualValues(t, models.DeviceStatusMaintenance, updatedDevice.Status)
 }
 
 func TestDeviceAPI_UpdateStatus_DeviceInUse(t *testing.T) {
@@ -599,7 +610,7 @@ func TestDeviceAPI_CreateMaintenance_Success(t *testing.T) {
 	// 验证设备状态已变为维护中
 	var updatedDevice models.Device
 	db.First(&updatedDevice, device.ID)
-	assert.Equal(t, models.DeviceStatusMaintenance, updatedDevice.Status)
+	assert.EqualValues(t, models.DeviceStatusMaintenance, updatedDevice.Status)
 }
 
 func TestDeviceAPI_CreateMaintenance_DeviceInUse(t *testing.T) {
@@ -664,12 +675,12 @@ func TestDeviceAPI_CompleteMaintenance_Success(t *testing.T) {
 	// 验证维护状态
 	var updatedMaintenance models.DeviceMaintenance
 	db.First(&updatedMaintenance, maintenance.ID)
-	assert.Equal(t, models.MaintenanceStatusCompleted, updatedMaintenance.Status)
+	assert.EqualValues(t, models.MaintenanceStatusCompleted, updatedMaintenance.Status)
 
 	// 验证设备状态恢复
 	var updatedDevice models.Device
 	db.First(&updatedDevice, device.ID)
-	assert.Equal(t, models.DeviceStatusActive, updatedDevice.Status)
+	assert.EqualValues(t, models.DeviceStatusActive, updatedDevice.Status)
 }
 
 func TestDeviceAPI_CompleteMaintenance_NotFound(t *testing.T) {

@@ -1,10 +1,15 @@
+//go:build integration
+// +build integration
+
 // Package integration 支付流程集成测试
 package integration
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
+	"strings"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -19,10 +24,16 @@ import (
 
 // setupPaymentIntegrationDB 创建支付集成测试数据库
 func setupPaymentIntegrationDB(t *testing.T) *gorm.DB {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{
+	dsn := fmt.Sprintf("file:%s?mode=memory&cache=shared", strings.ReplaceAll(t.Name(), "/", "_"))
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Silent),
 	})
 	require.NoError(t, err)
+
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+	sqlDB.SetMaxOpenConns(1)
+	sqlDB.SetMaxIdleConns(1)
 
 	err = db.AutoMigrate(
 		&models.User{},

@@ -1,10 +1,15 @@
+//go:build integration
+// +build integration
+
 // Package integration 租借流程集成测试
 package integration
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
+	"strings"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -21,10 +26,16 @@ import (
 
 // setupRentalIntegrationDB 创建集成测试数据库
 func setupRentalIntegrationDB(t *testing.T) *gorm.DB {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{
+	dsn := fmt.Sprintf("file:%s?mode=memory&cache=shared", strings.ReplaceAll(t.Name(), "/", "_"))
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Silent),
 	})
 	require.NoError(t, err)
+
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+	sqlDB.SetMaxOpenConns(1)
+	sqlDB.SetMaxIdleConns(1)
 
 	err = db.AutoMigrate(
 		&models.User{},
@@ -189,7 +200,7 @@ func TestRentalFlow_CompleteProcess(t *testing.T) {
 		// 验证钱包余额变化
 		var wallet models.UserWallet
 		db.Where("user_id = ?", user.ID).First(&wallet)
-		assert.Equal(t, 200.0-pricing.Price, wallet.Balance)
+		assert.Equal(t, 200.0-(pricing.Price+pricing.Deposit), wallet.Balance)
 		assert.Equal(t, pricing.Deposit, wallet.FrozenBalance)
 	})
 
@@ -204,11 +215,11 @@ func TestRentalFlow_CompleteProcess(t *testing.T) {
 		assert.NotNil(t, rental.UnlockedAt)
 		assert.NotNil(t, rental.ExpectedReturnAt)
 
-		// 验证设备状态
-		var updatedDevice models.Device
-		db.First(&updatedDevice, device.ID)
-		assert.Equal(t, models.DeviceRentalInUse, updatedDevice.RentalStatus)
-	})
+			// 验证设备状态
+			var updatedDevice models.Device
+			db.First(&updatedDevice, device.ID)
+			assert.EqualValues(t, models.DeviceRentalInUse, updatedDevice.RentalStatus)
+		})
 
 	// 4. 归还租借
 	t.Run("步骤4: 归还租借", func(t *testing.T) {
@@ -220,12 +231,12 @@ func TestRentalFlow_CompleteProcess(t *testing.T) {
 		assert.Equal(t, models.RentalStatusReturned, rental.Status)
 		assert.NotNil(t, rental.ReturnedAt)
 
-		// 验证设备状态恢复
-		var updatedDevice models.Device
-		db.First(&updatedDevice, device.ID)
-		assert.Equal(t, models.DeviceRentalFree, updatedDevice.RentalStatus)
-		assert.Equal(t, 1, updatedDevice.AvailableSlots)
-	})
+			// 验证设备状态恢复
+			var updatedDevice models.Device
+			db.First(&updatedDevice, device.ID)
+			assert.EqualValues(t, models.DeviceRentalFree, updatedDevice.RentalStatus)
+			assert.Equal(t, 1, updatedDevice.AvailableSlots)
+		})
 
 	// 5. 完成租借（结算）
 	t.Run("步骤5: 完成租借", func(t *testing.T) {
@@ -235,15 +246,15 @@ func TestRentalFlow_CompleteProcess(t *testing.T) {
 		// 验证订单状态
 		db.First(&rental, rental.ID)
 		assert.Equal(t, models.RentalStatusCompleted, rental.Status)
-		// 检查Refund记录（押金全额退还）
-		var refund models.Refund
-		db.Where("order_id = ?", rental.OrderID).First(&refund)
-		assert.Equal(t, pricing.Deposit, refund.Amount)
+		// 检查Order完成时间
+		var order models.Order
+		db.Where("id = ?", rental.OrderID).First(&order)
+		assert.NotNil(t, order.CompletedAt)
 
 		// 验证钱包余额 - 押金已退还
 		var wallet models.UserWallet
 		db.Where("user_id = ?", user.ID).First(&wallet)
-		assert.Equal(t, 200.0-pricing.Price+pricing.Deposit, wallet.Balance)
+		assert.Equal(t, 200.0-pricing.Price, wallet.Balance)
 		assert.Equal(t, float64(0), wallet.FrozenBalance)
 	})
 }
@@ -507,7 +518,11 @@ func TestRentalFlow_OverdueRental(t *testing.T) {
 	db.Create(rental)
 
 	// 设置钱包冻结余额
-	db.Model(&wallet).Update("frozen_balance", pricing.Deposit)
+	// 模拟已支付：租金 + 押金已从余额扣除，押金被冻结
+	db.Model(&wallet).Updates(map[string]interface{}{
+		"balance":        200.0 - (pricing.Price + pricing.Deposit),
+		"frozen_balance": pricing.Deposit,
+	})
 
 	// 创建服务
 	rentalRepo := repository.NewRentalRepository(db)
@@ -529,7 +544,8 @@ func TestRentalFlow_OverdueRental(t *testing.T) {
 	// 超时费用应从押金扣除
 	// 超时约1.5小时，按小时计算应该扣除 2 小时的费用 = 20元
 	// 押金50元，扣除20元后应退还30元
-	var refund models.Refund
-	db.Where("order_id = ?", rental.OrderID).First(&refund)
-	assert.Less(t, refund.Amount, pricing.Deposit)
+	var updatedWallet models.UserWallet
+	db.Where("user_id = ?", user.ID).First(&updatedWallet)
+	assert.Equal(t, 200.0-(pricing.Price+20.0), updatedWallet.Balance) // 初始200 - 租金10 - 超时20
+	assert.Equal(t, float64(0), updatedWallet.FrozenBalance)
 }

@@ -1,3 +1,6 @@
+//go:build api
+// +build api
+
 // Package api Auth API 测试
 package api
 
@@ -5,8 +8,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -59,10 +64,16 @@ func (m *mockCodeService) GetCodeExpireIn() time.Duration {
 
 // setupTestDB 创建测试数据库
 func setupTestDB(t *testing.T) *gorm.DB {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{
+	dsn := fmt.Sprintf("file:%s?mode=memory&cache=shared", strings.ReplaceAll(t.Name(), "/", "_"))
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Silent),
 	})
 	require.NoError(t, err)
+
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+	sqlDB.SetMaxOpenConns(1)
+	sqlDB.SetMaxIdleConns(1)
 
 	err = db.AutoMigrate(
 		&models.User{},
@@ -182,6 +193,10 @@ func setupRouter(t *testing.T) (*gin.Engine, *gorm.DB) {
 			RefreshToken string `json:"refresh_token"`
 		}
 		if err := c.ShouldBindJSON(&req); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "参数错误"})
+			return
+		}
+		if req.RefreshToken == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"code": 400, "message": "参数错误"})
 			return
 		}
@@ -333,19 +348,20 @@ func TestAuthAPI_SmsLogin(t *testing.T) {
 		assert.Equal(t, http.StatusUnauthorized, w.Code)
 	})
 
-	t.Run("禁用用户登录失败", func(t *testing.T) {
-		phone := "13800138004"
-		user := &models.User{
-			Phone:         &phone,
-			Nickname:      "禁用用户",
-			MemberLevelID: 1,
-			Status:        models.UserStatusDisabled,
-		}
-		db.Create(user)
+		t.Run("禁用用户登录失败", func(t *testing.T) {
+			phone := "13800138004"
+			user := &models.User{
+				Phone:         &phone,
+				Nickname:      "禁用用户",
+				MemberLevelID: 1,
+				Status:        models.UserStatusActive,
+			}
+			db.Create(user)
+			db.Model(user).Update("status", models.UserStatusDisabled)
 
-		body := map[string]interface{}{
-			"phone": phone,
-			"code":  "123456",
+			body := map[string]interface{}{
+				"phone": phone,
+				"code":  "123456",
 		}
 		jsonBody, _ := json.Marshal(body)
 

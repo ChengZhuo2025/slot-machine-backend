@@ -20,6 +20,8 @@ Desktop.ini
 # ====================
 .idea/
 .vscode/
+.gocache/
+.gomodcache/
 *.swp
 *.swo
 *~

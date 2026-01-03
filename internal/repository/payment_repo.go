@@ -196,7 +196,13 @@ func (r *RefundRepository) GetTotalRefunded(ctx context.Context, paymentID int64
 	var total float64
 	err := r.db.WithContext(ctx).Model(&models.Refund{}).
 		Where("payment_id = ?", paymentID).
-		Where("status = ?", models.RefundStatusSuccess).
+		// 退款申请一旦创建就需要占用可退额度，避免并发/重复提交导致超额退款。
+		Where("status IN ?", []int8{
+			models.RefundStatusPending,
+			models.RefundStatusApproved,
+			models.RefundStatusProcessing,
+			models.RefundStatusSuccess,
+		}).
 		Select("COALESCE(SUM(amount), 0)").
 		Scan(&total).Error
 	return total, err

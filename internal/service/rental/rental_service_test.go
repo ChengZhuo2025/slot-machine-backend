@@ -165,6 +165,7 @@ func TestRentalService_CreateRental(t *testing.T) {
 	t.Run("创建租借订单成功", func(t *testing.T) {
 		req := &CreateRentalRequest{
 			DeviceID:  device.ID,
+			PricingID: pricing.ID,
 		}
 
 		rentalInfo, err := svc.CreateRental(ctx, user.ID, req)
@@ -193,8 +194,27 @@ func TestRentalService_CreateRental(t *testing.T) {
 		svc.db.Create(poorUser)
 		svc.db.Create(&models.UserWallet{UserID: poorUser.ID, Balance: 10.0})
 
+		// 创建设备（避免被上一个用例预占槽位影响）
+		device2 := &models.Device{
+			DeviceNo:       "D20240101002",
+			Name:           "测试设备2",
+			Type:           models.DeviceTypeStandard,
+			VenueID:        device.VenueID,
+			QRCode:         "https://qr.example.com/D20240101002",
+			ProductName:    "测试产品",
+			SlotCount:      1,
+			AvailableSlots: 1,
+			OnlineStatus:   models.DeviceOnline,
+			LockStatus:     models.DeviceLocked,
+			RentalStatus:   models.DeviceRentalFree,
+			NetworkType:    "WiFi",
+			Status:         models.DeviceStatusActive,
+		}
+		svc.db.Create(device2)
+
 		req := &CreateRentalRequest{
-			DeviceID: device.ID,
+			DeviceID:  device2.ID,
+			PricingID: pricing.ID,
 		}
 
 		_, err := svc.CreateRental(ctx, poorUser.ID, req)
@@ -222,4 +242,53 @@ func TestRentalService_getStatusName(t *testing.T) {
 		name := svc.getStatusName(tt.status)
 		assert.Equal(t, tt.expected, name)
 	}
+}
+
+func TestRentalService_PayStartReturnComplete_FullWalletFlow(t *testing.T) {
+	svc := setupTestRentalService(t)
+	ctx := context.Background()
+
+	user, device, pricing := createTestData(t, svc.db)
+
+	// 1) 创建租借
+	rentalInfo, err := svc.CreateRental(ctx, user.ID, &CreateRentalRequest{
+		DeviceID:  device.ID,
+		PricingID: pricing.ID,
+	})
+	require.NoError(t, err)
+
+	// 2) 支付
+	err = svc.PayRental(ctx, user.ID, rentalInfo.ID)
+	require.NoError(t, err)
+
+	// 验证订单状态与钱包变化
+	var order models.Order
+	err = svc.db.First(&order, rentalInfo.OrderID).Error
+	require.NoError(t, err)
+	assert.Equal(t, models.OrderStatusPaid, order.Status)
+	assert.NotNil(t, order.PaidAt)
+
+	var wallet models.UserWallet
+	err = svc.db.Where("user_id = ?", user.ID).First(&wallet).Error
+	require.NoError(t, err)
+	assert.Equal(t, 200.0-(pricing.Price+pricing.Deposit), wallet.Balance)
+	assert.Equal(t, pricing.Deposit, wallet.FrozenBalance)
+
+	// 3) 开始租借
+	err = svc.StartRental(ctx, user.ID, rentalInfo.ID)
+	require.NoError(t, err)
+
+	// 4) 归还
+	err = svc.ReturnRental(ctx, user.ID, rentalInfo.ID)
+	require.NoError(t, err)
+
+	// 5) 结算
+	err = svc.CompleteRental(ctx, rentalInfo.ID)
+	require.NoError(t, err)
+
+	// 押金退还后，余额应为初始 - 租金
+	err = svc.db.Where("user_id = ?", user.ID).First(&wallet).Error
+	require.NoError(t, err)
+	assert.Equal(t, 200.0-pricing.Price, wallet.Balance)
+	assert.Equal(t, float64(0), wallet.FrozenBalance)
 }

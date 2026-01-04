@@ -18,6 +18,8 @@ import (
 	adminHandler "github.com/dumeirei/smart-locker-backend/internal/handler/admin"
 	authHandler "github.com/dumeirei/smart-locker-backend/internal/handler/auth"
 	deviceHandler "github.com/dumeirei/smart-locker-backend/internal/handler/device"
+	mallHandler "github.com/dumeirei/smart-locker-backend/internal/handler/mall"
+	orderHandler "github.com/dumeirei/smart-locker-backend/internal/handler/order"
 	paymentHandler "github.com/dumeirei/smart-locker-backend/internal/handler/payment"
 	rentalHandler "github.com/dumeirei/smart-locker-backend/internal/handler/rental"
 	userHandler "github.com/dumeirei/smart-locker-backend/internal/handler/user"
@@ -26,6 +28,8 @@ import (
 	adminService "github.com/dumeirei/smart-locker-backend/internal/service/admin"
 	authService "github.com/dumeirei/smart-locker-backend/internal/service/auth"
 	deviceService "github.com/dumeirei/smart-locker-backend/internal/service/device"
+	mallService "github.com/dumeirei/smart-locker-backend/internal/service/mall"
+	orderService "github.com/dumeirei/smart-locker-backend/internal/service/order"
 	paymentService "github.com/dumeirei/smart-locker-backend/internal/service/payment"
 	rentalService "github.com/dumeirei/smart-locker-backend/internal/service/rental"
 	userService "github.com/dumeirei/smart-locker-backend/internal/service/user"
@@ -56,6 +60,12 @@ func setupRouter(
 	rentalRepo := repository.NewRentalRepository(db)
 	paymentRepo := repository.NewPaymentRepository(db)
 	refundRepo := repository.NewRefundRepository(db)
+	categoryRepo := repository.NewCategoryRepository(db)
+	productRepo := repository.NewProductRepository(db)
+	productSkuRepo := repository.NewProductSkuRepository(db)
+	cartRepo := repository.NewCartRepository(db)
+	orderRepo := repository.NewOrderRepository(db)
+	reviewRepo := repository.NewReviewRepository(db)
 
 	// 初始化外部服务客户端
 	smsClient := sms.NewMockClient(cfg.SMS.SignName) // 开发环境使用 Mock，生产环境使用阿里云
@@ -78,12 +88,31 @@ func setupRouter(
 	rentalSvc := rentalService.NewRentalService(db, rentalRepo, deviceRepo, deviceSvc, walletSvc, nil)
 	paymentSvc := paymentService.NewPaymentService(db, paymentRepo, refundRepo, rentalRepo, wechatPayClient)
 
+	// 商城服务
+	productSvc := mallService.NewProductService(db, productRepo, categoryRepo, productSkuRepo)
+	cartSvc := mallService.NewCartService(db, cartRepo, productRepo, productSkuRepo)
+	mallOrderSvc := mallService.NewMallOrderService(db, orderRepo, cartRepo, productRepo, productSkuRepo, productSvc)
+	reviewSvc := mallService.NewReviewService(db, reviewRepo, orderRepo)
+	searchSvc := mallService.NewSearchService(db, productRepo)
+
+	// 退款服务
+	refundSvc := orderService.NewRefundService(db, refundRepo, orderRepo, paymentRepo)
+
 	// 初始化处理器
 	authH := authHandler.NewHandler(authSvc, wechatSvc, codeService)
 	userH := userHandler.NewHandler(userSvc, walletSvc)
 	deviceH := deviceHandler.NewHandler(deviceSvc, venueSvc)
 	rentalH := rentalHandler.NewHandler(rentalSvc)
 	paymentH := paymentHandler.NewHandler(paymentSvc)
+
+	// 商城处理器
+	mallProductH := mallHandler.NewProductHandler(productSvc, searchSvc)
+	cartH := mallHandler.NewCartHandler(cartSvc)
+	mallOrderH := mallHandler.NewOrderHandler(mallOrderSvc)
+	reviewH := mallHandler.NewReviewHandler(reviewSvc)
+
+	// 退款处理器
+	refundH := orderHandler.NewRefundHandler(refundSvc)
 
 	// 全局中间件
 	r.Use(userMiddleware.Recovery(logger))
@@ -127,9 +156,16 @@ func setupRouter(
 			public.GET("/banners", placeholderHandler("获取轮播图"))
 			public.GET("/articles", placeholderHandler("获取文章列表"))
 			public.GET("/articles/:id", placeholderHandler("获取文章详情"))
-			public.GET("/products", placeholderHandler("获取商品列表"))
-			public.GET("/products/:id", placeholderHandler("获取商品详情"))
-			public.GET("/categories", placeholderHandler("获取分类列表"))
+
+			// 商城公开接口
+			public.GET("/categories", mallProductH.GetCategories)
+			public.GET("/products", mallProductH.GetProducts)
+			public.GET("/products/:id", mallProductH.GetProductDetail)
+			public.GET("/products/search", mallProductH.SearchProducts)
+			public.GET("/search/hot-keywords", mallProductH.GetHotKeywords)
+			public.GET("/search/suggestions", mallProductH.GetSearchSuggestions)
+			public.GET("/products/:id/reviews", reviewH.GetProductReviews)
+			public.GET("/products/:id/review-stats", reviewH.GetProductReviewStats)
 		}
 
 		// 支付回调（需要验签，不需要认证）
@@ -157,18 +193,33 @@ func setupRouter(
 			user.PUT("/addresses/:id", placeholderHandler("更新地址"))
 			user.DELETE("/addresses/:id", placeholderHandler("删除地址"))
 
-			// 订单相关
-			user.GET("/orders", placeholderHandler("获取订单列表"))
-			user.POST("/orders", placeholderHandler("创建订单"))
-			user.GET("/orders/:id", placeholderHandler("获取订单详情"))
-			user.POST("/orders/:id/cancel", placeholderHandler("取消订单"))
-			user.POST("/orders/:id/confirm", placeholderHandler("确认收货"))
-
 			// 购物车
-			user.GET("/cart", placeholderHandler("获取购物车"))
-			user.POST("/cart", placeholderHandler("添加到购物车"))
-			user.PUT("/cart/:id", placeholderHandler("更新购物车项"))
-			user.DELETE("/cart/:id", placeholderHandler("删除购物车项"))
+			user.GET("/cart", cartH.GetCart)
+			user.POST("/cart", cartH.AddItem)
+			user.PUT("/cart/:id", cartH.UpdateItem)
+			user.DELETE("/cart/:id", cartH.RemoveItem)
+			user.DELETE("/cart", cartH.ClearCart)
+			user.PUT("/cart/select-all", cartH.SelectAll)
+			user.GET("/cart/count", cartH.GetCartCount)
+
+			// 商城订单
+			user.GET("/orders", mallOrderH.GetOrders)
+			user.POST("/orders", mallOrderH.CreateOrder)
+			user.POST("/orders/from-cart", mallOrderH.CreateOrderFromCart)
+			user.GET("/orders/:id", mallOrderH.GetOrderDetail)
+			user.POST("/orders/:id/cancel", mallOrderH.CancelOrder)
+			user.POST("/orders/:id/confirm", mallOrderH.ConfirmReceive)
+
+			// 退款
+			user.GET("/refunds", refundH.GetRefunds)
+			user.POST("/refunds", refundH.CreateRefund)
+			user.GET("/refunds/:id", refundH.GetRefundDetail)
+			user.POST("/refunds/:id/cancel", refundH.CancelRefund)
+
+			// 商品评价
+			user.POST("/reviews", reviewH.CreateReview)
+			user.GET("/user/reviews", reviewH.GetUserReviews)
+			user.DELETE("/reviews/:id", reviewH.DeleteReview)
 
 			// 优惠券
 			user.GET("/coupons", placeholderHandler("获取可用优惠券"))
@@ -228,12 +279,14 @@ func setupRouter(
 		venueAdminSvc := adminService.NewVenueAdminService(venueRepo, merchantRepo, deviceRepo)
 		merchantAdminSvc := adminService.NewMerchantAdminService(merchantRepo, aesEncryptor)
 		_ = adminService.NewDeviceAlertService(deviceRepo, deviceLogRepo, deviceAlertRepo) // 告警服务（后续集成使用）
+		productAdminSvc := adminService.NewProductAdminService(db, categoryRepo, productRepo, productSkuRepo)
 
 		// 初始化管理员处理器
 		adminAuthH := adminHandler.NewAuthHandler(adminAuthSvc)
 		deviceAdminH := adminHandler.NewDeviceHandler(deviceAdminSvc)
 		venueAdminH := adminHandler.NewVenueHandler(venueAdminSvc)
 		merchantAdminH := adminHandler.NewMerchantHandler(merchantAdminSvc)
+		productAdminH := adminHandler.NewProductHandler(productAdminSvc)
 
 		// 操作日志中间件
 		operationLogger := middleware.NewOperationLogger(operationLogRepo)
@@ -275,16 +328,18 @@ func setupRouter(
 			adminAuth.GET("/rentals/:id", placeholderHandler("获取租借详情"))
 
 			// 商品管理
-			adminAuth.GET("/products", placeholderHandler("获取商品列表"))
-			adminAuth.POST("/products", placeholderHandler("添加商品"))
-			adminAuth.PUT("/products/:id", placeholderHandler("更新商品"))
-			adminAuth.DELETE("/products/:id", placeholderHandler("删除商品"))
+			adminAuth.GET("/products", productAdminH.GetProducts)
+			adminAuth.POST("/products", productAdminH.CreateProduct)
+			adminAuth.GET("/products/:id", productAdminH.GetProductDetail)
+			adminAuth.PUT("/products/:id", productAdminH.UpdateProduct)
+			adminAuth.DELETE("/products/:id", productAdminH.DeleteProduct)
+			adminAuth.PUT("/products/:id/status", productAdminH.UpdateProductStatus)
 
 			// 分类管理
-			adminAuth.GET("/categories", placeholderHandler("获取分类列表"))
-			adminAuth.POST("/categories", placeholderHandler("添加分类"))
-			adminAuth.PUT("/categories/:id", placeholderHandler("更新分类"))
-			adminAuth.DELETE("/categories/:id", placeholderHandler("删除分类"))
+			adminAuth.GET("/categories", productAdminH.GetCategories)
+			adminAuth.POST("/categories", productAdminH.CreateCategory)
+			adminAuth.PUT("/categories/:id", productAdminH.UpdateCategory)
+			adminAuth.DELETE("/categories/:id", productAdminH.DeleteCategory)
 
 			// 酒店管理
 			adminAuth.GET("/hotels", placeholderHandler("获取酒店列表"))

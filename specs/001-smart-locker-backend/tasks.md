@@ -260,49 +260,49 @@
 
 ### 商品模块
 
-- [ ] T114 [P] [US3] 定义 Category/Product/ProductSku 模型 `internal/models/product.go`
-- [ ] T115 [P] [US3] 定义 CartItem 模型 `internal/models/cart.go`
-- [ ] T116 [P] [US3] 定义 Review 模型 `internal/models/review.go`
-- [ ] T117 [US3] 实现分类 Repository `internal/repository/category_repo.go`
-- [ ] T118 [US3] 实现商品 Repository `internal/repository/product_repo.go`
-- [ ] T119 [US3] 实现商品服务 `internal/service/mall/product_service.go`
-- [ ] T120 [US3] 实现商品搜索服务 `internal/service/mall/search_service.go`
-- [ ] T121 [US3] 实现商品 API Handler `internal/handler/mall/product_handler.go`
+- [x] T114 [P] [US3] 定义 Category/Product/ProductSku 模型 `internal/models/product.go`
+- [x] T115 [P] [US3] 定义 CartItem 模型 `internal/models/cart.go`
+- [x] T116 [P] [US3] 定义 Review 模型 `internal/models/review.go`
+- [x] T117 [US3] 实现分类 Repository `internal/repository/category_repo.go`
+- [x] T118 [US3] 实现商品 Repository `internal/repository/product_repo.go`
+- [x] T119 [US3] 实现商品服务 `internal/service/mall/product_service.go`
+- [x] T120 [US3] 实现商品搜索服务 `internal/service/mall/search_service.go`
+- [x] T121 [US3] 实现商品 API Handler `internal/handler/mall/product_handler.go`
 
 ### 购物车模块
 
-- [ ] T122 [US3] 实现购物车 Repository `internal/repository/cart_repo.go`
-- [ ] T123 [US3] 实现购物车服务 `internal/service/mall/cart_service.go`
-- [ ] T124 [US3] 实现购物车 API Handler `internal/handler/mall/cart_handler.go`
+- [x] T122 [US3] 实现购物车 Repository `internal/repository/cart_repo.go`
+- [x] T123 [US3] 实现购物车服务 `internal/service/mall/cart_service.go`
+- [x] T124 [US3] 实现购物车 API Handler `internal/handler/mall/cart_handler.go`
 
 ### 商城订单
 
-- [ ] T125 [US3] 实现商城订单服务 `internal/service/mall/mall_order_service.go`
-- [ ] T126 [US3] 实现商城订单 API Handler `internal/handler/mall/order_handler.go`
+- [x] T125 [US3] 实现商城订单服务 `internal/service/mall/mall_order_service.go`
+- [x] T126 [US3] 实现商城订单 API Handler `internal/handler/mall/order_handler.go`
 
 ### 商品评价
 
-- [ ] T127 [US3] 实现评价 Repository `internal/repository/review_repo.go`
-- [ ] T128 [US3] 实现评价服务 `internal/service/mall/review_service.go`
-- [ ] T129 [US3] 实现评价 API Handler `internal/handler/mall/review_handler.go`
+- [x] T127 [US3] 实现评价 Repository `internal/repository/review_repo.go`
+- [x] T128 [US3] 实现评价服务 `internal/service/mall/review_service.go`
+- [x] T129 [US3] 实现评价 API Handler `internal/handler/mall/review_handler.go`
 
 ### 退款处理
 
-- [ ] T130 [P] [US3] 定义 Refund 模型 `internal/models/refund.go`
-- [ ] T131 [US3] 实现退款 Repository `internal/repository/refund_repo.go`
-- [ ] T132 [US3] 实现退款服务 `internal/service/order/refund_service.go`
-- [ ] T133 [US3] 实现退款 API Handler `internal/handler/order/refund_handler.go`
+- [x] T130 [P] [US3] 定义 Refund 模型 `internal/models/refund.go` (已合并到 payment.go)
+- [x] T131 [US3] 实现退款 Repository `internal/repository/refund_repo.go` (已合并到 payment_repo.go)
+- [x] T132 [US3] 实现退款服务 `internal/service/order/refund_service.go`
+- [x] T133 [US3] 实现退款 API Handler `internal/handler/order/refund_handler.go`
 
 ### 商品管理（管理端）
 
-- [ ] T134 [US3] 实现商品管理服务 `internal/service/admin/product_admin_service.go`
-- [ ] T135 [US3] 实现商品管理 API Handler `internal/handler/admin/product_handler.go`
+- [x] T134 [US3] 实现商品管理服务 `internal/service/admin/product_admin_service.go`
+- [x] T135 [US3] 实现商品管理 API Handler `internal/handler/admin/product_handler.go`
 
 ### 路由注册
 
-- [ ] T136 [US3] 注册 User Story 3 所有路由
+- [x] T136 [US3] 注册 User Story 3 所有路由
 
-**Checkpoint**: User Story 3 完成，商城购物功能可用
+**Checkpoint**: User Story 3 完成，商城购物功能可用 ✅
 
 ---
 

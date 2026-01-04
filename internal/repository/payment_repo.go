@@ -207,3 +207,92 @@ func (r *RefundRepository) GetTotalRefunded(ctx context.Context, paymentID int64
 		Scan(&total).Error
 	return total, err
 }
+
+// GetByIDWithRelations 根据 ID 获取退款记录（包含关联）
+func (r *RefundRepository) GetByIDWithRelations(ctx context.Context, id int64) (*models.Refund, error) {
+	var refund models.Refund
+	err := r.db.WithContext(ctx).
+		Preload("Order").
+		Preload("Payment").
+		Preload("User").
+		First(&refund, id).Error
+	if err != nil {
+		return nil, err
+	}
+	return &refund, nil
+}
+
+// GetByOrderID 根据订单ID获取退款记录
+func (r *RefundRepository) GetByOrderID(ctx context.Context, orderID int64) (*models.Refund, error) {
+	var refund models.Refund
+	err := r.db.WithContext(ctx).Where("order_id = ?", orderID).First(&refund).Error
+	if err != nil {
+		return nil, err
+	}
+	return &refund, nil
+}
+
+// RefundListParams 退款列表查询参数
+type RefundListParams struct {
+	Offset   int
+	Limit    int
+	UserID   int64
+	OrderID  int64
+	Status   *int8
+	RefundNo string
+}
+
+// List 获取退款列表
+func (r *RefundRepository) List(ctx context.Context, params RefundListParams) ([]*models.Refund, int64, error) {
+	var refunds []*models.Refund
+	var total int64
+
+	query := r.db.WithContext(ctx).Model(&models.Refund{})
+
+	if params.UserID > 0 {
+		query = query.Where("user_id = ?", params.UserID)
+	}
+	if params.OrderID > 0 {
+		query = query.Where("order_id = ?", params.OrderID)
+	}
+	if params.Status != nil {
+		query = query.Where("status = ?", *params.Status)
+	}
+	if params.RefundNo != "" {
+		query = query.Where("refund_no LIKE ?", "%"+params.RefundNo+"%")
+	}
+
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	if err := query.Preload("Order").Preload("User").
+		Order("id DESC").Offset(params.Offset).Limit(params.Limit).
+		Find(&refunds).Error; err != nil {
+		return nil, 0, err
+	}
+
+	return refunds, total, nil
+}
+
+// ListByUserID 根据用户ID获取退款列表
+func (r *RefundRepository) ListByUserID(ctx context.Context, userID int64, offset, limit int) ([]*models.Refund, int64, error) {
+	return r.List(ctx, RefundListParams{
+		Offset: offset,
+		Limit:  limit,
+		UserID: userID,
+	})
+}
+
+// ExistsPendingByOrderID 检查订单是否存在待处理的退款
+func (r *RefundRepository) ExistsPendingByOrderID(ctx context.Context, orderID int64) (bool, error) {
+	var count int64
+	err := r.db.WithContext(ctx).Model(&models.Refund{}).
+		Where("order_id = ? AND status IN ?", orderID, []int8{
+			models.RefundStatusPending,
+			models.RefundStatusApproved,
+			models.RefundStatusProcessing,
+		}).
+		Count(&count).Error
+	return count > 0, err
+}

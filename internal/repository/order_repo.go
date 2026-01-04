@@ -197,3 +197,37 @@ func (r *OrderRepository) CountByStatus(ctx context.Context, userID int64) (map[
 	}
 	return counts, nil
 }
+
+// ListByUserID 获取用户订单列表（支持字符串过滤）
+func (r *OrderRepository) ListByUserID(ctx context.Context, userID int64, offset, limit int, filters map[string]interface{}) ([]*models.Order, int64, error) {
+	var orders []*models.Order
+	var total int64
+
+	query := r.db.WithContext(ctx).Model(&models.Order{}).Where("user_id = ?", userID)
+
+	if orderType, ok := filters["type"].(string); ok && orderType != "" {
+		query = query.Where("type = ?", orderType)
+	}
+	if status, ok := filters["status"].(string); ok && status != "" {
+		query = query.Where("status = ?", status)
+	}
+
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	if err := query.Preload("Items").
+		Order("id DESC").Offset(offset).Limit(limit).
+		Find(&orders).Error; err != nil {
+		return nil, 0, err
+	}
+
+	return orders, total, nil
+}
+
+// GetOrderItems 获取订单项列表
+func (r *OrderRepository) GetOrderItems(ctx context.Context, orderID int64) ([]*models.OrderItem, error) {
+	var items []*models.OrderItem
+	err := r.db.WithContext(ctx).Where("order_id = ?", orderID).Find(&items).Error
+	return items, err
+}

@@ -1,40 +1,42 @@
 package models
 
 import (
+	"encoding/json"
 	"time"
 )
 
 // Order 订单模型
 type Order struct {
-	ID             int64      `gorm:"primaryKey;autoIncrement" json:"id"`
-	OrderNo        string     `gorm:"column:order_no;type:varchar(64);uniqueIndex;not null" json:"order_no"`
-	UserID         int64      `gorm:"column:user_id;index;not null" json:"user_id"`
-	Type           string     `gorm:"column:type;type:varchar(20);not null" json:"type"`
-	OriginalAmount float64    `gorm:"column:original_amount;type:decimal(12,2);not null" json:"original_amount"`
-	DiscountAmount float64    `gorm:"column:discount_amount;type:decimal(12,2);not null;default:0" json:"discount_amount"`
-	ActualAmount   float64    `gorm:"column:actual_amount;type:decimal(12,2);not null" json:"actual_amount"`
-	DepositAmount  float64    `gorm:"column:deposit_amount;type:decimal(12,2);not null;default:0" json:"deposit_amount"`
-	Status         string     `gorm:"column:status;type:varchar(20);not null" json:"status"`
-	CouponID       *int64     `gorm:"column:coupon_id" json:"coupon_id,omitempty"`
-	Remark         *string    `gorm:"column:remark;type:varchar(255)" json:"remark,omitempty"`
-	AddressID      *int64     `gorm:"column:address_id" json:"address_id,omitempty"`
-	ExpressCompany *string    `gorm:"column:express_company;type:varchar(50)" json:"express_company,omitempty"`
-	ExpressNo      *string    `gorm:"column:express_no;type:varchar(64)" json:"express_no,omitempty"`
-	ShippedAt      *time.Time `gorm:"column:shipped_at" json:"shipped_at,omitempty"`
-	ReceivedAt     *time.Time `gorm:"column:received_at" json:"received_at,omitempty"`
-	PaidAt         *time.Time `gorm:"column:paid_at" json:"paid_at,omitempty"`
-	CompletedAt    *time.Time `gorm:"column:completed_at" json:"completed_at,omitempty"`
-	CancelledAt    *time.Time `gorm:"column:cancelled_at" json:"cancelled_at,omitempty"`
-	CancelReason   *string    `gorm:"column:cancel_reason;type:varchar(255)" json:"cancel_reason,omitempty"`
-	CreatedAt      time.Time  `gorm:"column:created_at;autoCreateTime" json:"created_at"`
-	UpdatedAt      time.Time  `gorm:"column:updated_at;autoUpdateTime" json:"updated_at"`
+	ID              int64           `gorm:"primaryKey;autoIncrement" json:"id"`
+	OrderNo         string          `gorm:"column:order_no;type:varchar(64);uniqueIndex;not null" json:"order_no"`
+	UserID          int64           `gorm:"column:user_id;index;not null" json:"user_id"`
+	Type            string          `gorm:"column:type;type:varchar(20);not null" json:"type"`
+	OriginalAmount  float64         `gorm:"column:original_amount;type:decimal(12,2);not null" json:"original_amount"`
+	DiscountAmount  float64         `gorm:"column:discount_amount;type:decimal(12,2);not null;default:0" json:"discount_amount"`
+	ActualAmount    float64         `gorm:"column:actual_amount;type:decimal(12,2);not null" json:"actual_amount"`
+	DepositAmount   float64         `gorm:"column:deposit_amount;type:decimal(12,2);not null;default:0" json:"deposit_amount"`
+	Status          string          `gorm:"column:status;type:varchar(20);not null" json:"status"`
+	CouponID        *int64          `gorm:"column:coupon_id" json:"coupon_id,omitempty"`
+	Remark          *string         `gorm:"column:remark;type:varchar(255)" json:"remark,omitempty"`
+	AddressID       *int64          `gorm:"column:address_id" json:"address_id,omitempty"`
+	AddressSnapshot json.RawMessage `gorm:"column:address_snapshot;type:jsonb" json:"address_snapshot,omitempty"`
+	ExpressCompany  *string         `gorm:"column:express_company;type:varchar(50)" json:"express_company,omitempty"`
+	ExpressNo       *string         `gorm:"column:express_no;type:varchar(64)" json:"express_no,omitempty"`
+	ShippedAt       *time.Time      `gorm:"column:shipped_at" json:"shipped_at,omitempty"`
+	ReceivedAt      *time.Time      `gorm:"column:received_at" json:"received_at,omitempty"`
+	PaidAt          *time.Time      `gorm:"column:paid_at" json:"paid_at,omitempty"`
+	CompletedAt     *time.Time      `gorm:"column:completed_at" json:"completed_at,omitempty"`
+	CancelledAt     *time.Time      `gorm:"column:cancelled_at" json:"cancelled_at,omitempty"`
+	CancelReason    *string         `gorm:"column:cancel_reason;type:varchar(255)" json:"cancel_reason,omitempty"`
+	CreatedAt       time.Time       `gorm:"column:created_at;autoCreateTime" json:"created_at"`
+	UpdatedAt       time.Time       `gorm:"column:updated_at;autoUpdateTime" json:"updated_at"`
 
 	// 关联
-	User     *User       `gorm:"foreignKey:UserID" json:"user,omitempty"`
-	Coupon   *Coupon     `gorm:"foreignKey:CouponID" json:"coupon,omitempty"`
-	Address  *Address    `gorm:"foreignKey:AddressID" json:"address,omitempty"`
-	Items    []OrderItem `gorm:"foreignKey:OrderID" json:"items,omitempty"`
-	Payments []Payment   `gorm:"foreignKey:OrderID" json:"payments,omitempty"`
+	User     *User        `gorm:"foreignKey:UserID" json:"user,omitempty"`
+	Coupon   *Coupon      `gorm:"foreignKey:CouponID" json:"coupon,omitempty"`
+	Address  *Address     `gorm:"foreignKey:AddressID" json:"address,omitempty"`
+	Items    []*OrderItem `gorm:"foreignKey:OrderID" json:"items,omitempty"`
+	Payments []Payment    `gorm:"foreignKey:OrderID" json:"payments,omitempty"`
 }
 
 // TableName 表名
@@ -51,33 +53,34 @@ const (
 
 // OrderStatus 订单状态
 const (
-	OrderStatusPending   = "pending"   // 待支付
-	OrderStatusPaid      = "paid"      // 已支付
-	OrderStatusShipping  = "shipping"  // 配送中
-	OrderStatusDelivered = "delivered" // 已送达
-	OrderStatusCompleted = "completed" // 已完成
-	OrderStatusCancelled = "cancelled" // 已取消
-	OrderStatusRefunding = "refunding" // 退款中
-	OrderStatusRefunded  = "refunded"  // 已退款
+	OrderStatusPending     = "pending"      // 待支付
+	OrderStatusPaid        = "paid"         // 已支付
+	OrderStatusPendingShip = "pending_ship" // 待发货
+	OrderStatusShipping    = "shipping"     // 配送中
+	OrderStatusShipped     = "shipped"      // 已发货
+	OrderStatusDelivered   = "delivered"    // 已送达
+	OrderStatusCompleted   = "completed"    // 已完成
+	OrderStatusCancelled   = "cancelled"    // 已取消
+	OrderStatusRefunding   = "refunding"    // 退款中
+	OrderStatusRefunded    = "refunded"     // 已退款
 )
 
 // OrderItem 订单项
 type OrderItem struct {
-	ID           int64   `gorm:"primaryKey;autoIncrement" json:"id"`
-	OrderID      int64   `gorm:"index;not null" json:"order_id"`
-	ProductID    int64   `gorm:"not null" json:"product_id"`
-	SkuID        int64   `gorm:"not null" json:"sku_id"`
-	ProductName  string  `gorm:"type:varchar(200);not null" json:"product_name"`
-	SkuName      *string `gorm:"type:varchar(100)" json:"sku_name,omitempty"`
-	ProductImage *string `gorm:"type:varchar(255)" json:"product_image,omitempty"`
-	Price        float64 `gorm:"type:decimal(10,2);not null" json:"price"`
-	Quantity     int     `gorm:"not null" json:"quantity"`
-	TotalAmount  float64 `gorm:"type:decimal(12,2);not null" json:"total_amount"`
+	ID           int64     `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
+	OrderID      int64     `gorm:"column:order_id;index;not null" json:"order_id"`
+	ProductID    *int64    `gorm:"column:product_id" json:"product_id,omitempty"`
+	ProductName  string    `gorm:"column:product_name;type:varchar(100);not null" json:"product_name"`
+	ProductImage *string   `gorm:"column:product_image;type:varchar(255)" json:"product_image,omitempty"`
+	SkuInfo      *string   `gorm:"column:sku_info;type:varchar(255)" json:"sku_info,omitempty"`
+	Price        float64   `gorm:"column:price;type:decimal(12,2);not null" json:"price"`
+	Quantity     int       `gorm:"column:quantity;not null" json:"quantity"`
+	Subtotal     float64   `gorm:"column:subtotal;type:decimal(12,2);not null" json:"subtotal"`
+	CreatedAt    time.Time `gorm:"column:created_at;autoCreateTime" json:"created_at"`
 
 	// 关联
-	Order   *Order      `gorm:"foreignKey:OrderID" json:"order,omitempty"`
-	Product *Product    `gorm:"foreignKey:ProductID" json:"product,omitempty"`
-	Sku     *ProductSku `gorm:"foreignKey:SkuID" json:"sku,omitempty"`
+	Order   *Order   `gorm:"foreignKey:OrderID" json:"order,omitempty"`
+	Product *Product `gorm:"foreignKey:ProductID" json:"product,omitempty"`
 }
 
 // TableName 表名

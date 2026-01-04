@@ -72,6 +72,7 @@ var (
 	ErrExternalService  = New(1007, "外部服务错误")
 	ErrRateLimitExceed  = New(1008, "请求过于频繁")
 	ErrOperationFailed  = New(1009, "操作失败")
+	ErrResourceNotFound = New(1010, "资源不存在")
 )
 
 // 认证错误码 (2000-2999)

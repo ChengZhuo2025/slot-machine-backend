@@ -71,6 +71,18 @@ go mod verify
 ```bash
 # 启动 PostgreSQL、Redis、EMQX
 docker-compose -f deployments/docker/docker-compose.yml up -d postgres redis emqx
+
+# 通过以下命令启动Adminer：
+docker-compose -f deployments/docker/docker-compose.yml up -d adminer
+
+# 访问Adminer：
+# 打开浏览器，访问 http://localhost:8080
+# 数据库连接信息：
+# 服务器：postgres
+# 端口：5432
+# 数据库：slot_machine
+# 用户名：postgres
+# 密码：postgres
 ```
 
 ### 4. 配置环境变量

@@ -44,6 +44,12 @@ func SetupTestDB(t *testing.T) *gorm.DB {
 		&models.OrderItem{},
 		&models.Payment{},
 		&models.Refund{},
+		// 商城模块 - US3
+		&models.Category{},
+		&models.Product{},
+		&models.ProductSku{},
+		&models.CartItem{},
+		&models.Review{},
 	)
 	require.NoError(t, err, "failed to migrate test database")
 
@@ -70,6 +76,13 @@ func TestMain(m *testing.M) {
 // CleanupDB 清理数据库中的所有数据
 func CleanupDB(t *testing.T, db *gorm.DB) {
 	tables := []string{
+		// 商城模块 - US3
+		"reviews",
+		"cart_items",
+		"product_skus",
+		"products",
+		"categories",
+		// 原有模块
 		"wallet_transactions",
 		"refunds",
 		"payments",

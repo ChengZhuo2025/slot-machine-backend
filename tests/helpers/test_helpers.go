@@ -2,6 +2,7 @@
 package helpers
 
 import (
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"time"
@@ -177,5 +178,130 @@ func NewTestPayment(userID, orderID int64, orderNo string, amount float64, statu
 		PaymentMethod:  models.PaymentMethodWechat,
 		PaymentChannel: models.PaymentChannelMiniProgram,
 		Status:         status,
+	}
+}
+
+// ==================== 商城模块测试辅助函数 - US3 ====================
+
+// NewTestCategory 创建测试分类
+func NewTestCategory(parentID *int64, level int) *models.Category {
+	return &models.Category{
+		ParentID: parentID,
+		Name:     "测试分类" + RandomString(4),
+		Level:    int16(level),
+		Sort:     rand.Intn(100),
+		IsActive: true,
+	}
+}
+
+// NewTestProduct 创建测试商品
+func NewTestProduct(categoryID int64) *models.Product {
+	images, _ := json.Marshal([]string{"https://example.com/image1.jpg", "https://example.com/image2.jpg"})
+	originalPrice := RandomFloat(50, 200)
+	description := "测试商品描述"
+	return &models.Product{
+		CategoryID:    categoryID,
+		Name:          "测试商品" + RandomString(4),
+		Images:        images,
+		Description:   &description,
+		Price:         originalPrice * 0.8,
+		OriginalPrice: &originalPrice,
+		Stock:         RandomInt(10, 100),
+		Sales:         RandomInt(0, 50),
+		Unit:          "件",
+		IsOnSale:      true,
+		IsHot:         rand.Intn(2) == 1,
+		IsNew:         rand.Intn(2) == 1,
+		Sort:          rand.Intn(100),
+	}
+}
+
+// NewTestProductWithStock 创建指定库存的测试商品
+func NewTestProductWithStock(categoryID int64, stock int) *models.Product {
+	product := NewTestProduct(categoryID)
+	product.Stock = stock
+	return product
+}
+
+// NewTestProductSku 创建测试 SKU
+func NewTestProductSku(productID int64, color, size string) *models.ProductSku {
+	attrs, _ := json.Marshal(map[string]string{"颜色": color, "尺码": size})
+	return &models.ProductSku{
+		ProductID:  productID,
+		SkuCode:    fmt.Sprintf("SKU%d%s%s", productID, color, size),
+		Attributes: attrs,
+		Price:      RandomFloat(30, 150),
+		Stock:      RandomInt(5, 50),
+		IsActive:   true,
+	}
+}
+
+// NewTestCartItem 创建测试购物车项
+func NewTestCartItem(userID, productID int64, skuID *int64, quantity int) *models.CartItem {
+	return &models.CartItem{
+		UserID:    userID,
+		ProductID: productID,
+		SkuID:     skuID,
+		Quantity:  quantity,
+		Selected:  true,
+	}
+}
+
+// NewTestMallOrder 创建测试商城订单
+func NewTestMallOrder(userID int64, amount float64) *models.Order {
+	orderNo := fmt.Sprintf("M%s%06d", time.Now().Format("20060102150405"), rand.Intn(1000000))
+	return &models.Order{
+		OrderNo:        orderNo,
+		UserID:         userID,
+		Type:           models.OrderTypeMall,
+		OriginalAmount: amount,
+		DiscountAmount: 0,
+		ActualAmount:   amount,
+		DepositAmount:  0,
+		Status:         models.OrderStatusPending,
+	}
+}
+
+// NewTestOrderItem 创建测试订单项
+func NewTestOrderItem(orderID int64, productID int64, productName string, price float64, quantity int) *models.OrderItem {
+	image := "https://example.com/product.jpg"
+	return &models.OrderItem{
+		OrderID:      orderID,
+		ProductID:    &productID,
+		ProductName:  productName,
+		ProductImage: &image,
+		Price:        price,
+		Quantity:     quantity,
+		Subtotal:     price * float64(quantity),
+	}
+}
+
+// NewTestReview 创建测试评价
+func NewTestReview(orderID, productID, userID int64, rating int16) *models.Review {
+	content := "测试评价内容" + RandomString(10)
+	images, _ := json.Marshal([]string{"https://example.com/review1.jpg"})
+	return &models.Review{
+		OrderID:     orderID,
+		ProductID:   productID,
+		UserID:      userID,
+		Rating:      rating,
+		Content:     &content,
+		Images:      images,
+		IsAnonymous: false,
+		Status:      models.ReviewStatusVisible,
+	}
+}
+
+// NewTestAddress 创建测试地址
+func NewTestAddress(userID int64) *models.Address {
+	return &models.Address{
+		UserID:        userID,
+		ReceiverName:  "测试收货人",
+		ReceiverPhone: RandomPhone(),
+		Province:      "广东省",
+		City:          "深圳市",
+		District:      "南山区",
+		Detail:        "科技园路" + RandomString(2) + "号",
+		IsDefault:     true,
 	}
 }

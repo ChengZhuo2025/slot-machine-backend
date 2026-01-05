@@ -158,3 +158,8 @@ func IsLoggedIn(c *gin.Context) bool {
 	_, exists := c.Get(ContextKeyUserID)
 	return exists
 }
+
+// GetAdminID 从上下文获取管理员 ID（本质上和 GetUserID 相同，用于语义区分）
+func GetAdminID(c *gin.Context) int64 {
+	return GetUserID(c)
+}

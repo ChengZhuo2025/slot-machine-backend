@@ -18,6 +18,7 @@ import (
 	adminHandler "github.com/dumeirei/smart-locker-backend/internal/handler/admin"
 	authHandler "github.com/dumeirei/smart-locker-backend/internal/handler/auth"
 	deviceHandler "github.com/dumeirei/smart-locker-backend/internal/handler/device"
+	distributionHandler "github.com/dumeirei/smart-locker-backend/internal/handler/distribution"
 	hotelHandler "github.com/dumeirei/smart-locker-backend/internal/handler/hotel"
 	mallHandler "github.com/dumeirei/smart-locker-backend/internal/handler/mall"
 	orderHandler "github.com/dumeirei/smart-locker-backend/internal/handler/order"
@@ -29,6 +30,7 @@ import (
 	adminService "github.com/dumeirei/smart-locker-backend/internal/service/admin"
 	authService "github.com/dumeirei/smart-locker-backend/internal/service/auth"
 	deviceService "github.com/dumeirei/smart-locker-backend/internal/service/device"
+	distributionService "github.com/dumeirei/smart-locker-backend/internal/service/distribution"
 	hotelService "github.com/dumeirei/smart-locker-backend/internal/service/hotel"
 	mallService "github.com/dumeirei/smart-locker-backend/internal/service/mall"
 	orderService "github.com/dumeirei/smart-locker-backend/internal/service/order"
@@ -75,6 +77,11 @@ func setupRouter(
 	roomTimeSlotRepo := repository.NewRoomTimeSlotRepository(db)
 	bookingRepo := repository.NewBookingRepository(db)
 
+	// 分销相关仓储
+	distributorRepo := repository.NewDistributorRepository(db)
+	commissionRepo := repository.NewCommissionRepository(db)
+	withdrawalRepo := repository.NewWithdrawalRepository(db)
+
 	// 初始化外部服务客户端
 	smsClient := sms.NewMockClient(cfg.SMS.SignName) // 开发环境使用 Mock，生产环境使用阿里云
 	wechatPayClient, _ := wechatpay.NewClient(&wechatpay.Config{})
@@ -111,6 +118,12 @@ func setupRouter(
 	hotelSvc := hotelService.NewHotelService(db, hotelRepo, roomRepo, roomTimeSlotRepo)
 	bookingSvc := hotelService.NewBookingService(db, bookingRepo, roomRepo, hotelRepo, orderRepo, roomTimeSlotRepo, hotelCodeSvc, deviceSvc, nil)
 
+	// 分销服务
+	distributorSvc := distributionService.NewDistributorService(distributorRepo, userRepo, db)
+	commissionSvc := distributionService.NewCommissionService(commissionRepo, distributorRepo, userRepo, db)
+	inviteSvc := distributionService.NewInviteService(distributorRepo, "") // BaseURL 在 InviteService 中有默认值
+	withdrawSvc := distributionService.NewWithdrawService(withdrawalRepo, distributorRepo, userRepo, db)
+
 	// 初始化处理器
 	authH := authHandler.NewHandler(authSvc, wechatSvc, codeService)
 	userH := userHandler.NewHandler(userSvc, walletSvc)
@@ -130,6 +143,9 @@ func setupRouter(
 	// 酒店处理器
 	hotelH := hotelHandler.NewHandler(hotelSvc)
 	bookingH := hotelHandler.NewBookingHandler(bookingSvc)
+
+	// 分销处理器
+	distributionH := distributionHandler.NewHandler(distributorSvc, commissionSvc, inviteSvc, withdrawSvc)
 
 	// 全局中间件
 	r.Use(userMiddleware.Recovery(logger))
@@ -259,10 +275,24 @@ func setupRouter(
 			user.POST("/bookings/unlock", bookingH.UnlockByCode)
 
 			// 分销相关
-			user.GET("/distributor", placeholderHandler("获取分销员信息"))
-			user.POST("/distributor/apply", placeholderHandler("申请成为分销员"))
-			user.GET("/distributor/commissions", placeholderHandler("获取佣金记录"))
-			user.POST("/distributor/withdraw", placeholderHandler("申请提现"))
+			distribution := user.Group("/distribution")
+			{
+				distribution.GET("/check", distributionH.CheckStatus)
+				distribution.POST("/apply", distributionH.Apply)
+				distribution.GET("/info", distributionH.GetInfo)
+				distribution.GET("/dashboard", distributionH.GetDashboard)
+				distribution.GET("/team/stats", distributionH.GetTeamStats)
+				distribution.GET("/team/members", distributionH.GetTeamMembers)
+				distribution.GET("/invite", distributionH.GetInviteInfo)
+				distribution.GET("/invite/validate", distributionH.ValidateInviteCode)
+				distribution.GET("/share", distributionH.GetShareContent)
+				distribution.GET("/commissions", distributionH.GetCommissions)
+				distribution.GET("/commissions/stats", distributionH.GetCommissionStats)
+				distribution.POST("/withdraw", distributionH.ApplyWithdraw)
+				distribution.GET("/withdrawals", distributionH.GetWithdrawals)
+				distribution.GET("/withdraw/config", distributionH.GetWithdrawConfig)
+				distribution.GET("/ranking", distributionH.GetRanking)
+			}
 
 			// 反馈相关
 			user.POST("/feedbacks", placeholderHandler("提交反馈"))
@@ -303,6 +333,7 @@ func setupRouter(
 		_ = adminService.NewDeviceAlertService(deviceRepo, deviceLogRepo, deviceAlertRepo) // 告警服务（后续集成使用）
 		productAdminSvc := adminService.NewProductAdminService(db, categoryRepo, productRepo, productSkuRepo)
 		hotelAdminSvc := adminService.NewHotelAdminService(db, hotelRepo, roomRepo, bookingRepo, roomTimeSlotRepo)
+		distributionAdminSvc := adminService.NewDistributionAdminService(distributorRepo, commissionRepo, withdrawalRepo, db)
 
 		// 初始化管理员处理器
 		adminAuthH := adminHandler.NewAuthHandler(adminAuthSvc)
@@ -312,6 +343,7 @@ func setupRouter(
 		productAdminH := adminHandler.NewProductHandler(productAdminSvc)
 		hotelAdminH := adminHandler.NewHotelHandler(hotelAdminSvc)
 		bookingVerifyH := adminHandler.NewBookingVerifyHandler(bookingSvc)
+		distributionAdminH := adminHandler.NewDistributionHandler(distributionAdminSvc)
 
 		// 操作日志中间件
 		operationLogger := middleware.NewOperationLogger(operationLogRepo)
@@ -384,10 +416,19 @@ func setupRouter(
 			adminAuth.DELETE("/campaigns/:id", placeholderHandler("删除活动"))
 
 			// 分销管理
-			adminAuth.GET("/distributors", placeholderHandler("获取分销员列表"))
-			adminAuth.PUT("/distributors/:id/status", placeholderHandler("更新分销员状态"))
-			adminAuth.GET("/withdrawals", placeholderHandler("获取提现列表"))
-			adminAuth.PUT("/withdrawals/:id/approve", placeholderHandler("审核提现"))
+			distAdmin := adminAuth.Group("/distribution")
+			{
+				distAdmin.GET("/stats", distributionAdminH.GetStats)
+				distAdmin.GET("/distributors", distributionAdminH.ListDistributors)
+				distAdmin.GET("/distributors/pending", distributionAdminH.GetPendingDistributors)
+				distAdmin.GET("/distributors/:id", distributionAdminH.GetDistributor)
+				distAdmin.POST("/distributors/:id/approve", distributionAdminH.ApproveDistributor)
+				distAdmin.GET("/commissions", distributionAdminH.ListCommissions)
+				distAdmin.GET("/withdrawals", distributionAdminH.ListWithdrawals)
+				distAdmin.GET("/withdrawals/pending", distributionAdminH.GetPendingWithdrawals)
+				distAdmin.GET("/withdrawals/:id", distributionAdminH.GetWithdrawal)
+				distAdmin.POST("/withdrawals/:id/handle", distributionAdminH.HandleWithdrawal)
+			}
 
 			// 财务管理
 			adminAuth.GET("/settlements", placeholderHandler("获取结算列表"))

@@ -350,34 +350,34 @@
 
 ### 分销模块
 
-- [ ] T151 [P] [US5] 定义 Distributor/Commission/Withdrawal 模型 `internal/models/distribution.go`
-- [ ] T152 [US5] 实现分销商 Repository `internal/repository/distributor_repo.go`
-- [ ] T153 [US5] 实现佣金 Repository `internal/repository/commission_repo.go`
-- [ ] T154 [US5] 实现提现 Repository `internal/repository/withdrawal_repo.go`
-- [ ] T155 [US5] 实现分销商服务（申请/审核/团队）`internal/service/distribution/distributor_service.go`
-- [ ] T156 [US5] 实现佣金计算服务（按实付金额）`internal/service/distribution/commission_service.go`
-- [ ] T157 [US5] 实现推广链接生成服务 `internal/service/distribution/invite_service.go`
-- [ ] T158 [US5] 实现提现服务 `internal/service/distribution/withdraw_service.go`
-- [ ] T159 [US5] 实现分销 API Handler（用户端）`internal/handler/distribution/distribution_handler.go`
+- [x] T151 [P] [US5] 定义 Distributor/Commission/Withdrawal 模型 `internal/models/distribution.go`
+- [x] T152 [US5] 实现分销商 Repository `internal/repository/distributor_repo.go`
+- [x] T153 [US5] 实现佣金 Repository `internal/repository/commission_repo.go`
+- [x] T154 [US5] 实现提现 Repository `internal/repository/withdrawal_repo.go`
+- [x] T155 [US5] 实现分销商服务（申请/审核/团队）`internal/service/distribution/distributor_service.go`
+- [x] T156 [US5] 实现佣金计算服务（按实付金额）`internal/service/distribution/commission_service.go`
+- [x] T157 [US5] 实现推广链接生成服务 `internal/service/distribution/invite_service.go`
+- [x] T158 [US5] 实现提现服务 `internal/service/distribution/withdraw_service.go`
+- [x] T159 [US5] 实现分销 API Handler（用户端）`internal/handler/distribution/distribution_handler.go`
 
 ### 分销管理（管理端）
 
-- [ ] T160 [US5] 实现分销管理服务 `internal/service/admin/distribution_admin_service.go`
-- [ ] T161 [US5] 实现分销管理 API Handler `internal/handler/admin/distribution_handler.go`
+- [x] T160 [US5] 实现分销管理服务 `internal/service/admin/distribution_admin_service.go`
+- [x] T161 [US5] 实现分销管理 API Handler `internal/handler/admin/distribution_handler.go`
 
 ### 佣金设置
 
-- [ ] T162 [US5] 实现佣金设置服务 `internal/service/admin/commission_setting_service.go`
+- [x] T162 [US5] 实现佣金设置服务 `internal/service/admin/commission_setting_service.go`
 
 ### 订单完成触发佣金
 
-- [ ] T163 [US5] 在订单完成时触发佣金计算 `internal/service/order/order_complete_hook.go`
+- [x] T163 [US5] 在订单完成时触发佣金计算 `internal/service/order/order_complete_hook.go`
 
 ### 路由注册
 
-- [ ] T164 [US5] 注册 User Story 5 所有路由
+- [x] T164 [US5] 注册 User Story 5 所有路由
 
-**Checkpoint**: User Story 5 完成，分销体系可用
+**Checkpoint**: User Story 5 完成，分销体系可用 ✅
 
 ---
 

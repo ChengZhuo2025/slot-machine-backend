@@ -429,3 +429,98 @@ func NewTestRole() *models.Role {
 		IsSystem:    false,
 	}
 }
+
+// ==================== 分销模块测试辅助函数 - US5 ====================
+
+// NewTestDistributor 创建测试分销商
+func NewTestDistributor(userID int64, status int) *models.Distributor {
+	return &models.Distributor{
+		UserID:              userID,
+		Level:               models.DistributorLevelDirect,
+		InviteCode:          RandomString(8),
+		TotalCommission:     0,
+		AvailableCommission: 0,
+		FrozenCommission:    0,
+		WithdrawnCommission: 0,
+		TeamCount:           0,
+		DirectCount:         0,
+		Status:              status,
+	}
+}
+
+// NewTestDistributorWithParent 创建带上级的测试分销商
+func NewTestDistributorWithParent(userID int64, parentID int64, status int) *models.Distributor {
+	return &models.Distributor{
+		UserID:              userID,
+		ParentID:            &parentID,
+		Level:               models.DistributorLevelIndirect,
+		InviteCode:          RandomString(8),
+		TotalCommission:     0,
+		AvailableCommission: 0,
+		FrozenCommission:    0,
+		WithdrawnCommission: 0,
+		TeamCount:           0,
+		DirectCount:         0,
+		Status:              status,
+	}
+}
+
+// NewTestDistributorWithCommission 创建带佣金余额的测试分销商
+func NewTestDistributorWithCommission(userID int64, totalCommission, availableCommission, frozenCommission float64) *models.Distributor {
+	return &models.Distributor{
+		UserID:              userID,
+		Level:               models.DistributorLevelDirect,
+		InviteCode:          RandomString(8),
+		TotalCommission:     totalCommission,
+		AvailableCommission: availableCommission,
+		FrozenCommission:    frozenCommission,
+		WithdrawnCommission: 0,
+		TeamCount:           0,
+		DirectCount:         0,
+		Status:              models.DistributorStatusApproved,
+	}
+}
+
+// NewTestCommission 创建测试佣金记录
+func NewTestCommission(distributorID, orderID, fromUserID int64, commType string, orderAmount, rate, amount float64, status int) *models.Commission {
+	return &models.Commission{
+		DistributorID: distributorID,
+		OrderID:       orderID,
+		FromUserID:    fromUserID,
+		Type:          commType,
+		OrderAmount:   orderAmount,
+		Rate:          rate,
+		Amount:        amount,
+		Status:        status,
+	}
+}
+
+// NewTestWithdrawal 创建测试提现记录
+func NewTestWithdrawal(userID int64, withdrawType string, amount, fee, actualAmount float64, status string) *models.Withdrawal {
+	return &models.Withdrawal{
+		WithdrawalNo:         fmt.Sprintf("W%s%06d", time.Now().Format("20060102150405"), rand.Intn(1000000)),
+		UserID:               userID,
+		Type:                 withdrawType,
+		Amount:               amount,
+		Fee:                  fee,
+		ActualAmount:         actualAmount,
+		WithdrawTo:           models.WithdrawToWechat,
+		AccountInfoEncrypted: `{"account":"test_account"}`,
+		Status:               status,
+	}
+}
+
+// NewTestUserWithReferrer 创建带推荐人的测试用户
+func NewTestUserWithReferrer(referrerID int64) *models.User {
+	phone := RandomPhone()
+	return &models.User{
+		Phone:         &phone,
+		Nickname:      "测试用户" + RandomString(4),
+		Gender:        0,
+		MemberLevelID: 1,
+		ReferrerID:    &referrerID,
+		Points:        0,
+		IsVerified:    false,
+		Status:        models.UserStatusActive,
+	}
+}

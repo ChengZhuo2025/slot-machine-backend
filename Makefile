@@ -92,13 +92,11 @@ test-api: ## Run API tests
 
 coverage: ## Generate test coverage report
 	@echo "Generating coverage report..."
-	$(GOTEST) -coverprofile=coverage.out -covermode=atomic ./...
-	$(GOCMD) tool cover -html=coverage.out -o coverage.html
-	@echo "Coverage report generated: coverage.html"
+	bash ./scripts/coverage.sh
 
 coverage-gate: ## Verify coverage meets requirements
 	@echo "Verifying coverage gate..."
-	./scripts/coverage-gate.sh
+	bash ./scripts/coverage-gate.sh
 
 # =========================================
 # Lint & Format

@@ -198,3 +198,15 @@ func (j JSON) Value() (driver.Value, error) {
 	}
 	return json.Marshal(j)
 }
+
+// Unmarshal 将 JSON 值反序列化到目标结构（便于业务层使用）
+func (j JSON) Unmarshal(target interface{}) error {
+	if j == nil {
+		return nil
+	}
+	b, err := json.Marshal(j)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(b, target)
+}

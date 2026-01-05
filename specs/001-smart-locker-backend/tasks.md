@@ -314,31 +314,31 @@
 
 ### 酒店模块
 
-- [ ] T137 [P] [US4] 定义 Hotel/Room/Booking 模型 `internal/models/hotel.go`
-- [ ] T138 [US4] 实现酒店 Repository `internal/repository/hotel_repo.go`
-- [ ] T139 [US4] 实现房间 Repository `internal/repository/room_repo.go`
-- [ ] T140 [US4] 实现酒店服务 `internal/service/hotel/hotel_service.go`
-- [ ] T141 [US4] 实现酒店 API Handler `internal/handler/hotel/hotel_handler.go`
+- [x] T137 [P] [US4] 定义 Hotel/Room/Booking 模型 `internal/models/hotel.go`
+- [x] T138 [US4] 实现酒店 Repository `internal/repository/hotel_repo.go`
+- [x] T139 [US4] 实现房间 Repository `internal/repository/room_repo.go`
+- [x] T140 [US4] 实现酒店服务 `internal/service/hotel/hotel_service.go`
+- [x] T141 [US4] 实现酒店 API Handler `internal/handler/hotel/hotel_handler.go`
 
 ### 预订模块
 
-- [ ] T142 [US4] 实现预订 Repository `internal/repository/booking_repo.go`
-- [ ] T143 [US4] 实现预订服务（创建/核销/开锁码验证）`internal/service/hotel/booking_service.go`
-- [ ] T144 [US4] 实现开锁码生成与验证 `internal/service/hotel/unlock_code_service.go`
-- [ ] T145 [US4] 实现核销码生成 `internal/service/hotel/verify_code_service.go`
-- [ ] T146 [US4] 实现预订 API Handler `internal/handler/hotel/booking_handler.go`
+- [x] T142 [US4] 实现预订 Repository `internal/repository/booking_repo.go`
+- [x] T143 [US4] 实现预订服务（创建/核销/开锁码验证）`internal/service/hotel/booking_service.go`
+- [x] T144 [US4] 实现开锁码生成与验证 `internal/service/hotel/code_service.go` (合并 T144/T145)
+- [x] T145 [US4] 实现核销码生成 `internal/service/hotel/code_service.go` (合并到 T144)
+- [x] T146 [US4] 实现预订 API Handler `internal/handler/hotel/booking_handler.go`
 
 ### 酒店管理（管理端）
 
-- [ ] T147 [US4] 实现酒店管理服务 `internal/service/admin/hotel_admin_service.go`
-- [ ] T148 [US4] 实现酒店管理 API Handler `internal/handler/admin/hotel_handler.go`
-- [ ] T149 [US4] 实现前台核销 API Handler `internal/handler/admin/booking_verify_handler.go`
+- [x] T147 [US4] 实现酒店管理服务 `internal/service/admin/hotel_admin_service.go`
+- [x] T148 [US4] 实现酒店管理 API Handler `internal/handler/admin/hotel_handler.go`
+- [x] T149 [US4] 实现前台核销 API Handler `internal/handler/admin/booking_verify_handler.go`
 
 ### 路由注册
 
-- [ ] T150 [US4] 注册 User Story 4 所有路由
+- [x] T150 [US4] 注册 User Story 4 所有路由
 
-**Checkpoint**: User Story 4 完成，酒店预订功能可用
+**Checkpoint**: User Story 4 完成，酒店预订功能可用 ✅
 
 ---
 

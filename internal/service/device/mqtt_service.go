@@ -148,6 +148,16 @@ func (s *MQTTService) SendUnlockCommand(ctx context.Context, deviceNo string, sl
 	return result, nil
 }
 
+// Unlock 通过设备ID发送开锁命令（兼容旧接口）
+func (s *MQTTService) Unlock(ctx context.Context, deviceID int64) error {
+	device, err := s.deviceRepo.GetByID(ctx, deviceID)
+	if err != nil {
+		return err
+	}
+	_, err = s.SendUnlockCommand(ctx, device.DeviceNo, nil)
+	return err
+}
+
 // SendUnlockCommandAsync 异步发送开锁命令
 func (s *MQTTService) SendUnlockCommandAsync(ctx context.Context, deviceNo string, slotNo *int) (string, error) {
 	if s.commandSender == nil {

@@ -18,6 +18,7 @@ import (
 	adminHandler "github.com/dumeirei/smart-locker-backend/internal/handler/admin"
 	authHandler "github.com/dumeirei/smart-locker-backend/internal/handler/auth"
 	deviceHandler "github.com/dumeirei/smart-locker-backend/internal/handler/device"
+	hotelHandler "github.com/dumeirei/smart-locker-backend/internal/handler/hotel"
 	mallHandler "github.com/dumeirei/smart-locker-backend/internal/handler/mall"
 	orderHandler "github.com/dumeirei/smart-locker-backend/internal/handler/order"
 	paymentHandler "github.com/dumeirei/smart-locker-backend/internal/handler/payment"
@@ -28,6 +29,7 @@ import (
 	adminService "github.com/dumeirei/smart-locker-backend/internal/service/admin"
 	authService "github.com/dumeirei/smart-locker-backend/internal/service/auth"
 	deviceService "github.com/dumeirei/smart-locker-backend/internal/service/device"
+	hotelService "github.com/dumeirei/smart-locker-backend/internal/service/hotel"
 	mallService "github.com/dumeirei/smart-locker-backend/internal/service/mall"
 	orderService "github.com/dumeirei/smart-locker-backend/internal/service/order"
 	paymentService "github.com/dumeirei/smart-locker-backend/internal/service/payment"
@@ -67,6 +69,12 @@ func setupRouter(
 	orderRepo := repository.NewOrderRepository(db)
 	reviewRepo := repository.NewReviewRepository(db)
 
+	// 酒店相关仓储
+	hotelRepo := repository.NewHotelRepository(db)
+	roomRepo := repository.NewRoomRepository(db)
+	roomTimeSlotRepo := repository.NewRoomTimeSlotRepository(db)
+	bookingRepo := repository.NewBookingRepository(db)
+
 	// 初始化外部服务客户端
 	smsClient := sms.NewMockClient(cfg.SMS.SignName) // 开发环境使用 Mock，生产环境使用阿里云
 	wechatPayClient, _ := wechatpay.NewClient(&wechatpay.Config{})
@@ -98,6 +106,11 @@ func setupRouter(
 	// 退款服务
 	refundSvc := orderService.NewRefundService(db, refundRepo, orderRepo, paymentRepo)
 
+	// 酒店服务
+	hotelCodeSvc := hotelService.NewCodeService()
+	hotelSvc := hotelService.NewHotelService(db, hotelRepo, roomRepo, roomTimeSlotRepo)
+	bookingSvc := hotelService.NewBookingService(db, bookingRepo, roomRepo, hotelRepo, orderRepo, roomTimeSlotRepo, hotelCodeSvc, deviceSvc, nil)
+
 	// 初始化处理器
 	authH := authHandler.NewHandler(authSvc, wechatSvc, codeService)
 	userH := userHandler.NewHandler(userSvc, walletSvc)
@@ -113,6 +126,10 @@ func setupRouter(
 
 	// 退款处理器
 	refundH := orderHandler.NewRefundHandler(refundSvc)
+
+	// 酒店处理器
+	hotelH := hotelHandler.NewHandler(hotelSvc)
+	bookingH := hotelHandler.NewBookingHandler(bookingSvc)
 
 	// 全局中间件
 	r.Use(userMiddleware.Recovery(logger))
@@ -226,15 +243,20 @@ func setupRouter(
 			user.GET("/user/coupons", placeholderHandler("获取我的优惠券"))
 			user.POST("/coupons/:id/receive", placeholderHandler("领取优惠券"))
 
-			// 预订相关
-			user.GET("/hotels", placeholderHandler("获取酒店列表"))
-			user.GET("/hotels/:id", placeholderHandler("获取酒店详情"))
-			user.GET("/hotels/:id/rooms", placeholderHandler("获取房间列表"))
-			user.GET("/rooms/:id/slots", placeholderHandler("获取可用时段"))
-			user.POST("/bookings", placeholderHandler("创建预订"))
-			user.GET("/bookings", placeholderHandler("获取预订列表"))
-			user.GET("/bookings/:id", placeholderHandler("获取预订详情"))
-			user.POST("/bookings/:id/cancel", placeholderHandler("取消预订"))
+			// 酒店/预订相关
+			user.GET("/hotels", hotelH.GetHotelList)
+			user.GET("/hotels/cities", hotelH.GetCities)
+			user.GET("/hotels/:id", hotelH.GetHotelDetail)
+			user.GET("/hotels/:hotel_id/rooms", hotelH.GetRoomList)
+			user.GET("/rooms/:id", hotelH.GetRoomDetail)
+			user.GET("/rooms/:id/availability", hotelH.CheckRoomAvailability)
+			user.GET("/rooms/:id/time-slots", hotelH.GetRoomTimeSlots)
+			user.POST("/bookings", bookingH.CreateBooking)
+			user.GET("/bookings", bookingH.GetMyBookings)
+			user.GET("/bookings/:id", bookingH.GetBookingDetail)
+			user.GET("/bookings/no/:booking_no", bookingH.GetBookingByNo)
+			user.POST("/bookings/:id/cancel", bookingH.CancelBooking)
+			user.POST("/bookings/unlock", bookingH.UnlockByCode)
 
 			// 分销相关
 			user.GET("/distributor", placeholderHandler("获取分销员信息"))
@@ -280,6 +302,7 @@ func setupRouter(
 		merchantAdminSvc := adminService.NewMerchantAdminService(merchantRepo, aesEncryptor)
 		_ = adminService.NewDeviceAlertService(deviceRepo, deviceLogRepo, deviceAlertRepo) // 告警服务（后续集成使用）
 		productAdminSvc := adminService.NewProductAdminService(db, categoryRepo, productRepo, productSkuRepo)
+		hotelAdminSvc := adminService.NewHotelAdminService(db, hotelRepo, roomRepo, bookingRepo, roomTimeSlotRepo)
 
 		// 初始化管理员处理器
 		adminAuthH := adminHandler.NewAuthHandler(adminAuthSvc)
@@ -287,6 +310,8 @@ func setupRouter(
 		venueAdminH := adminHandler.NewVenueHandler(venueAdminSvc)
 		merchantAdminH := adminHandler.NewMerchantHandler(merchantAdminSvc)
 		productAdminH := adminHandler.NewProductHandler(productAdminSvc)
+		hotelAdminH := adminHandler.NewHotelHandler(hotelAdminSvc)
+		bookingVerifyH := adminHandler.NewBookingVerifyHandler(bookingSvc)
 
 		// 操作日志中间件
 		operationLogger := middleware.NewOperationLogger(operationLogRepo)
@@ -342,20 +367,10 @@ func setupRouter(
 			adminAuth.DELETE("/categories/:id", productAdminH.DeleteCategory)
 
 			// 酒店管理
-			adminAuth.GET("/hotels", placeholderHandler("获取酒店列表"))
-			adminAuth.POST("/hotels", placeholderHandler("添加酒店"))
-			adminAuth.PUT("/hotels/:id", placeholderHandler("更新酒店"))
-			adminAuth.DELETE("/hotels/:id", placeholderHandler("删除酒店"))
+			hotelAdminH.RegisterRoutes(adminAuth)
 
-			// 房间管理
-			adminAuth.GET("/hotels/:hotel_id/rooms", placeholderHandler("获取房间列表"))
-			adminAuth.POST("/hotels/:hotel_id/rooms", placeholderHandler("添加房间"))
-			adminAuth.PUT("/rooms/:id", placeholderHandler("更新房间"))
-			adminAuth.DELETE("/rooms/:id", placeholderHandler("删除房间"))
-
-			// 预订管理
-			adminAuth.GET("/bookings", placeholderHandler("获取预订列表"))
-			adminAuth.GET("/bookings/:id", placeholderHandler("获取预订详情"))
+			// 预订核销
+			bookingVerifyH.RegisterRoutes(adminAuth)
 
 			// 营销管理
 			adminAuth.GET("/coupons", placeholderHandler("获取优惠券列表"))

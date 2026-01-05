@@ -21,11 +21,11 @@ import (
 
 // distributionE2ETestContext E2E测试上下文
 type distributionE2ETestContext struct {
-	db               *gorm.DB
-	distributorSvc   *distributionService.DistributorService
-	commissionSvc    *distributionService.CommissionService
-	withdrawSvc      *distributionService.WithdrawService
-	inviteSvc        *distributionService.InviteService
+	db                *gorm.DB
+	distributorSvc    *distributionService.DistributorService
+	commissionSvc     *distributionService.CommissionService
+	withdrawSvc       *distributionService.WithdrawService
+	inviteSvc         *distributionService.InviteService
 	orderCompleteHook *orderService.OrderCompleteHook
 }
 
@@ -72,11 +72,11 @@ func setupDistributionE2ETestContext(t *testing.T) *distributionE2ETestContext {
 	orderHook := orderService.NewOrderCompleteHook(commissionSvc)
 
 	return &distributionE2ETestContext{
-		db:               db,
-		distributorSvc:   distributorSvc,
-		commissionSvc:    commissionSvc,
-		withdrawSvc:      withdrawSvc,
-		inviteSvc:        inviteSvc,
+		db:                db,
+		distributorSvc:    distributorSvc,
+		commissionSvc:     commissionSvc,
+		withdrawSvc:       withdrawSvc,
+		inviteSvc:         inviteSvc,
 		orderCompleteHook: orderHook,
 	}
 }
@@ -190,7 +190,7 @@ func TestE2E_DistributionCompleteFlow(t *testing.T) {
 		t.Logf("Step 6: 分销商仪表盘 - 总佣金: %.2f, 团队人数: %d", dashboard.TotalCommission, dashboard.TeamCount)
 
 		// Step 7: 获取邀请信息和邀请链接
-		inviteInfo, err := tc.inviteSvc.GetInviteInfo(ctx, user.ID)
+		inviteInfo, err := tc.inviteSvc.GenerateInviteInfo(ctx, distributor.ID)
 		require.NoError(t, err)
 		assert.NotEmpty(t, inviteInfo.InviteCode)
 		assert.NotEmpty(t, inviteInfo.InviteLink)
@@ -368,7 +368,7 @@ func TestE2E_DistributionCompleteFlow(t *testing.T) {
 		var finalWithdrawal models.Withdrawal
 		tc.db.First(&finalWithdrawal, withdrawResp.Withdrawal.ID)
 		assert.Equal(t, models.WithdrawalStatusSuccess, finalWithdrawal.Status)
-		assert.NotNil(t, finalWithdrawal.CompletedAt)
+		assert.NotNil(t, finalWithdrawal.ProcessedAt)
 
 		finalDistributor, _ := tc.distributorSvc.GetByUserID(ctx, user.ID)
 		assert.Equal(t, 0.0, finalDistributor.FrozenCommission)
@@ -512,7 +512,7 @@ func TestE2E_DistributionTeamManagement(t *testing.T) {
 		t.Logf("团队统计 - 直推: %d, 团队总人数: %d", teamStats.DirectCount, teamStats.TeamCount)
 
 		// 获取团队成员列表
-		members, total, err := tc.distributorSvc.GetTeamMembers(ctx, topDistributor.ID, 1, 10)
+		members, total, err := tc.distributorSvc.GetTeamMembers(ctx, topDistributor.ID, 0, 10, "all")
 		require.NoError(t, err)
 		assert.Equal(t, int64(3), total)
 		assert.Len(t, members, 3)
@@ -552,7 +552,7 @@ func TestE2E_DistributionRanking(t *testing.T) {
 		}
 
 		// 获取排行榜
-		ranking, err := tc.distributorSvc.GetRanking(ctx, 10)
+		ranking, err := tc.distributorSvc.GetTopDistributors(ctx, 10)
 		require.NoError(t, err)
 		assert.Len(t, ranking, 5)
 
@@ -589,14 +589,14 @@ func TestE2E_DistributionInviteValidation(t *testing.T) {
 		// 验证有效邀请码
 		result, err := tc.inviteSvc.ValidateInviteCode(ctx, distributor.InviteCode)
 		require.NoError(t, err)
-		assert.True(t, result.Valid)
-		assert.NotNil(t, result.Inviter)
-		t.Logf("邀请码 %s 有效，邀请人ID: %d", distributor.InviteCode, result.Inviter.ID)
+		assert.NotNil(t, result)
+		assert.Equal(t, distributor.ID, result.ID)
+		t.Logf("邀请码 %s 有效，邀请人ID: %d", distributor.InviteCode, result.ID)
 
 		// 验证无效邀请码
 		invalidResult, err := tc.inviteSvc.ValidateInviteCode(ctx, "INVALID123")
-		require.NoError(t, err)
-		assert.False(t, invalidResult.Valid)
+		assert.Error(t, err)
+		assert.Nil(t, invalidResult)
 		t.Logf("邀请码 INVALID123 无效")
 	})
 }
@@ -644,8 +644,8 @@ func TestE2E_DistributionCommissionHistory(t *testing.T) {
 		// 获取佣金统计
 		stats, err := tc.commissionSvc.GetStats(ctx, distributor.ID)
 		require.NoError(t, err)
-		t.Logf("佣金统计 - 待结算: %.2f, 已结算: %.2f, 已取消: %.2f",
-			stats.PendingAmount, stats.SettledAmount, stats.CancelledAmount)
+		t.Logf("佣金统计 - 待结算: %.2f, 已结算: %.2f, 总金额: %.2f",
+			stats["pending_amount"], stats["settled_amount"], stats["total_amount"])
 	})
 }
 

@@ -1,0 +1,1370 @@
+
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>distribution: Go Coverage Report</title>
+		<style>
+			body {
+				background: black;
+				color: rgb(80, 80, 80);
+			}
+			body, pre, #legend span {
+				font-family: Menlo, monospace;
+				font-weight: bold;
+			}
+			#topbar {
+				background: black;
+				position: fixed;
+				top: 0; left: 0; right: 0;
+				height: 42px;
+				border-bottom: 1px solid rgb(80, 80, 80);
+			}
+			#content {
+				margin-top: 50px;
+			}
+			#nav, #legend {
+				float: left;
+				margin-left: 10px;
+			}
+			#legend {
+				margin-top: 12px;
+			}
+			#nav {
+				margin-top: 10px;
+			}
+			#legend span {
+				margin: 0 5px;
+			}
+			.cov0 { color: rgb(192, 0, 0) }
+.cov1 { color: rgb(128, 128, 128) }
+.cov2 { color: rgb(116, 140, 131) }
+.cov3 { color: rgb(104, 152, 134) }
+.cov4 { color: rgb(92, 164, 137) }
+.cov5 { color: rgb(80, 176, 140) }
+.cov6 { color: rgb(68, 188, 143) }
+.cov7 { color: rgb(56, 200, 146) }
+.cov8 { color: rgb(44, 212, 149) }
+.cov9 { color: rgb(32, 224, 152) }
+.cov10 { color: rgb(20, 236, 155) }
+
+		</style>
+	</head>
+	<body>
+		<div id="topbar">
+			<div id="nav">
+				<select id="files">
+				
+				<option value="file0">github.com/dumeirei/smart-locker-backend/internal/service/distribution/commission_service.go (73.0%)</option>
+				
+				<option value="file1">github.com/dumeirei/smart-locker-backend/internal/service/distribution/distributor_service.go (74.6%)</option>
+				
+				<option value="file2">github.com/dumeirei/smart-locker-backend/internal/service/distribution/invite_service.go (0.0%)</option>
+				
+				<option value="file3">github.com/dumeirei/smart-locker-backend/internal/service/distribution/withdraw_service.go (74.5%)</option>
+				
+				</select>
+			</div>
+			<div id="legend">
+				<span>not tracked</span>
+			
+				<span class="cov0">no coverage</span>
+				<span class="cov1">low coverage</span>
+				<span class="cov2">*</span>
+				<span class="cov3">*</span>
+				<span class="cov4">*</span>
+				<span class="cov5">*</span>
+				<span class="cov6">*</span>
+				<span class="cov7">*</span>
+				<span class="cov8">*</span>
+				<span class="cov9">*</span>
+				<span class="cov10">high coverage</span>
+			
+			</div>
+		</div>
+		<div id="content">
+		
+		<pre class="file" id="file0" style="display: none">// Package distribution 分销服务
+package distribution
+
+import (
+        "context"
+        "errors"
+        "time"
+
+        "gorm.io/gorm"
+
+        "github.com/dumeirei/smart-locker-backend/internal/models"
+        "github.com/dumeirei/smart-locker-backend/internal/repository"
+)
+
+// 默认佣金比例
+const (
+        DefaultDirectRate   = 0.10 // 直推佣金比例 10%
+        DefaultIndirectRate = 0.05 // 间推佣金比例 5%
+        DefaultSettleDelay  = 7    // 默认结算延迟天数
+)
+
+// CommissionService 佣金服务
+type CommissionService struct {
+        commissionRepo  *repository.CommissionRepository
+        distributorRepo *repository.DistributorRepository
+        userRepo        *repository.UserRepository
+        db              *gorm.DB
+        directRate      float64 // 直推佣金比例
+        indirectRate    float64 // 间推佣金比例
+        settleDelay     int     // 结算延迟天数
+}
+
+// NewCommissionService 创建佣金服务
+func NewCommissionService(
+        commissionRepo *repository.CommissionRepository,
+        distributorRepo *repository.DistributorRepository,
+        userRepo *repository.UserRepository,
+        db *gorm.DB,
+) *CommissionService <span class="cov10" title="14">{
+        return &amp;CommissionService{
+                commissionRepo:  commissionRepo,
+                distributorRepo: distributorRepo,
+                userRepo:        userRepo,
+                db:              db,
+                directRate:      DefaultDirectRate,
+                indirectRate:    DefaultIndirectRate,
+                settleDelay:     DefaultSettleDelay,
+        }
+}</span>
+
+// SetRates 设置佣金比例
+func (s *CommissionService) SetRates(directRate, indirectRate float64, settleDelay int) <span class="cov1" title="1">{
+        s.directRate = directRate
+        s.indirectRate = indirectRate
+        s.settleDelay = settleDelay
+}</span>
+
+// CalculateRequest 计算佣金请求
+type CalculateRequest struct {
+        OrderID     int64   `json:"order_id"`
+        UserID      int64   `json:"user_id"`      // 消费用户ID
+        OrderAmount float64 `json:"order_amount"` // 订单实付金额
+}
+
+// CalculateResponse 计算佣金响应
+type CalculateResponse struct {
+        DirectCommission   *models.Commission `json:"direct_commission,omitempty"`
+        IndirectCommission *models.Commission `json:"indirect_commission,omitempty"`
+        TotalAmount        float64            `json:"total_amount"`
+}
+
+// Calculate 计算订单佣金
+// 当订单完成时调用此方法计算并记录佣金
+func (s *CommissionService) Calculate(ctx context.Context, req *CalculateRequest) (*CalculateResponse, error) <span class="cov8" title="8">{
+        if req.OrderAmount &lt;= 0 </span><span class="cov3" title="2">{
+                return nil, errors.New("订单金额无效")
+        }</span>
+
+        // 获取消费用户信息
+        <span class="cov7" title="6">user, err := s.userRepo.GetByID(ctx, req.UserID)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        // 如果用户没有推荐人，无需计算佣金
+        <span class="cov7" title="6">if user.ReferrerID == nil </span><span class="cov1" title="1">{
+                return &amp;CalculateResponse{TotalAmount: 0}, nil
+        }</span>
+
+        <span class="cov6" title="5">response := &amp;CalculateResponse{TotalAmount: 0}
+        var commissions []*models.Commission
+
+        // 使用事务处理
+        err = s.db.Transaction(func(tx *gorm.DB) error </span><span class="cov6" title="5">{
+                // 查找直推分销商（推荐人）
+                directDistributor, err := s.findDistributorByUserID(ctx, tx, *user.ReferrerID)
+                if err != nil || directDistributor == nil </span><span class="cov3" title="2">{
+                        // 推荐人不是分销商或未审核通过，不计算佣金
+                        return nil
+                }</span>
+
+                // 计算直推佣金
+                <span class="cov4" title="3">directAmount := req.OrderAmount * s.directRate
+                if directAmount &gt; 0 </span><span class="cov4" title="3">{
+                        directCommission := &amp;models.Commission{
+                                DistributorID: directDistributor.ID,
+                                OrderID:       req.OrderID,
+                                FromUserID:    req.UserID,
+                                Type:          models.CommissionTypeDirect,
+                                OrderAmount:   req.OrderAmount,
+                                Rate:          s.directRate,
+                                Amount:        directAmount,
+                                Status:        models.CommissionStatusPending,
+                        }
+                        commissions = append(commissions, directCommission)
+                        response.DirectCommission = directCommission
+                        response.TotalAmount += directAmount
+                }</span>
+
+                // 查找间推分销商（推荐人的推荐人）
+                <span class="cov4" title="3">if directDistributor.ParentID != nil </span><span class="cov1" title="1">{
+                        indirectDistributor, err := s.findDistributorByID(ctx, tx, *directDistributor.ParentID)
+                        if err == nil &amp;&amp; indirectDistributor != nil </span><span class="cov1" title="1">{
+                                // 计算间推佣金
+                                indirectAmount := req.OrderAmount * s.indirectRate
+                                if indirectAmount &gt; 0 </span><span class="cov1" title="1">{
+                                        indirectCommission := &amp;models.Commission{
+                                                DistributorID: indirectDistributor.ID,
+                                                OrderID:       req.OrderID,
+                                                FromUserID:    req.UserID,
+                                                Type:          models.CommissionTypeIndirect,
+                                                OrderAmount:   req.OrderAmount,
+                                                Rate:          s.indirectRate,
+                                                Amount:        indirectAmount,
+                                                Status:        models.CommissionStatusPending,
+                                        }
+                                        commissions = append(commissions, indirectCommission)
+                                        response.IndirectCommission = indirectCommission
+                                        response.TotalAmount += indirectAmount
+                                }</span>
+                        }
+                }
+
+                // 批量创建佣金记录
+                <span class="cov4" title="3">if len(commissions) &gt; 0 </span><span class="cov4" title="3">{
+                        if err := tx.Create(&amp;commissions).Error; err != nil </span><span class="cov0" title="0">{
+                                return err
+                        }</span>
+                }
+
+                <span class="cov4" title="3">return nil</span>
+        })
+
+        <span class="cov6" title="5">if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov6" title="5">return response, nil</span>
+}
+
+// findDistributorByUserID 根据用户ID查找已审核通过的分销商
+func (s *CommissionService) findDistributorByUserID(ctx context.Context, tx *gorm.DB, userID int64) (*models.Distributor, error) <span class="cov6" title="5">{
+        var distributor models.Distributor
+        err := tx.WithContext(ctx).
+                Where("user_id = ? AND status = ?", userID, models.DistributorStatusApproved).
+                First(&amp;distributor).Error
+        if err != nil </span><span class="cov3" title="2">{
+                return nil, err
+        }</span>
+        <span class="cov4" title="3">return &amp;distributor, nil</span>
+}
+
+// findDistributorByID 根据分销商ID查找已审核通过的分销商
+func (s *CommissionService) findDistributorByID(ctx context.Context, tx *gorm.DB, distributorID int64) (*models.Distributor, error) <span class="cov1" title="1">{
+        var distributor models.Distributor
+        err := tx.WithContext(ctx).
+                Where("id = ? AND status = ?", distributorID, models.DistributorStatusApproved).
+                First(&amp;distributor).Error
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov1" title="1">return &amp;distributor, nil</span>
+}
+
+// Settle 结算佣金（将待结算佣金转为可提现）
+func (s *CommissionService) Settle(ctx context.Context, commissionID int64) error <span class="cov3" title="2">{
+        commission, err := s.commissionRepo.GetByID(ctx, commissionID)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov3" title="2">if commission.Status != models.CommissionStatusPending </span><span class="cov1" title="1">{
+                return errors.New("该佣金已处理")
+        }</span>
+
+        <span class="cov1" title="1">return s.db.Transaction(func(tx *gorm.DB) error </span><span class="cov1" title="1">{
+                // 更新佣金状态
+                now := time.Now()
+                if err := tx.Model(&amp;models.Commission{}).
+                        Where("id = ?", commissionID).
+                        Updates(map[string]interface{}{
+                                "status":     models.CommissionStatusSettled,
+                                "settled_at": now,
+                        }).Error; err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+
+                // 增加分销商的可用佣金
+                <span class="cov1" title="1">if err := tx.Model(&amp;models.Distributor{}).
+                        Where("id = ?", commission.DistributorID).
+                        Updates(map[string]interface{}{
+                                "total_commission":     gorm.Expr("total_commission + ?", commission.Amount),
+                                "available_commission": gorm.Expr("available_commission + ?", commission.Amount),
+                        }).Error; err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+
+                <span class="cov1" title="1">return nil</span>
+        })
+}
+
+// SettlePendingCommissions 结算超过延迟期的待结算佣金
+func (s *CommissionService) SettlePendingCommissions(ctx context.Context) (int64, error) <span class="cov0" title="0">{
+        // 计算结算截止时间
+        settleTime := time.Now().AddDate(0, 0, -s.settleDelay)
+
+        // 获取需要结算的佣金
+        var commissions []*models.Commission
+        if err := s.db.WithContext(ctx).
+                Where("status = ? AND created_at &lt; ?", models.CommissionStatusPending, settleTime).
+                Find(&amp;commissions).Error; err != nil </span><span class="cov0" title="0">{
+                return 0, err
+        }</span>
+
+        <span class="cov0" title="0">if len(commissions) == 0 </span><span class="cov0" title="0">{
+                return 0, nil
+        }</span>
+
+        <span class="cov0" title="0">var settledCount int64
+        for _, commission := range commissions </span><span class="cov0" title="0">{
+                if err := s.Settle(ctx, commission.ID); err == nil </span><span class="cov0" title="0">{
+                        settledCount++
+                }</span>
+        }
+
+        <span class="cov0" title="0">return settledCount, nil</span>
+}
+
+// CancelByOrderID 取消订单相关的佣金（退款时调用）
+func (s *CommissionService) CancelByOrderID(ctx context.Context, orderID int64) error <span class="cov4" title="3">{
+        // 获取订单相关的佣金记录
+        commissions, err := s.commissionRepo.GetByOrderID(ctx, orderID)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov4" title="3">if len(commissions) == 0 </span><span class="cov1" title="1">{
+                return nil
+        }</span>
+
+        <span class="cov3" title="2">return s.db.Transaction(func(tx *gorm.DB) error </span><span class="cov3" title="2">{
+                for _, commission := range commissions </span><span class="cov3" title="2">{
+                        if commission.Status == models.CommissionStatusSettled </span><span class="cov1" title="1">{
+                                // 已结算的佣金，需要从分销商账户扣除
+                                if err := tx.Model(&amp;models.Distributor{}).
+                                        Where("id = ? AND available_commission &gt;= ?", commission.DistributorID, commission.Amount).
+                                        Updates(map[string]interface{}{
+                                                "total_commission":     gorm.Expr("total_commission - ?", commission.Amount),
+                                                "available_commission": gorm.Expr("available_commission - ?", commission.Amount),
+                                        }).Error; err != nil </span><span class="cov0" title="0">{
+                                        return err
+                                }</span>
+                        }
+
+                        // 更新佣金状态为已取消
+                        <span class="cov3" title="2">if err := tx.Model(&amp;models.Commission{}).
+                                Where("id = ?", commission.ID).
+                                Update("status", models.CommissionStatusCancelled).Error; err != nil </span><span class="cov0" title="0">{
+                                return err
+                        }</span>
+                }
+                <span class="cov3" title="2">return nil</span>
+        })
+}
+
+// GetByDistributorID 获取分销商的佣金记录
+func (s *CommissionService) GetByDistributorID(ctx context.Context, distributorID int64, offset, limit int) ([]*models.Commission, int64, error) <span class="cov1" title="1">{
+        return s.commissionRepo.GetByDistributorID(ctx, distributorID, offset, limit)
+}</span>
+
+// GetStats 获取佣金统计
+func (s *CommissionService) GetStats(ctx context.Context, distributorID int64) (map[string]interface{}, error) <span class="cov0" title="0">{
+        return s.commissionRepo.GetStatsByDistributorID(ctx, distributorID)
+}</span>
+
+// List 获取佣金列表
+func (s *CommissionService) List(ctx context.Context, offset, limit int, filters map[string]interface{}) ([]*models.Commission, int64, error) <span class="cov0" title="0">{
+        return s.commissionRepo.List(ctx, offset, limit, filters)
+}</span>
+
+// GetByOrderID 获取订单相关的佣金记录
+func (s *CommissionService) GetByOrderID(ctx context.Context, orderID int64) ([]*models.Commission, error) <span class="cov0" title="0">{
+        return s.commissionRepo.GetByOrderID(ctx, orderID)
+}</span>
+</pre>
+		
+		<pre class="file" id="file1" style="display: none">// Package distribution 分销服务
+package distribution
+
+import (
+        "context"
+        "crypto/rand"
+        "encoding/hex"
+        "errors"
+        "strings"
+        "time"
+
+        "gorm.io/gorm"
+
+        "github.com/dumeirei/smart-locker-backend/internal/models"
+        "github.com/dumeirei/smart-locker-backend/internal/repository"
+)
+
+// DistributorService 分销商服务
+type DistributorService struct {
+        distributorRepo *repository.DistributorRepository
+        userRepo        *repository.UserRepository
+        db              *gorm.DB
+}
+
+// NewDistributorService 创建分销商服务
+func NewDistributorService(
+        distributorRepo *repository.DistributorRepository,
+        userRepo *repository.UserRepository,
+        db *gorm.DB,
+) *DistributorService <span class="cov10" title="21">{
+        return &amp;DistributorService{
+                distributorRepo: distributorRepo,
+                userRepo:        userRepo,
+                db:              db,
+        }
+}</span>
+
+// ApplyRequest 申请成为分销商请求
+type ApplyRequest struct {
+        UserID     int64   `json:"user_id"`
+        InviteCode *string `json:"invite_code,omitempty"` // 上级邀请码
+}
+
+// ApplyResponse 申请成为分销商响应
+type ApplyResponse struct {
+        Distributor *models.Distributor `json:"distributor"`
+        Message     string              `json:"message"`
+}
+
+// Apply 申请成为分销商
+func (s *DistributorService) Apply(ctx context.Context, req *ApplyRequest) (*ApplyResponse, error) <span class="cov7" title="8">{
+        // 检查用户是否存在
+        user, err := s.userRepo.GetByID(ctx, req.UserID)
+        if err != nil </span><span class="cov1" title="1">{
+                if errors.Is(err, gorm.ErrRecordNotFound) </span><span class="cov1" title="1">{
+                        return nil, errors.New("用户不存在")
+                }</span>
+                <span class="cov0" title="0">return nil, err</span>
+        }
+
+        // 检查是否已经是分销商
+        <span class="cov6" title="7">exists, err := s.distributorRepo.ExistsByUserID(ctx, req.UserID)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov6" title="7">if exists </span><span class="cov3" title="2">{
+                return nil, errors.New("您已经是分销商了")
+        }</span>
+
+        // 查找上级分销商
+        <span class="cov5" title="5">var parentID *int64
+        if req.InviteCode != nil &amp;&amp; *req.InviteCode != "" </span><span class="cov4" title="3">{
+                parent, err := s.distributorRepo.GetByInviteCode(ctx, *req.InviteCode)
+                if err != nil </span><span class="cov1" title="1">{
+                        if errors.Is(err, gorm.ErrRecordNotFound) </span><span class="cov1" title="1">{
+                                return nil, errors.New("邀请码无效")
+                        }</span>
+                        <span class="cov0" title="0">return nil, err</span>
+                }
+                // 检查上级是否已审核通过
+                <span class="cov3" title="2">if parent.Status != models.DistributorStatusApproved </span><span class="cov1" title="1">{
+                        return nil, errors.New("邀请人尚未通过审核")
+                }</span>
+                // 检查是否形成循环（不能邀请自己的上级）
+                <span class="cov1" title="1">if parent.UserID == req.UserID </span><span class="cov0" title="0">{
+                        return nil, errors.New("不能填写自己的邀请码")
+                }</span>
+                <span class="cov1" title="1">parentID = &amp;parent.ID</span>
+        } else<span class="cov3" title="2"> if user.ReferrerID != nil </span><span class="cov1" title="1">{
+                // 如果用户注册时有推荐人，尝试查找推荐人是否是分销商
+                referrerDistributor, err := s.distributorRepo.GetByUserID(ctx, *user.ReferrerID)
+                if err == nil &amp;&amp; referrerDistributor.Status == models.DistributorStatusApproved </span><span class="cov1" title="1">{
+                        parentID = &amp;referrerDistributor.ID
+                }</span>
+        }
+
+        // 生成唯一邀请码
+        <span class="cov4" title="3">inviteCode, err := s.generateInviteCode(ctx)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        // 确定层级
+        <span class="cov4" title="3">level := models.DistributorLevelDirect
+        if parentID != nil </span><span class="cov3" title="2">{
+                parent, _ := s.distributorRepo.GetByID(ctx, *parentID)
+                if parent != nil &amp;&amp; parent.Level &gt;= models.DistributorLevelIndirect </span><span class="cov0" title="0">{
+                        // 只支持2级分销
+                        level = models.DistributorLevelIndirect
+                }</span>
+        }
+
+        // 创建分销商
+        <span class="cov4" title="3">distributor := &amp;models.Distributor{
+                UserID:     req.UserID,
+                ParentID:   parentID,
+                Level:      level,
+                InviteCode: inviteCode,
+                Status:     models.DistributorStatusPending,
+        }
+
+        if err := s.distributorRepo.Create(ctx, distributor); err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov4" title="3">return &amp;ApplyResponse{
+                Distributor: distributor,
+                Message:     "申请已提交，请等待审核",
+        }, nil</span>
+}
+
+// generateInviteCode 生成唯一邀请码
+func (s *DistributorService) generateInviteCode(ctx context.Context) (string, error) <span class="cov4" title="3">{
+        for i := 0; i &lt; 10; i++ </span><span class="cov4" title="3">{
+                code := s.randomCode(8)
+                exists, err := s.distributorRepo.ExistsByInviteCode(ctx, code)
+                if err != nil </span><span class="cov0" title="0">{
+                        return "", err
+                }</span>
+                <span class="cov4" title="3">if !exists </span><span class="cov4" title="3">{
+                        return code, nil
+                }</span>
+        }
+        <span class="cov0" title="0">return "", errors.New("生成邀请码失败，请重试")</span>
+}
+
+// randomCode 生成随机码
+func (s *DistributorService) randomCode(length int) string <span class="cov4" title="3">{
+        bytes := make([]byte, length/2+1)
+        rand.Read(bytes)
+        code := strings.ToUpper(hex.EncodeToString(bytes))
+        return code[:length]
+}</span>
+
+// GetByUserID 根据用户 ID 获取分销商信息
+func (s *DistributorService) GetByUserID(ctx context.Context, userID int64) (*models.Distributor, error) <span class="cov3" title="2">{
+        distributor, err := s.distributorRepo.GetByUserID(ctx, userID)
+        if err != nil </span><span class="cov1" title="1">{
+                if errors.Is(err, gorm.ErrRecordNotFound) </span><span class="cov1" title="1">{
+                        return nil, errors.New("您还不是分销商")
+                }</span>
+                <span class="cov0" title="0">return nil, err</span>
+        }
+        <span class="cov1" title="1">return distributor, nil</span>
+}
+
+// GetByID 根据 ID 获取分销商信息
+func (s *DistributorService) GetByID(ctx context.Context, id int64) (*models.Distributor, error) <span class="cov0" title="0">{
+        return s.distributorRepo.GetByIDWithUser(ctx, id)
+}</span>
+
+// GetByInviteCode 根据邀请码获取分销商信息
+func (s *DistributorService) GetByInviteCode(ctx context.Context, inviteCode string) (*models.Distributor, error) <span class="cov0" title="0">{
+        return s.distributorRepo.GetByInviteCodeWithUser(ctx, inviteCode)
+}</span>
+
+// TeamStats 团队统计
+type TeamStats struct {
+        TeamCount       int     `json:"team_count"`         // 团队总人数
+        DirectCount     int     `json:"direct_count"`       // 直推人数
+        IndirectCount   int     `json:"indirect_count"`     // 间推人数
+        TotalCommission float64 `json:"total_commission"`   // 累计佣金
+        MonthCommission float64 `json:"month_commission"`   // 本月佣金
+}
+
+// GetTeamStats 获取团队统计
+func (s *DistributorService) GetTeamStats(ctx context.Context, distributorID int64) (*TeamStats, error) <span class="cov1" title="1">{
+        distributor, err := s.distributorRepo.GetByID(ctx, distributorID)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        // 计算间推人数 = 团队总人数 - 直推人数
+        <span class="cov1" title="1">indirectCount := distributor.TeamCount - distributor.DirectCount
+        if indirectCount &lt; 0 </span><span class="cov0" title="0">{
+                indirectCount = 0
+        }</span>
+
+        <span class="cov1" title="1">return &amp;TeamStats{
+                TeamCount:       distributor.TeamCount,
+                DirectCount:     distributor.DirectCount,
+                IndirectCount:   indirectCount,
+                TotalCommission: distributor.TotalCommission,
+        }, nil</span>
+}
+
+// GetTeamMembers 获取团队成员列表
+func (s *DistributorService) GetTeamMembers(ctx context.Context, distributorID int64, offset, limit int, memberType string) ([]*models.Distributor, int64, error) <span class="cov0" title="0">{
+        switch memberType </span>{
+        case "direct":<span class="cov0" title="0">
+                return s.distributorRepo.GetDirectMembers(ctx, distributorID, offset, limit)</span>
+        case "all":<span class="cov0" title="0">
+                return s.distributorRepo.GetTeamMembers(ctx, distributorID, offset, limit)</span>
+        default:<span class="cov0" title="0">
+                return s.distributorRepo.GetDirectMembers(ctx, distributorID, offset, limit)</span>
+        }
+}
+
+// GetDirectMembers 获取直推成员列表
+func (s *DistributorService) GetDirectMembers(ctx context.Context, distributorID int64, offset, limit int) ([]*models.Distributor, int64, error) <span class="cov0" title="0">{
+        return s.distributorRepo.GetDirectMembers(ctx, distributorID, offset, limit)
+}</span>
+
+// DashboardData 仪表盘数据
+type DashboardData struct {
+        TotalCommission     float64 `json:"total_commission"`      // 累计佣金
+        AvailableCommission float64 `json:"available_commission"`  // 可提现佣金
+        FrozenCommission    float64 `json:"frozen_commission"`     // 冻结佣金
+        WithdrawnCommission float64 `json:"withdrawn_commission"`  // 已提现佣金
+        TeamCount           int     `json:"team_count"`            // 团队人数
+        DirectCount         int     `json:"direct_count"`          // 直推人数
+        TodayCommission     float64 `json:"today_commission"`      // 今日佣金
+        MonthCommission     float64 `json:"month_commission"`      // 本月佣金
+        InviteCode          string  `json:"invite_code"`           // 邀请码
+        InviteLink          string  `json:"invite_link"`           // 邀请链接
+        Level               int     `json:"level"`                 // 分销层级
+        Status              int     `json:"status"`                // 状态
+}
+
+// GetDashboard 获取仪表盘数据
+func (s *DistributorService) GetDashboard(ctx context.Context, distributorID int64) (*DashboardData, error) <span class="cov1" title="1">{
+        distributor, err := s.distributorRepo.GetByID(ctx, distributorID)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov1" title="1">return &amp;DashboardData{
+                TotalCommission:     distributor.TotalCommission,
+                AvailableCommission: distributor.AvailableCommission,
+                FrozenCommission:    distributor.FrozenCommission,
+                WithdrawnCommission: distributor.WithdrawnCommission,
+                TeamCount:           distributor.TeamCount,
+                DirectCount:         distributor.DirectCount,
+                InviteCode:          distributor.InviteCode,
+                InviteLink:          s.generateInviteLink(distributor.InviteCode),
+                Level:               distributor.Level,
+                Status:              distributor.Status,
+        }, nil</span>
+}
+
+// generateInviteLink 生成邀请链接
+func (s *DistributorService) generateInviteLink(inviteCode string) string <span class="cov1" title="1">{
+        // 这里应该从配置读取域名，简化处理使用占位符
+        return "https://app.example.com/invite/" + inviteCode
+}</span>
+
+// ApproveRequest 审核请求
+type ApproveRequest struct {
+        DistributorID int64 `json:"distributor_id"`
+        OperatorID    int64 `json:"operator_id"`
+        Approved      bool  `json:"approved"`
+        Reason        string `json:"reason,omitempty"` // 拒绝原因
+}
+
+// Approve 审核分销商申请
+func (s *DistributorService) Approve(ctx context.Context, req *ApproveRequest) error <span class="cov5" title="5">{
+        distributor, err := s.distributorRepo.GetByID(ctx, req.DistributorID)
+        if err != nil </span><span class="cov1" title="1">{
+                if errors.Is(err, gorm.ErrRecordNotFound) </span><span class="cov1" title="1">{
+                        return errors.New("分销商不存在")
+                }</span>
+                <span class="cov0" title="0">return err</span>
+        }
+
+        <span class="cov5" title="4">if distributor.Status != models.DistributorStatusPending </span><span class="cov1" title="1">{
+                return errors.New("该申请已处理")
+        }</span>
+
+        <span class="cov4" title="3">now := time.Now()
+
+        return s.db.Transaction(func(tx *gorm.DB) error </span><span class="cov4" title="3">{
+                var status int
+                if req.Approved </span><span class="cov3" title="2">{
+                        status = models.DistributorStatusApproved
+                }</span> else<span class="cov1" title="1"> {
+                        status = models.DistributorStatusRejected
+                }</span>
+
+                // 更新分销商状态
+                <span class="cov4" title="3">updates := map[string]interface{}{
+                        "status":      status,
+                        "approved_at": now,
+                        "approved_by": req.OperatorID,
+                }
+                if err := tx.Model(&amp;models.Distributor{}).Where("id = ?", req.DistributorID).Updates(updates).Error; err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+
+                // 如果审核通过，更新上级的团队人数
+                <span class="cov4" title="3">if req.Approved &amp;&amp; distributor.ParentID != nil </span><span class="cov1" title="1">{
+                        // 更新直接上级的直推人数
+                        if err := tx.Model(&amp;models.Distributor{}).
+                                Where("id = ?", *distributor.ParentID).
+                                UpdateColumn("direct_count", gorm.Expr("direct_count + 1")).Error; err != nil </span><span class="cov0" title="0">{
+                                return err
+                        }</span>
+
+                        // 更新所有上级的团队人数
+                        <span class="cov1" title="1">parentID := distributor.ParentID
+                        for parentID != nil </span><span class="cov1" title="1">{
+                                if err := tx.Model(&amp;models.Distributor{}).
+                                        Where("id = ?", *parentID).
+                                        UpdateColumn("team_count", gorm.Expr("team_count + 1")).Error; err != nil </span><span class="cov0" title="0">{
+                                        return err
+                                }</span>
+
+                                // 获取上级的上级
+                                <span class="cov1" title="1">var parent models.Distributor
+                                if err := tx.First(&amp;parent, *parentID).Error; err != nil </span><span class="cov0" title="0">{
+                                        break</span>
+                                }
+                                <span class="cov1" title="1">parentID = parent.ParentID</span>
+                        }
+                }
+
+                <span class="cov4" title="3">return nil</span>
+        })
+}
+
+// GetPendingList 获取待审核列表
+func (s *DistributorService) GetPendingList(ctx context.Context, offset, limit int) ([]*models.Distributor, int64, error) <span class="cov0" title="0">{
+        return s.distributorRepo.GetPendingList(ctx, offset, limit)
+}</span>
+
+// List 获取分销商列表
+func (s *DistributorService) List(ctx context.Context, offset, limit int, filters map[string]interface{}) ([]*models.Distributor, int64, error) <span class="cov0" title="0">{
+        return s.distributorRepo.List(ctx, offset, limit, filters)
+}</span>
+
+// GetTopDistributors 获取佣金排行榜
+func (s *DistributorService) GetTopDistributors(ctx context.Context, limit int) ([]*models.Distributor, error) <span class="cov0" title="0">{
+        return s.distributorRepo.GetTopDistributors(ctx, limit)
+}</span>
+
+// CheckIsDistributor 检查用户是否是分销商
+func (s *DistributorService) CheckIsDistributor(ctx context.Context, userID int64) (bool, error) <span class="cov3" title="2">{
+        return s.distributorRepo.ExistsByUserID(ctx, userID)
+}</span>
+
+// GetApprovedDistributorByUserID 获取已审核通过的分销商
+func (s *DistributorService) GetApprovedDistributorByUserID(ctx context.Context, userID int64) (*models.Distributor, error) <span class="cov3" title="2">{
+        distributor, err := s.distributorRepo.GetByUserID(ctx, userID)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov3" title="2">if distributor.Status != models.DistributorStatusApproved </span><span class="cov1" title="1">{
+                return nil, errors.New("分销商尚未审核通过")
+        }</span>
+        <span class="cov1" title="1">return distributor, nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file2" style="display: none">// Package distribution 分销服务
+package distribution
+
+import (
+        "context"
+        "crypto/md5"
+        "encoding/base64"
+        "encoding/hex"
+        "errors"
+        "fmt"
+        "net/url"
+        "time"
+
+        "github.com/dumeirei/smart-locker-backend/internal/models"
+        "github.com/dumeirei/smart-locker-backend/internal/repository"
+)
+
+// InviteService 邀请服务
+type InviteService struct {
+        distributorRepo *repository.DistributorRepository
+        baseURL         string // 邀请链接基础URL
+}
+
+// NewInviteService 创建邀请服务
+func NewInviteService(distributorRepo *repository.DistributorRepository, baseURL string) *InviteService <span class="cov0" title="0">{
+        if baseURL == "" </span><span class="cov0" title="0">{
+                baseURL = "https://app.example.com"
+        }</span>
+        <span class="cov0" title="0">return &amp;InviteService{
+                distributorRepo: distributorRepo,
+                baseURL:         baseURL,
+        }</span>
+}
+
+// SetBaseURL 设置基础URL
+func (s *InviteService) SetBaseURL(baseURL string) <span class="cov0" title="0">{
+        s.baseURL = baseURL
+}</span>
+
+// InviteInfo 邀请信息
+type InviteInfo struct {
+        InviteCode    string `json:"invite_code"`    // 邀请码
+        InviteLink    string `json:"invite_link"`    // 邀请链接
+        QRCodeURL     string `json:"qrcode_url"`     // 二维码URL
+        ShortLink     string `json:"short_link"`     // 短链接
+        PosterURL     string `json:"poster_url"`     // 邀请海报URL
+        DistributorID int64  `json:"distributor_id"` // 分销商ID
+        UserName      string `json:"user_name"`      // 分销商名称
+}
+
+// GenerateInviteInfo 生成邀请信息
+func (s *InviteService) GenerateInviteInfo(ctx context.Context, distributorID int64) (*InviteInfo, error) <span class="cov0" title="0">{
+        distributor, err := s.distributorRepo.GetByIDWithUser(ctx, distributorID)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov0" title="0">if distributor.Status != models.DistributorStatusApproved </span><span class="cov0" title="0">{
+                return nil, errors.New("分销商尚未审核通过")
+        }</span>
+
+        <span class="cov0" title="0">inviteLink := s.generateInviteLink(distributor.InviteCode)
+        qrCodeURL := s.generateQRCodeURL(inviteLink)
+        shortLink := s.generateShortLink(distributor.InviteCode)
+        posterURL := s.generatePosterURL(distributor.InviteCode)
+
+        userName := ""
+        if distributor.User != nil </span><span class="cov0" title="0">{
+                userName = distributor.User.Nickname
+        }</span>
+
+        <span class="cov0" title="0">return &amp;InviteInfo{
+                InviteCode:    distributor.InviteCode,
+                InviteLink:    inviteLink,
+                QRCodeURL:     qrCodeURL,
+                ShortLink:     shortLink,
+                PosterURL:     posterURL,
+                DistributorID: distributor.ID,
+                UserName:      userName,
+        }, nil</span>
+}
+
+// generateInviteLink 生成邀请链接
+func (s *InviteService) generateInviteLink(inviteCode string) string <span class="cov0" title="0">{
+        return fmt.Sprintf("%s/invite/%s", s.baseURL, inviteCode)
+}</span>
+
+// generateQRCodeURL 生成二维码URL
+// 使用第三方二维码生成服务或自建服务
+func (s *InviteService) generateQRCodeURL(link string) string <span class="cov0" title="0">{
+        // 使用 URL 编码
+        encodedLink := url.QueryEscape(link)
+        // 这里可以使用自建的二维码服务或第三方服务
+        return fmt.Sprintf("%s/api/qrcode?data=%s&amp;size=200", s.baseURL, encodedLink)
+}</span>
+
+// generateShortLink 生成短链接
+func (s *InviteService) generateShortLink(inviteCode string) string <span class="cov0" title="0">{
+        // 简单的短链接生成，实际可以使用专门的短链服务
+        hash := md5.Sum([]byte(inviteCode + time.Now().Format("20060102")))
+        shortCode := hex.EncodeToString(hash[:])[:8]
+        return fmt.Sprintf("%s/s/%s", s.baseURL, shortCode)
+}</span>
+
+// generatePosterURL 生成邀请海报URL
+func (s *InviteService) generatePosterURL(inviteCode string) string <span class="cov0" title="0">{
+        // 海报生成服务URL
+        return fmt.Sprintf("%s/api/poster?code=%s", s.baseURL, inviteCode)
+}</span>
+
+// ValidateInviteCode 验证邀请码是否有效
+func (s *InviteService) ValidateInviteCode(ctx context.Context, inviteCode string) (*models.Distributor, error) <span class="cov0" title="0">{
+        distributor, err := s.distributorRepo.GetByInviteCodeWithUser(ctx, inviteCode)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, errors.New("邀请码无效")
+        }</span>
+
+        <span class="cov0" title="0">if distributor.Status != models.DistributorStatusApproved </span><span class="cov0" title="0">{
+                return nil, errors.New("邀请人尚未通过审核")
+        }</span>
+
+        <span class="cov0" title="0">return distributor, nil</span>
+}
+
+// GetInviteCodeFromLink 从邀请链接中提取邀请码
+func (s *InviteService) GetInviteCodeFromLink(link string) (string, error) <span class="cov0" title="0">{
+        parsedURL, err := url.Parse(link)
+        if err != nil </span><span class="cov0" title="0">{
+                return "", errors.New("无效的邀请链接")
+        }</span>
+
+        // 从路径中提取邀请码
+        // 期望格式: /invite/{code} 或 /s/{code}
+        <span class="cov0" title="0">path := parsedURL.Path
+        if len(path) &gt; 8 &amp;&amp; path[:8] == "/invite/" </span><span class="cov0" title="0">{
+                return path[8:], nil
+        }</span>
+        <span class="cov0" title="0">if len(path) &gt; 3 &amp;&amp; path[:3] == "/s/" </span><span class="cov0" title="0">{
+                // 短链接需要通过其他方式解析
+                return "", errors.New("短链接请通过专门接口解析")
+        }</span>
+
+        <span class="cov0" title="0">return "", errors.New("无效的邀请链接格式")</span>
+}
+
+// ShareContent 分享内容
+type ShareContent struct {
+        Title       string `json:"title"`        // 分享标题
+        Description string `json:"description"`  // 分享描述
+        ImageURL    string `json:"image_url"`    // 分享图片
+        Link        string `json:"link"`         // 分享链接
+        WechatPath  string `json:"wechat_path"`  // 微信小程序路径
+}
+
+// GenerateShareContent 生成分享内容
+func (s *InviteService) GenerateShareContent(ctx context.Context, distributorID int64) (*ShareContent, error) <span class="cov0" title="0">{
+        inviteInfo, err := s.GenerateInviteInfo(ctx, distributorID)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov0" title="0">return &amp;ShareContent{
+                Title:       "邀请您加入，一起赚佣金",
+                Description: fmt.Sprintf("%s邀请您加入平台，享受专属优惠", inviteInfo.UserName),
+                ImageURL:    inviteInfo.PosterURL,
+                Link:        inviteInfo.InviteLink,
+                WechatPath:  fmt.Sprintf("/pages/register/index?code=%s", inviteInfo.InviteCode),
+        }, nil</span>
+}
+
+// TrackClick 记录邀请链接点击
+// 可以用于统计分析
+func (s *InviteService) TrackClick(ctx context.Context, inviteCode string, source string) error <span class="cov0" title="0">{
+        // 验证邀请码有效性
+        _, err := s.ValidateInviteCode(ctx, inviteCode)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        // TODO: 记录点击统计
+        // 可以存储到 Redis 或数据库进行统计分析
+
+        <span class="cov0" title="0">return nil</span>
+}
+
+// EncodeInviteCode 编码邀请码（用于URL）
+func (s *InviteService) EncodeInviteCode(code string) string <span class="cov0" title="0">{
+        return base64.URLEncoding.EncodeToString([]byte(code))
+}</span>
+
+// DecodeInviteCode 解码邀请码
+func (s *InviteService) DecodeInviteCode(encoded string) (string, error) <span class="cov0" title="0">{
+        decoded, err := base64.URLEncoding.DecodeString(encoded)
+        if err != nil </span><span class="cov0" title="0">{
+                return "", errors.New("无效的邀请码")
+        }</span>
+        <span class="cov0" title="0">return string(decoded), nil</span>
+}
+</pre>
+		
+		<pre class="file" id="file3" style="display: none">// Package distribution 分销服务
+package distribution
+
+import (
+        "context"
+        "errors"
+        "fmt"
+        "time"
+
+        "gorm.io/gorm"
+
+        "github.com/dumeirei/smart-locker-backend/internal/models"
+        "github.com/dumeirei/smart-locker-backend/internal/repository"
+)
+
+// 提现相关常量
+const (
+        DefaultMinWithdraw  = 10.0  // 默认最低提现金额
+        DefaultWithdrawFee  = 0.006 // 默认提现手续费比例 0.6%
+        MaxWithdrawPerDay   = 3     // 每日最大提现次数
+        MaxPendingWithdraw  = 5     // 最大待处理提现数
+)
+
+// WithdrawService 提现服务
+type WithdrawService struct {
+        withdrawalRepo  *repository.WithdrawalRepository
+        distributorRepo *repository.DistributorRepository
+        userRepo        *repository.UserRepository
+        db              *gorm.DB
+        minWithdraw     float64 // 最低提现金额
+        withdrawFee     float64 // 提现手续费比例
+}
+
+// NewWithdrawService 创建提现服务
+func NewWithdrawService(
+        withdrawalRepo *repository.WithdrawalRepository,
+        distributorRepo *repository.DistributorRepository,
+        userRepo *repository.UserRepository,
+        db *gorm.DB,
+) *WithdrawService <span class="cov10" title="21">{
+        return &amp;WithdrawService{
+                withdrawalRepo:  withdrawalRepo,
+                distributorRepo: distributorRepo,
+                userRepo:        userRepo,
+                db:              db,
+                minWithdraw:     DefaultMinWithdraw,
+                withdrawFee:     DefaultWithdrawFee,
+        }
+}</span>
+
+// SetConfig 设置提现配置
+func (s *WithdrawService) SetConfig(minWithdraw, withdrawFee float64) <span class="cov1" title="1">{
+        s.minWithdraw = minWithdraw
+        s.withdrawFee = withdrawFee
+}</span>
+
+// WithdrawRequest 提现请求
+type WithdrawRequest struct {
+        UserID       int64   `json:"user_id"`
+        Type         string  `json:"type"`          // wallet/commission
+        Amount       float64 `json:"amount"`        // 提现金额
+        WithdrawTo   string  `json:"withdraw_to"`   // wechat/alipay/bank
+        AccountInfo  string  `json:"account_info"`  // 账户信息（JSON格式）
+}
+
+// WithdrawResponse 提现响应
+type WithdrawResponse struct {
+        Withdrawal   *models.Withdrawal `json:"withdrawal"`
+        Fee          float64            `json:"fee"`           // 手续费
+        ActualAmount float64            `json:"actual_amount"` // 实际到账金额
+        Message      string             `json:"message"`
+}
+
+// Apply 申请提现
+func (s *WithdrawService) Apply(ctx context.Context, req *WithdrawRequest) (*WithdrawResponse, error) <span class="cov7" title="10">{
+        // 验证提现类型
+        if req.Type != models.WithdrawalTypeWallet &amp;&amp; req.Type != models.WithdrawalTypeCommission </span><span class="cov1" title="1">{
+                return nil, errors.New("无效的提现类型")
+        }</span>
+
+        // 验证提现方式
+        <span class="cov7" title="9">if req.WithdrawTo != models.WithdrawToWechat &amp;&amp;
+                req.WithdrawTo != models.WithdrawToAlipay &amp;&amp;
+                req.WithdrawTo != models.WithdrawToBank </span><span class="cov1" title="1">{
+                return nil, errors.New("无效的提现方式")
+        }</span>
+
+        // 验证最低提现金额
+        <span class="cov7" title="8">if req.Amount &lt; s.minWithdraw </span><span class="cov1" title="1">{
+                return nil, fmt.Errorf("最低提现金额为%.2f元", s.minWithdraw)
+        }</span>
+
+        // 检查待处理提现数量
+        <span class="cov6" title="7">pendingCount, err := s.withdrawalRepo.CountPendingByUserID(ctx, req.UserID)
+        if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+        <span class="cov6" title="7">if pendingCount &gt;= MaxPendingWithdraw </span><span class="cov1" title="1">{
+                return nil, errors.New("您有太多待处理的提现申请，请等待处理后再申请")
+        }</span>
+
+        // 根据提现类型验证余额
+        <span class="cov6" title="6">var availableBalance float64
+        if req.Type == models.WithdrawalTypeCommission </span><span class="cov5" title="4">{
+                // 佣金提现，检查分销商可用佣金
+                distributor, err := s.distributorRepo.GetByUserID(ctx, req.UserID)
+                if err != nil </span><span class="cov1" title="1">{
+                        if errors.Is(err, gorm.ErrRecordNotFound) </span><span class="cov1" title="1">{
+                                return nil, errors.New("您还不是分销商")
+                        }</span>
+                        <span class="cov0" title="0">return nil, err</span>
+                }
+                <span class="cov4" title="3">if distributor.Status != models.DistributorStatusApproved </span><span class="cov1" title="1">{
+                        return nil, errors.New("分销商尚未审核通过")
+                }</span>
+                <span class="cov3" title="2">availableBalance = distributor.AvailableCommission</span>
+        } else<span class="cov3" title="2"> {
+                // 钱包提现，检查用户钱包余额
+                user, err := s.userRepo.GetByIDWithWallet(ctx, req.UserID)
+                if err != nil </span><span class="cov0" title="0">{
+                        return nil, err
+                }</span>
+                <span class="cov3" title="2">if user.Wallet != nil </span><span class="cov3" title="2">{
+                        availableBalance = user.Wallet.Balance
+                }</span>
+        }
+
+        <span class="cov5" title="4">if availableBalance &lt; req.Amount </span><span class="cov3" title="2">{
+                return nil, fmt.Errorf("可提现余额不足，当前可提现: %.2f元", availableBalance)
+        }</span>
+
+        // 计算手续费和实际到账金额
+        <span class="cov3" title="2">fee := req.Amount * s.withdrawFee
+        actualAmount := req.Amount - fee
+
+        // 生成提现单号
+        withdrawalNo := s.generateWithdrawalNo()
+
+        // 创建提现记录
+        withdrawal := &amp;models.Withdrawal{
+                WithdrawalNo:         withdrawalNo,
+                UserID:               req.UserID,
+                Type:                 req.Type,
+                Amount:               req.Amount,
+                Fee:                  fee,
+                ActualAmount:         actualAmount,
+                WithdrawTo:           req.WithdrawTo,
+                AccountInfoEncrypted: req.AccountInfo, // 实际应该加密存储
+                Status:               models.WithdrawalStatusPending,
+        }
+
+        // 使用事务处理
+        err = s.db.Transaction(func(tx *gorm.DB) error </span><span class="cov3" title="2">{
+                // 冻结余额
+                if req.Type == models.WithdrawalTypeCommission </span><span class="cov1" title="1">{
+                        // 冻结佣金
+                        result := tx.Model(&amp;models.Distributor{}).
+                                Where("user_id = ? AND available_commission &gt;= ?", req.UserID, req.Amount).
+                                Updates(map[string]interface{}{
+                                        "available_commission": gorm.Expr("available_commission - ?", req.Amount),
+                                        "frozen_commission":    gorm.Expr("frozen_commission + ?", req.Amount),
+                                })
+                        if result.Error != nil </span><span class="cov0" title="0">{
+                                return result.Error
+                        }</span>
+                        <span class="cov1" title="1">if result.RowsAffected == 0 </span><span class="cov0" title="0">{
+                                return errors.New("余额不足")
+                        }</span>
+                } else<span class="cov1" title="1"> {
+                        // 冻结钱包余额
+                        result := tx.Model(&amp;models.UserWallet{}).
+                                Where("user_id = ? AND balance &gt;= ?", req.UserID, req.Amount).
+                                Updates(map[string]interface{}{
+                                        "balance":        gorm.Expr("balance - ?", req.Amount),
+                                        "frozen_balance": gorm.Expr("frozen_balance + ?", req.Amount),
+                                })
+                        if result.Error != nil </span><span class="cov0" title="0">{
+                                return result.Error
+                        }</span>
+                        <span class="cov1" title="1">if result.RowsAffected == 0 </span><span class="cov0" title="0">{
+                                return errors.New("余额不足")
+                        }</span>
+                }
+
+                // 创建提现记录
+                <span class="cov3" title="2">if err := tx.Create(withdrawal).Error; err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+
+                <span class="cov3" title="2">return nil</span>
+        })
+
+        <span class="cov3" title="2">if err != nil </span><span class="cov0" title="0">{
+                return nil, err
+        }</span>
+
+        <span class="cov3" title="2">return &amp;WithdrawResponse{
+                Withdrawal:   withdrawal,
+                Fee:          fee,
+                ActualAmount: actualAmount,
+                Message:      "提现申请已提交，请等待审核",
+        }, nil</span>
+}
+
+// generateWithdrawalNo 生成提现单号
+func (s *WithdrawService) generateWithdrawalNo() string <span class="cov3" title="2">{
+        return fmt.Sprintf("W%s%06d", time.Now().Format("20060102150405"), time.Now().Nanosecond()/1000%1000000)
+}</span>
+
+// Approve 审核通过
+func (s *WithdrawService) Approve(ctx context.Context, withdrawalID int64, operatorID int64) error <span class="cov3" title="2">{
+        withdrawal, err := s.withdrawalRepo.GetByID(ctx, withdrawalID)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov3" title="2">if withdrawal.Status != models.WithdrawalStatusPending </span><span class="cov1" title="1">{
+                return errors.New("该提现申请已处理")
+        }</span>
+
+        <span class="cov1" title="1">return s.withdrawalRepo.Approve(ctx, withdrawalID, operatorID)</span>
+}
+
+// Reject 审核拒绝
+func (s *WithdrawService) Reject(ctx context.Context, withdrawalID int64, operatorID int64, reason string) error <span class="cov3" title="2">{
+        withdrawal, err := s.withdrawalRepo.GetByID(ctx, withdrawalID)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov3" title="2">if withdrawal.Status != models.WithdrawalStatusPending </span><span class="cov0" title="0">{
+                return errors.New("该提现申请已处理")
+        }</span>
+
+        // 拒绝需要解冻余额
+        <span class="cov3" title="2">return s.db.Transaction(func(tx *gorm.DB) error </span><span class="cov3" title="2">{
+                // 更新提现状态
+                now := time.Now()
+                if err := tx.Model(&amp;models.Withdrawal{}).
+                        Where("id = ?", withdrawalID).
+                        Updates(map[string]interface{}{
+                                "status":        models.WithdrawalStatusRejected,
+                                "operator_id":   operatorID,
+                                "processed_at":  now,
+                                "reject_reason": reason,
+                        }).Error; err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+
+                // 解冻余额
+                <span class="cov3" title="2">if withdrawal.Type == models.WithdrawalTypeCommission </span><span class="cov1" title="1">{
+                        if err := tx.Model(&amp;models.Distributor{}).
+                                Where("user_id = ?", withdrawal.UserID).
+                                Updates(map[string]interface{}{
+                                        "available_commission": gorm.Expr("available_commission + ?", withdrawal.Amount),
+                                        "frozen_commission":    gorm.Expr("frozen_commission - ?", withdrawal.Amount),
+                                }).Error; err != nil </span><span class="cov0" title="0">{
+                                return err
+                        }</span>
+                } else<span class="cov1" title="1"> {
+                        if err := tx.Model(&amp;models.UserWallet{}).
+                                Where("user_id = ?", withdrawal.UserID).
+                                Updates(map[string]interface{}{
+                                        "balance":        gorm.Expr("balance + ?", withdrawal.Amount),
+                                        "frozen_balance": gorm.Expr("frozen_balance - ?", withdrawal.Amount),
+                                }).Error; err != nil </span><span class="cov0" title="0">{
+                                return err
+                        }</span>
+                }
+
+                <span class="cov3" title="2">return nil</span>
+        })
+}
+
+// Process 处理提现（打款）
+func (s *WithdrawService) Process(ctx context.Context, withdrawalID int64) error <span class="cov3" title="2">{
+        withdrawal, err := s.withdrawalRepo.GetByID(ctx, withdrawalID)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov3" title="2">if withdrawal.Status != models.WithdrawalStatusApproved </span><span class="cov1" title="1">{
+                return errors.New("该提现申请状态不正确")
+        }</span>
+
+        // 标记为处理中
+        <span class="cov1" title="1">return s.withdrawalRepo.MarkProcessing(ctx, withdrawalID)</span>
+}
+
+// Complete 完成提现
+func (s *WithdrawService) Complete(ctx context.Context, withdrawalID int64) error <span class="cov4" title="3">{
+        withdrawal, err := s.withdrawalRepo.GetByID(ctx, withdrawalID)
+        if err != nil </span><span class="cov0" title="0">{
+                return err
+        }</span>
+
+        <span class="cov4" title="3">if withdrawal.Status != models.WithdrawalStatusProcessing </span><span class="cov1" title="1">{
+                return errors.New("该提现申请状态不正确")
+        }</span>
+
+        // 使用事务处理
+        <span class="cov3" title="2">return s.db.Transaction(func(tx *gorm.DB) error </span><span class="cov3" title="2">{
+                // 更新提现状态
+                if err := tx.Model(&amp;models.Withdrawal{}).
+                        Where("id = ?", withdrawalID).
+                        Update("status", models.WithdrawalStatusSuccess).Error; err != nil </span><span class="cov0" title="0">{
+                        return err
+                }</span>
+
+                // 扣除冻结余额，增加已提现金额
+                <span class="cov3" title="2">if withdrawal.Type == models.WithdrawalTypeCommission </span><span class="cov1" title="1">{
+                        if err := tx.Model(&amp;models.Distributor{}).
+                                Where("user_id = ?", withdrawal.UserID).
+                                Updates(map[string]interface{}{
+                                        "frozen_commission":    gorm.Expr("frozen_commission - ?", withdrawal.Amount),
+                                        "withdrawn_commission": gorm.Expr("withdrawn_commission + ?", withdrawal.Amount),
+                                }).Error; err != nil </span><span class="cov0" title="0">{
+                                return err
+                        }</span>
+                } else<span class="cov1" title="1"> {
+                        if err := tx.Model(&amp;models.UserWallet{}).
+                                Where("user_id = ?", withdrawal.UserID).
+                                Updates(map[string]interface{}{
+                                        "frozen_balance":   gorm.Expr("frozen_balance - ?", withdrawal.Amount),
+                                        "total_withdrawn":  gorm.Expr("total_withdrawn + ?", withdrawal.ActualAmount),
+                                }).Error; err != nil </span><span class="cov0" title="0">{
+                                return err
+                        }</span>
+                }
+
+                <span class="cov3" title="2">return nil</span>
+        })
+}
+
+// GetByUserID 获取用户的提现记录
+func (s *WithdrawService) GetByUserID(ctx context.Context, userID int64, offset, limit int) ([]*models.Withdrawal, int64, error) <span class="cov0" title="0">{
+        return s.withdrawalRepo.GetByUserID(ctx, userID, offset, limit)
+}</span>
+
+// GetByID 获取提现详情
+func (s *WithdrawService) GetByID(ctx context.Context, id int64) (*models.Withdrawal, error) <span class="cov0" title="0">{
+        return s.withdrawalRepo.GetByIDWithRelations(ctx, id)
+}</span>
+
+// List 获取提现列表
+func (s *WithdrawService) List(ctx context.Context, offset, limit int, filters map[string]interface{}) ([]*models.Withdrawal, int64, error) <span class="cov0" title="0">{
+        return s.withdrawalRepo.List(ctx, offset, limit, filters)
+}</span>
+
+// GetPendingList 获取待审核列表
+func (s *WithdrawService) GetPendingList(ctx context.Context, offset, limit int) ([]*models.Withdrawal, int64, error) <span class="cov0" title="0">{
+        return s.withdrawalRepo.GetPendingList(ctx, offset, limit)
+}</span>
+
+// GetApprovedList 获取已审批待打款列表
+func (s *WithdrawService) GetApprovedList(ctx context.Context, offset, limit int) ([]*models.Withdrawal, int64, error) <span class="cov0" title="0">{
+        return s.withdrawalRepo.GetApprovedList(ctx, offset, limit)
+}</span>
+
+// GetStats 获取用户提现统计
+func (s *WithdrawService) GetStats(ctx context.Context, userID int64) (map[string]interface{}, error) <span class="cov0" title="0">{
+        return s.withdrawalRepo.GetStatsByUserID(ctx, userID)
+}</span>
+
+// GetConfig 获取提现配置
+func (s *WithdrawService) GetConfig() map[string]interface{} <span class="cov3" title="2">{
+        return map[string]interface{}{
+                "min_withdraw":       s.minWithdraw,
+                "withdraw_fee":       s.withdrawFee,
+                "withdraw_fee_desc":  fmt.Sprintf("%.1f%%", s.withdrawFee*100),
+                "max_pending":        MaxPendingWithdraw,
+                "support_methods":    []string{models.WithdrawToWechat, models.WithdrawToAlipay, models.WithdrawToBank},
+        }
+}</span>
+</pre>
+		
+		</div>
+	</body>
+	<script>
+	(function() {
+		var files = document.getElementById('files');
+		var visible;
+		files.addEventListener('change', onChange, false);
+		function select(part) {
+			if (visible)
+				visible.style.display = 'none';
+			visible = document.getElementById(part);
+			if (!visible)
+				return;
+			files.value = part;
+			visible.style.display = 'block';
+			location.hash = part;
+		}
+		function onChange() {
+			select(files.value);
+			window.scrollTo(0, 0);
+		}
+		if (location.hash != "") {
+			select(location.hash.substr(1));
+		}
+		if (!visible) {
+			select("file0");
+		}
+	})();
+	</script>
+</html>

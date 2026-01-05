@@ -161,8 +161,8 @@ func createAPITestDistributor(db *gorm.DB, userID int64, status int) *models.Dis
 
 // generateTestToken 生成测试 Token
 func generateTestToken(jwtManager *jwt.Manager, userID int64) string {
-	token, _ := jwtManager.GenerateToken(userID, jwt.UserTypeUser, "")
-	return token.AccessToken
+	token, _, _ := jwtManager.GenerateAccessToken(userID, jwt.UserTypeUser, "")
+	return token
 }
 
 func TestDistributionAPI_CheckStatus(t *testing.T) {
@@ -403,7 +403,9 @@ func TestDistributionAPI_ValidateInviteCode(t *testing.T) {
 		assert.Equal(t, float64(0), response["code"])
 
 		data := response["data"].(map[string]interface{})
-		assert.True(t, data["valid"].(bool))
+		assert.NotNil(t, data)
+		assert.Equal(t, parentDistributor.ID, int64(data["id"].(float64)))
+		assert.Equal(t, parentDistributor.InviteCode, data["invite_code"].(string))
 	})
 
 	t.Run("验证无效邀请码", func(t *testing.T) {
@@ -419,13 +421,11 @@ func TestDistributionAPI_ValidateInviteCode(t *testing.T) {
 		w := httptest.NewRecorder()
 		router.ServeHTTP(w, req)
 
-		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Equal(t, http.StatusBadRequest, w.Code)
 
 		var response map[string]interface{}
 		json.Unmarshal(w.Body.Bytes(), &response)
-
-		data := response["data"].(map[string]interface{})
-		assert.False(t, data["valid"].(bool))
+		assert.NotEqual(t, float64(0), response["code"])
 	})
 }
 

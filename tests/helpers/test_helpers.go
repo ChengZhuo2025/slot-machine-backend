@@ -305,3 +305,127 @@ func NewTestAddress(userID int64) *models.Address {
 		IsDefault:     true,
 	}
 }
+
+// ==================== 酒店模块测试辅助函数 - US4 ====================
+
+// NewTestHotel 创建测试酒店
+func NewTestHotel() *models.Hotel {
+	description := "测试酒店描述" + RandomString(10)
+	starRating := 4
+	longitude := 114.0579
+	latitude := 22.5431
+	return &models.Hotel{
+		Name:           "测试酒店" + RandomString(4),
+		StarRating:     &starRating,
+		Province:       "广东省",
+		City:           "深圳市",
+		District:       "南山区",
+		Address:        "科技园路" + RandomString(2) + "号",
+		Longitude:      &longitude,
+		Latitude:       &latitude,
+		Phone:          RandomPhone(),
+		Description:    &description,
+		CheckInTime:    "14:00",
+		CheckOutTime:   "12:00",
+		CommissionRate: 0.15,
+		Status:         models.HotelStatusActive,
+	}
+}
+
+// NewTestRoom 创建测试房间
+func NewTestRoom(hotelID int64) *models.Room {
+	area := 25
+	bedType := "大床"
+	return &models.Room{
+		HotelID:     hotelID,
+		RoomNo:      fmt.Sprintf("%d%02d", rand.Intn(10)+1, rand.Intn(20)+1),
+		RoomType:    models.RoomTypeStandard,
+		Area:        &area,
+		BedType:     &bedType,
+		MaxGuests:   2,
+		HourlyPrice: RandomFloat(50, 100),
+		DailyPrice:  RandomFloat(200, 400),
+		Status:      models.RoomStatusActive,
+	}
+}
+
+// NewTestRoomWithDevice 创建带设备的测试房间
+func NewTestRoomWithDevice(hotelID int64, deviceID int64) *models.Room {
+	room := NewTestRoom(hotelID)
+	room.DeviceID = &deviceID
+	return room
+}
+
+// NewTestRoomTimeSlot 创建测试时段价格
+func NewTestRoomTimeSlot(roomID int64, durationHours int, price float64) *models.RoomTimeSlot {
+	return &models.RoomTimeSlot{
+		RoomID:        roomID,
+		DurationHours: durationHours,
+		Price:         price,
+		IsActive:      true,
+		Sort:          durationHours,
+	}
+}
+
+// NewTestBooking 创建测试预订
+func NewTestBooking(orderID, userID, hotelID, roomID int64, status string) *models.Booking {
+	bookingNo := fmt.Sprintf("B%s%06d", time.Now().Format("20060102150405"), rand.Intn(1000000))
+	checkInTime := time.Now().Add(1 * time.Hour)
+	checkOutTime := checkInTime.Add(2 * time.Hour)
+	return &models.Booking{
+		BookingNo:        bookingNo,
+		OrderID:          orderID,
+		UserID:           userID,
+		HotelID:          hotelID,
+		RoomID:           roomID,
+		CheckInTime:      checkInTime,
+		CheckOutTime:     checkOutTime,
+		DurationHours:    2,
+		Amount:           100.0,
+		VerificationCode: fmt.Sprintf("V%s", RandomString(19)),
+		UnlockCode:       fmt.Sprintf("%06d", rand.Intn(1000000)),
+		QRCode:           fmt.Sprintf("/api/v1/hotel/verify/%s?code=xxx", bookingNo),
+		Status:           status,
+	}
+}
+
+// NewTestHotelOrder 创建测试酒店订单
+func NewTestHotelOrder(userID int64, amount float64) *models.Order {
+	orderNo := fmt.Sprintf("H%s%06d", time.Now().Format("20060102150405"), rand.Intn(1000000))
+	return &models.Order{
+		OrderNo:        orderNo,
+		UserID:         userID,
+		Type:           models.OrderTypeHotel,
+		OriginalAmount: amount,
+		DiscountAmount: 0,
+		ActualAmount:   amount,
+		DepositAmount:  0,
+		Status:         models.OrderStatusPending,
+	}
+}
+
+// NewTestAdmin 创建测试管理员
+func NewTestAdmin(roleID int64) *models.Admin {
+	email := RandomString(6) + "@test.com"
+	phone := RandomPhone()
+	return &models.Admin{
+		Username:     "admin_" + RandomString(4),
+		PasswordHash: "$2a$10$testhashedpassword", // bcrypt hashed password
+		Name:         "测试管理员",
+		Email:        &email,
+		Phone:        &phone,
+		RoleID:       roleID,
+		Status:       models.AdminStatusActive,
+	}
+}
+
+// NewTestRole 创建测试角色
+func NewTestRole() *models.Role {
+	description := "测试角色描述"
+	return &models.Role{
+		Code:        "test_role_" + RandomString(4),
+		Name:        "测试角色" + RandomString(4),
+		Description: &description,
+		IsSystem:    false,
+	}
+}

@@ -247,7 +247,7 @@ func setupRouter(
 			user.GET("/hotels", hotelH.GetHotelList)
 			user.GET("/hotels/cities", hotelH.GetCities)
 			user.GET("/hotels/:id", hotelH.GetHotelDetail)
-			user.GET("/hotels/:hotel_id/rooms", hotelH.GetRoomList)
+			user.GET("/hotels/:id/rooms", hotelH.GetRoomList)
 			user.GET("/rooms/:id", hotelH.GetRoomDetail)
 			user.GET("/rooms/:id/availability", hotelH.CheckRoomAvailability)
 			user.GET("/rooms/:id/time-slots", hotelH.GetRoomTimeSlots)

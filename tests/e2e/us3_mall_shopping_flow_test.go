@@ -49,8 +49,9 @@ func setupUS3E2E(t *testing.T) (*gin.Engine, *gorm.DB, *jwt.Manager) {
 
 	sqlDB, err := db.DB()
 	require.NoError(t, err)
-	sqlDB.SetMaxOpenConns(1)
-	sqlDB.SetMaxIdleConns(1)
+	// 允许多个连接：订单创建使用事务 + 仓储层非 tx DB 调用，单连接会导致 SQLite 死锁
+	sqlDB.SetMaxOpenConns(10)
+	sqlDB.SetMaxIdleConns(10)
 
 	require.NoError(t, db.AutoMigrate(
 		&models.User{},
@@ -85,7 +86,7 @@ func setupUS3E2E(t *testing.T) (*gin.Engine, *gorm.DB, *jwt.Manager) {
 
 	// 创建 services
 	productSvc := mallService.NewProductService(db, productRepo, categoryRepo, skuRepo)
-	searchSvc := mallService.NewSearchService(db, productRepo, categoryRepo)
+	searchSvc := mallService.NewSearchService(db, productRepo)
 	cartSvc := mallService.NewCartService(db, cartRepo, productRepo, skuRepo)
 	orderSvc := mallService.NewMallOrderService(db, orderRepo, cartRepo, productRepo, skuRepo, productSvc)
 	reviewSvc := mallService.NewReviewService(db, reviewRepo, orderRepo)
@@ -128,7 +129,7 @@ func setupUS3E2E(t *testing.T) (*gin.Engine, *gorm.DB, *jwt.Manager) {
 
 			// 评价
 			user.POST("/reviews", reviewH.CreateReview)
-			user.GET("/reviews/my", reviewH.GetMyReviews)
+			user.GET("/user/reviews", reviewH.GetUserReviews)
 			user.DELETE("/reviews/:id", reviewH.DeleteReview)
 		}
 	}

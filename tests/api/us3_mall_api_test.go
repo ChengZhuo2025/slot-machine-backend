@@ -43,8 +43,9 @@ func setupUS3APIRouter(t *testing.T) (*gin.Engine, *gorm.DB, *jwt.Manager) {
 
 	sqlDB, err := db.DB()
 	require.NoError(t, err)
-	sqlDB.SetMaxOpenConns(1)
-	sqlDB.SetMaxIdleConns(1)
+	// 允许多个连接：订单创建使用事务 + 仓储层非 tx DB 调用，单连接会导致 SQLite 死锁
+	sqlDB.SetMaxOpenConns(10)
+	sqlDB.SetMaxIdleConns(10)
 
 	err = db.AutoMigrate(
 		&models.User{},
@@ -81,7 +82,7 @@ func setupUS3APIRouter(t *testing.T) (*gin.Engine, *gorm.DB, *jwt.Manager) {
 
 	// 创建 services
 	productSvc := mallService.NewProductService(db, productRepo, categoryRepo, skuRepo)
-	searchSvc := mallService.NewSearchService(db, productRepo, categoryRepo)
+	searchSvc := mallService.NewSearchService(db, productRepo)
 	cartSvc := mallService.NewCartService(db, cartRepo, productRepo, skuRepo)
 	orderSvc := mallService.NewMallOrderService(db, orderRepo, cartRepo, productRepo, skuRepo, productSvc)
 	reviewSvc := mallService.NewReviewService(db, reviewRepo, orderRepo)
@@ -124,7 +125,7 @@ func setupUS3APIRouter(t *testing.T) (*gin.Engine, *gorm.DB, *jwt.Manager) {
 
 			// 评价
 			user.POST("/reviews", reviewH.CreateReview)
-			user.GET("/reviews/my", reviewH.GetMyReviews)
+			user.GET("/user/reviews", reviewH.GetUserReviews)
 			user.DELETE("/reviews/:id", reviewH.DeleteReview)
 		}
 	}
@@ -274,6 +275,202 @@ func TestUS3API_GetProductDetail_NotFound(t *testing.T) {
 	var resp map[string]interface{}
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 	assert.NotEqual(t, float64(0), resp["code"])
+}
+
+func TestUS3API_SearchProducts(t *testing.T) {
+	router, db, _ := setupUS3APIRouter(t)
+
+	// 分类
+	cat1 := &models.Category{Name: "电子产品", Level: 1, Sort: 1, IsActive: true}
+	cat2 := &models.Category{Name: "配件", Level: 1, Sort: 2, IsActive: true}
+	require.NoError(t, db.Create(cat1).Error)
+	require.NoError(t, db.Create(cat2).Error)
+
+	images, _ := json.Marshal([]string{"https://example.com/img.jpg"})
+
+	// 上架且匹配
+	p1 := &models.Product{
+		CategoryID: cat1.ID,
+		Name:       "无线蓝牙耳机",
+		Images:     images,
+		Price:      199.0,
+		Stock:      100,
+		Sales:      10,
+		Unit:       "件",
+		IsOnSale:   true,
+	}
+	require.NoError(t, db.Create(p1).Error)
+
+	// 下架但匹配（应被过滤掉）
+	p2 := &models.Product{
+		CategoryID: cat2.ID,
+		Name:       "耳机保护套",
+		Images:     images,
+		Price:      20.0,
+		Stock:      100,
+		Sales:      100,
+		Unit:       "件",
+		IsOnSale:   false,
+	}
+	require.NoError(t, db.Create(p2).Error)
+	// gorm + default(true) 场景下，Create 可能会忽略 bool 的零值；这里强制更新为下架
+	require.NoError(t, db.Model(&models.Product{}).Where("id = ?", p2.ID).UpdateColumn("is_on_sale", false).Error)
+
+	req, _ := http.NewRequest("GET", "/api/v1/products/search?keyword=耳机&page=1&page_size=10", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var resp map[string]interface{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, float64(0), resp["code"])
+
+	data := resp["data"].(map[string]interface{})
+	products := data["products"].([]interface{})
+	require.Len(t, products, 1)
+
+	first := products[0].(map[string]interface{})
+	assert.Equal(t, "无线蓝牙耳机", first["name"])
+}
+
+func TestUS3API_SearchProducts_CategoryAndPriceRange(t *testing.T) {
+	router, db, _ := setupUS3APIRouter(t)
+
+	cat1 := &models.Category{Name: "智能家居", Level: 1, Sort: 1, IsActive: true}
+	cat2 := &models.Category{Name: "穿戴设备", Level: 1, Sort: 2, IsActive: true}
+	require.NoError(t, db.Create(cat1).Error)
+	require.NoError(t, db.Create(cat2).Error)
+
+	images, _ := json.Marshal([]string{"https://example.com/img.jpg"})
+	require.NoError(t, db.Create(&models.Product{
+		CategoryID: cat1.ID,
+		Name:       "智能插座",
+		Images:     images,
+		Price:      99.0,
+		Stock:      100,
+		Sales:      5,
+		Unit:       "件",
+		IsOnSale:   true,
+	}).Error)
+	require.NoError(t, db.Create(&models.Product{
+		CategoryID: cat2.ID,
+		Name:       "智能手表",
+		Images:     images,
+		Price:      599.0,
+		Stock:      100,
+		Sales:      50,
+		Unit:       "件",
+		IsOnSale:   true,
+	}).Error)
+
+	req, _ := http.NewRequest("GET", "/api/v1/products/search?keyword=智能&category_id="+strconv.FormatInt(cat2.ID, 10)+"&min_price=500&max_price=700&page=1&page_size=10", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var resp map[string]interface{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, float64(0), resp["code"])
+
+	data := resp["data"].(map[string]interface{})
+	products := data["products"].([]interface{})
+	require.Len(t, products, 1)
+
+	first := products[0].(map[string]interface{})
+	assert.Equal(t, "智能手表", first["name"])
+	assert.Equal(t, float64(599.0), first["price"])
+}
+
+func TestUS3API_SearchProducts_SortByPriceAndSales(t *testing.T) {
+	router, db, _ := setupUS3APIRouter(t)
+
+	cat := &models.Category{Name: "测试分类", Level: 1, Sort: 1, IsActive: true}
+	require.NoError(t, db.Create(cat).Error)
+
+	images, _ := json.Marshal([]string{"https://example.com/img.jpg"})
+
+	require.NoError(t, db.Create(&models.Product{
+		CategoryID: cat.ID,
+		Name:       "测试商品A",
+		Images:     images,
+		Price:      30.0,
+		Stock:      100,
+		Sales:      5,
+		Unit:       "件",
+		IsOnSale:   true,
+	}).Error)
+	require.NoError(t, db.Create(&models.Product{
+		CategoryID: cat.ID,
+		Name:       "测试商品B",
+		Images:     images,
+		Price:      10.0,
+		Stock:      100,
+		Sales:      10,
+		Unit:       "件",
+		IsOnSale:   true,
+	}).Error)
+	require.NoError(t, db.Create(&models.Product{
+		CategoryID: cat.ID,
+		Name:       "测试商品C",
+		Images:     images,
+		Price:      20.0,
+		Stock:      100,
+		Sales:      50,
+		Unit:       "件",
+		IsOnSale:   true,
+	}).Error)
+
+	t.Run("price_asc", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/api/v1/products/search?keyword=测试&sort_by=price_asc&page=1&page_size=10", nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		var resp map[string]interface{}
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+		assert.Equal(t, float64(0), resp["code"])
+
+		data := resp["data"].(map[string]interface{})
+		products := data["products"].([]interface{})
+		require.Len(t, products, 3)
+		first := products[0].(map[string]interface{})
+		assert.Equal(t, float64(10.0), first["price"])
+	})
+
+	t.Run("sales_desc", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/api/v1/products/search?keyword=测试&sort_by=sales_desc&page=1&page_size=10", nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		var resp map[string]interface{}
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+		assert.Equal(t, float64(0), resp["code"])
+
+		data := resp["data"].(map[string]interface{})
+		products := data["products"].([]interface{})
+		require.Len(t, products, 3)
+		first := products[0].(map[string]interface{})
+		assert.Equal(t, float64(50), first["sales"])
+	})
+}
+
+func TestUS3API_SearchProducts_KeywordRequired(t *testing.T) {
+	router, _, _ := setupUS3APIRouter(t)
+
+	req, _ := http.NewRequest("GET", "/api/v1/products/search?page=1&page_size=10", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+
+	var resp map[string]interface{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+	assert.Equal(t, float64(400), resp["code"])
 }
 
 // ==================== 购物车 API 测试 ====================

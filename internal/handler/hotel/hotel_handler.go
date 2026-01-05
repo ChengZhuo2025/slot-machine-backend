@@ -91,11 +91,11 @@ func (h *Handler) GetHotelDetail(c *gin.Context) {
 // @Summary 获取房间列表
 // @Tags 酒店
 // @Produce json
-// @Param hotel_id path int true "酒店ID"
+// @Param id path int true "酒店ID"
 // @Success 200 {object} response.Response{data=[]hotelService.RoomInfo}
-// @Router /api/v1/hotels/{hotel_id}/rooms [get]
+// @Router /api/v1/hotels/{id}/rooms [get]
 func (h *Handler) GetRoomList(c *gin.Context) {
-	hotelID, err := strconv.ParseInt(c.Param("hotel_id"), 10, 64)
+	hotelID, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		response.BadRequest(c, "无效的酒店ID")
 		return

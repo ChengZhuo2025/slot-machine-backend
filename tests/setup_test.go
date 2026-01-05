@@ -50,6 +50,11 @@ func SetupTestDB(t *testing.T) *gorm.DB {
 		&models.ProductSku{},
 		&models.CartItem{},
 		&models.Review{},
+		// 酒店模块 - US4
+		&models.Hotel{},
+		&models.Room{},
+		&models.RoomTimeSlot{},
+		&models.Booking{},
 	)
 	require.NoError(t, err, "failed to migrate test database")
 
@@ -76,6 +81,11 @@ func TestMain(m *testing.M) {
 // CleanupDB 清理数据库中的所有数据
 func CleanupDB(t *testing.T, db *gorm.DB) {
 	tables := []string{
+		// 酒店模块 - US4
+		"bookings",
+		"room_time_slots",
+		"rooms",
+		"hotels",
 		// 商城模块 - US3
 		"reviews",
 		"cart_items",

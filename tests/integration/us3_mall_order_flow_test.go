@@ -33,8 +33,9 @@ func setupUS3IntegrationDB(t *testing.T) *gorm.DB {
 	// 设置连接池参数避免多连接问题
 	sqlDB, err := db.DB()
 	require.NoError(t, err)
-	sqlDB.SetMaxOpenConns(1)
-	sqlDB.SetMaxIdleConns(1)
+	// 允许多个连接：订单创建使用事务 + 仓储层非 tx DB 调用，单连接会导致 SQLite 死锁
+	sqlDB.SetMaxOpenConns(10)
+	sqlDB.SetMaxIdleConns(10)
 
 	err = db.AutoMigrate(
 		&models.User{},

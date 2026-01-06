@@ -108,25 +108,25 @@ const (
 )
 
 // Settlement 结算记录
+// 参考: migrations/000010_create_finance.up.sql
 type Settlement struct {
-	ID              int64      `gorm:"primaryKey;autoIncrement" json:"id"`
-	SettlementNo    string     `gorm:"type:varchar(64);uniqueIndex;not null" json:"settlement_no"`
-	MerchantID      int64      `gorm:"index;not null" json:"merchant_id"`
-	PeriodStart     time.Time  `gorm:"not null" json:"period_start"`
-	PeriodEnd       time.Time  `gorm:"not null" json:"period_end"`
-	TotalAmount     float64    `gorm:"type:decimal(12,2);not null" json:"total_amount"`
-	CommissionAmount float64   `gorm:"type:decimal(12,2);not null" json:"commission_amount"`
-	SettlementAmount float64   `gorm:"type:decimal(12,2);not null" json:"settlement_amount"`
-	OrderCount      int        `gorm:"not null;default:0" json:"order_count"`
-	Status          int8       `gorm:"type:smallint;not null;default:0" json:"status"`
-	SettledAt       *time.Time `json:"settled_at,omitempty"`
-	Remark          *string    `gorm:"type:varchar(255)" json:"remark,omitempty"`
-	OperatorID      *int64     `json:"operator_id,omitempty"`
-	CreatedAt       time.Time  `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt       time.Time  `gorm:"autoUpdateTime" json:"updated_at"`
+	ID           int64      `gorm:"primaryKey;autoIncrement" json:"id"`
+	SettlementNo string     `gorm:"column:settlement_no;type:varchar(64);uniqueIndex;not null" json:"settlement_no"`
+	Type         string     `gorm:"column:type;type:varchar(20);not null" json:"type"`
+	TargetID     int64      `gorm:"column:target_id;index;not null" json:"target_id"`
+	PeriodStart  time.Time  `gorm:"column:period_start;type:date;not null" json:"period_start"`
+	PeriodEnd    time.Time  `gorm:"column:period_end;type:date;not null" json:"period_end"`
+	TotalAmount  float64    `gorm:"column:total_amount;type:decimal(12,2);not null" json:"total_amount"`
+	Fee          float64    `gorm:"column:fee;type:decimal(10,2);not null;default:0" json:"fee"`
+	ActualAmount float64    `gorm:"column:actual_amount;type:decimal(12,2);not null" json:"actual_amount"`
+	OrderCount   int        `gorm:"column:order_count;not null" json:"order_count"`
+	Status       string     `gorm:"column:status;type:varchar(20);not null" json:"status"`
+	OperatorID   *int64     `gorm:"column:operator_id" json:"operator_id,omitempty"`
+	SettledAt    *time.Time `gorm:"column:settled_at" json:"settled_at,omitempty"`
+	CreatedAt    time.Time  `gorm:"column:created_at;autoCreateTime" json:"created_at"`
 
 	// 关联
-	Merchant *Merchant `gorm:"foreignKey:MerchantID" json:"merchant,omitempty"`
+	Operator *Admin `gorm:"foreignKey:OperatorID" json:"operator,omitempty"`
 }
 
 // TableName 表名
@@ -136,7 +136,8 @@ func (Settlement) TableName() string {
 
 // SettlementStatus 结算状态
 const (
-	SettlementStatusPending   = 0 // 待结算
-	SettlementStatusSettled   = 1 // 已结算
-	SettlementStatusFailed    = 2 // 结算失败
+	SettlementStatusPending    = "pending"    // 待结算
+	SettlementStatusProcessing = "processing" // 结算中
+	SettlementStatusCompleted  = "completed"  // 已完成
+	SettlementStatusFailed     = "failed"     // 结算失败
 )

@@ -389,20 +389,20 @@
 
 ### 财务模块
 
-- [ ] T165 [P] [US6] 定义 Settlement/WalletTransaction 模型 `internal/models/finance.go`
-- [ ] T166 [US6] 实现结算 Repository `internal/repository/settlement_repo.go`
-- [ ] T167 [US6] 实现交易流水 Repository `internal/repository/transaction_repo.go`
-- [ ] T168 [US6] 实现财务统计服务 `internal/service/finance/statistics_service.go`
-- [ ] T169 [US6] 实现结算服务（商户/分销商）`internal/service/finance/settlement_service.go`
-- [ ] T170 [US6] 实现提现审核服务 `internal/service/finance/withdrawal_audit_service.go`
-- [ ] T171 [US6] 实现报表导出服务 `internal/service/finance/export_service.go`
-- [ ] T172 [US6] 实现财务 API Handler `internal/handler/admin/finance_handler.go`
+- [x] T165 [P] [US6] 定义 Settlement/WalletTransaction 模型 `internal/models/finance.go`
+- [x] T166 [US6] 实现结算 Repository `internal/repository/settlement_repo.go`
+- [x] T167 [US6] 实现交易流水 Repository `internal/repository/transaction_repo.go`
+- [x] T168 [US6] 实现财务统计服务 `internal/service/finance/statistics_service.go`
+- [x] T169 [US6] 实现结算服务（商户/分销商）`internal/service/finance/settlement_service.go`
+- [x] T170 [US6] 实现提现审核服务 `internal/service/finance/withdrawal_audit_service.go`
+- [x] T171 [US6] 实现报表导出服务 `internal/service/finance/export_service.go`
+- [x] T172 [US6] 实现财务 API Handler `internal/handler/admin/finance_handler.go`
 
 ### 路由注册
 
-- [ ] T173 [US6] 注册 User Story 6 所有路由
+- [x] T173 [US6] 注册 User Story 6 所有路由
 
-**Checkpoint**: User Story 6 完成，财务管理功能可用
+**Checkpoint**: User Story 6 完成，财务管理功能可用 ✅
 
 ---
 

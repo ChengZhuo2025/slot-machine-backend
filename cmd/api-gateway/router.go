@@ -31,6 +31,7 @@ import (
 	authService "github.com/dumeirei/smart-locker-backend/internal/service/auth"
 	deviceService "github.com/dumeirei/smart-locker-backend/internal/service/device"
 	distributionService "github.com/dumeirei/smart-locker-backend/internal/service/distribution"
+	financeService "github.com/dumeirei/smart-locker-backend/internal/service/finance"
 	hotelService "github.com/dumeirei/smart-locker-backend/internal/service/hotel"
 	mallService "github.com/dumeirei/smart-locker-backend/internal/service/mall"
 	orderService "github.com/dumeirei/smart-locker-backend/internal/service/order"
@@ -345,6 +346,17 @@ func setupRouter(
 		bookingVerifyH := adminHandler.NewBookingVerifyHandler(bookingSvc)
 		distributionAdminH := adminHandler.NewDistributionHandler(distributionAdminSvc)
 
+		// 财务相关仓储和服务
+		settlementRepo := repository.NewSettlementRepository(db)
+		transactionRepo := repository.NewTransactionRepository(db)
+
+		settlementSvc := financeService.NewSettlementService(db, settlementRepo, orderRepo, merchantRepo, commissionRepo, distributorRepo)
+		statisticsSvc := financeService.NewStatisticsService(db, settlementRepo, transactionRepo, orderRepo, paymentRepo, commissionRepo, withdrawalRepo)
+		withdrawalAuditSvc := financeService.NewWithdrawalAuditService(db, withdrawalRepo, distributorRepo)
+		exportSvc := financeService.NewExportService(db, settlementRepo, transactionRepo, orderRepo, withdrawalRepo)
+
+		financeAdminH := adminHandler.NewFinanceHandler(settlementSvc, statisticsSvc, withdrawalAuditSvc, exportSvc)
+
 		// 操作日志中间件
 		operationLogger := middleware.NewOperationLogger(operationLogRepo)
 
@@ -431,8 +443,40 @@ func setupRouter(
 			}
 
 			// 财务管理
-			adminAuth.GET("/settlements", placeholderHandler("获取结算列表"))
-			adminAuth.POST("/settlements/:id/settle", placeholderHandler("执行结算"))
+			finance := adminAuth.Group("/finance")
+			{
+				// 概览和统计
+				finance.GET("/overview", financeAdminH.GetOverview)
+				finance.GET("/revenue/statistics", financeAdminH.GetRevenueStatistics)
+				finance.GET("/revenue/daily", financeAdminH.GetDailyRevenueReport)
+				finance.GET("/revenue/by-type", financeAdminH.GetOrderRevenueByType)
+				finance.GET("/transactions/statistics", financeAdminH.GetTransactionStatistics)
+
+				// 结算管理
+				finance.GET("/settlements", financeAdminH.ListSettlements)
+				finance.POST("/settlements", financeAdminH.CreateSettlement)
+				finance.GET("/settlements/summary", financeAdminH.GetSettlementSummary)
+				finance.POST("/settlements/generate", financeAdminH.GenerateSettlements)
+				finance.GET("/settlements/:id", financeAdminH.GetSettlement)
+				finance.POST("/settlements/:id/process", financeAdminH.ProcessSettlement)
+
+				// 提现管理
+				finance.GET("/withdrawals", financeAdminH.ListWithdrawals)
+				finance.GET("/withdrawals/summary", financeAdminH.GetWithdrawalSummary)
+				finance.POST("/withdrawals/batch", financeAdminH.BatchHandleWithdrawals)
+				finance.GET("/withdrawals/:id", financeAdminH.GetWithdrawal)
+				finance.POST("/withdrawals/:id/handle", financeAdminH.HandleWithdrawal)
+
+				// 报表
+				finance.GET("/reports/merchant-settlement", financeAdminH.GetMerchantSettlementReport)
+
+				// 导出
+				finance.GET("/export/settlements", financeAdminH.ExportSettlements)
+				finance.GET("/export/withdrawals", financeAdminH.ExportWithdrawals)
+				finance.GET("/export/daily-revenue", financeAdminH.ExportDailyRevenue)
+				finance.GET("/export/merchant-settlement", financeAdminH.ExportMerchantSettlement)
+				finance.GET("/export/transactions", financeAdminH.ExportTransactions)
+			}
 
 			// 系统管理
 			adminAuth.GET("/admins", placeholderHandler("获取管理员列表"))

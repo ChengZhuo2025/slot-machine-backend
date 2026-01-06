@@ -199,6 +199,18 @@ var (
 	ErrCampaignExpired    = New(9007, "活动已结束")
 )
 
+// 财务错误码 (10000-10999)
+var (
+	ErrSettlementNotFound = New(10000, "结算记录不存在")
+	ErrDuplicateRecord    = New(10001, "记录已存在")
+	ErrMerchantNotFound   = New(10002, "商户不存在")
+	ErrInvalidOperation   = New(10003, "无效的操作")
+	ErrWithdrawalNotFound = New(10004, "提现记录不存在")
+	ErrWithdrawalStatus   = New(10005, "提现状态异常")
+	ErrInsufficientBalance = New(10006, "可提现余额不足")
+	ErrExportFailed       = New(10007, "导出失败")
+)
+
 // IsAppError 判断是否为应用错误
 func IsAppError(err error) bool {
 	_, ok := err.(*AppError)

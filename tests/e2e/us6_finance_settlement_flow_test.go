@@ -46,8 +46,11 @@ func setupFinanceE2ETestDB(t *testing.T) *gorm.DB {
 		&models.User{},
 		&models.UserWallet{},
 		&models.Merchant{},
+		&models.Venue{},
+		&models.Device{},
 		&models.Distributor{},
 		&models.Order{},
+		&models.Rental{},
 		&models.Payment{},
 		&models.Refund{},
 		&models.Settlement{},
@@ -137,7 +140,7 @@ func setupE2EContext(t *testing.T) *E2ETestContext {
 	// 创建管理员
 	admin := &models.Admin{
 		Username: "e2e_admin",
-		Password: "hashed_password",
+		PasswordHash: "hashed_password",
 		Name:     "E2E测试管理员",
 		Status:   models.AdminStatusActive,
 	}

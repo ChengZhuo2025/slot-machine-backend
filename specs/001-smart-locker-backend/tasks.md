@@ -414,32 +414,32 @@
 
 ### 优惠券模块
 
-- [ ] T174 [P] [US7] 定义 Coupon/UserCoupon/Campaign 模型 `internal/models/marketing.go`
-- [ ] T175 [US7] 实现优惠券 Repository `internal/repository/coupon_repo.go`
-- [ ] T176 [US7] 实现用户优惠券 Repository `internal/repository/user_coupon_repo.go`
-- [ ] T177 [US7] 实现优惠券服务 `internal/service/marketing/coupon_service.go`
-- [ ] T178 [US7] 实现用户优惠券服务（领取/使用/过期）`internal/service/marketing/user_coupon_service.go`
-- [ ] T179 [US7] 实现营销 API Handler（用户端）`internal/handler/marketing/coupon_handler.go`
+- [x] T174 [P] [US7] 定义 Coupon/UserCoupon/Campaign 模型 `internal/models/marketing.go`
+- [x] T175 [US7] 实现优惠券 Repository `internal/repository/coupon_repo.go`
+- [x] T176 [US7] 实现用户优惠券 Repository `internal/repository/user_coupon_repo.go`
+- [x] T177 [US7] 实现优惠券服务 `internal/service/marketing/coupon_service.go`
+- [x] T178 [US7] 实现用户优惠券服务（领取/使用/过期）`internal/service/marketing/user_coupon_service.go`
+- [x] T179 [US7] 实现营销 API Handler（用户端）`internal/handler/marketing/coupon_handler.go`
 
 ### 营销活动
 
-- [ ] T180 [US7] 实现活动 Repository `internal/repository/campaign_repo.go`
-- [ ] T181 [US7] 实现活动服务 `internal/service/marketing/campaign_service.go`
+- [x] T180 [US7] 实现活动 Repository `internal/repository/campaign_repo.go`
+- [x] T181 [US7] 实现活动服务 `internal/service/marketing/campaign_service.go`
 
 ### 营销管理（管理端）
 
-- [ ] T182 [US7] 实现优惠券管理服务 `internal/service/admin/coupon_admin_service.go`
-- [ ] T183 [US7] 实现营销管理 API Handler `internal/handler/admin/marketing_handler.go`
+- [x] T182 [US7] 实现优惠券管理服务 `internal/service/admin/marketing_admin_service.go`
+- [x] T183 [US7] 实现营销管理 API Handler `internal/handler/admin/marketing_handler.go`
 
 ### 订单优惠计算
 
-- [ ] T184 [US7] 在订单创建时计算优惠 `internal/service/order/discount_calculator.go`
+- [x] T184 [US7] 在订单创建时计算优惠 `internal/service/order/discount_calculator.go`
 
 ### 路由注册
 
-- [ ] T185 [US7] 注册 User Story 7 所有路由
+- [x] T185 [US7] 注册 User Story 7 所有路由
 
-**Checkpoint**: User Story 7 完成，营销功能可用
+**Checkpoint**: User Story 7 完成，营销功能可用 ✅
 
 ---
 

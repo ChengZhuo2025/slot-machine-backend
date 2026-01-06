@@ -21,6 +21,7 @@ import (
 	distributionHandler "github.com/dumeirei/smart-locker-backend/internal/handler/distribution"
 	hotelHandler "github.com/dumeirei/smart-locker-backend/internal/handler/hotel"
 	mallHandler "github.com/dumeirei/smart-locker-backend/internal/handler/mall"
+	marketingHandler "github.com/dumeirei/smart-locker-backend/internal/handler/marketing"
 	orderHandler "github.com/dumeirei/smart-locker-backend/internal/handler/order"
 	paymentHandler "github.com/dumeirei/smart-locker-backend/internal/handler/payment"
 	rentalHandler "github.com/dumeirei/smart-locker-backend/internal/handler/rental"
@@ -34,6 +35,7 @@ import (
 	financeService "github.com/dumeirei/smart-locker-backend/internal/service/finance"
 	hotelService "github.com/dumeirei/smart-locker-backend/internal/service/hotel"
 	mallService "github.com/dumeirei/smart-locker-backend/internal/service/mall"
+	marketingService "github.com/dumeirei/smart-locker-backend/internal/service/marketing"
 	orderService "github.com/dumeirei/smart-locker-backend/internal/service/order"
 	paymentService "github.com/dumeirei/smart-locker-backend/internal/service/payment"
 	rentalService "github.com/dumeirei/smart-locker-backend/internal/service/rental"
@@ -83,6 +85,11 @@ func setupRouter(
 	commissionRepo := repository.NewCommissionRepository(db)
 	withdrawalRepo := repository.NewWithdrawalRepository(db)
 
+	// 营销相关仓储
+	couponRepo := repository.NewCouponRepository(db)
+	userCouponRepo := repository.NewUserCouponRepository(db)
+	campaignRepo := repository.NewCampaignRepository(db)
+
 	// 初始化外部服务客户端
 	smsClient := sms.NewMockClient(cfg.SMS.SignName) // 开发环境使用 Mock，生产环境使用阿里云
 	wechatPayClient, _ := wechatpay.NewClient(&wechatpay.Config{})
@@ -125,6 +132,11 @@ func setupRouter(
 	inviteSvc := distributionService.NewInviteService(distributorRepo, "") // BaseURL 在 InviteService 中有默认值
 	withdrawSvc := distributionService.NewWithdrawService(withdrawalRepo, distributorRepo, userRepo, db)
 
+	// 营销服务
+	couponSvc := marketingService.NewCouponService(db, couponRepo, userCouponRepo)
+	userCouponSvc := marketingService.NewUserCouponService(db, couponRepo, userCouponRepo)
+	campaignSvc := marketingService.NewCampaignService(campaignRepo)
+
 	// 初始化处理器
 	authH := authHandler.NewHandler(authSvc, wechatSvc, codeService)
 	userH := userHandler.NewHandler(userSvc, walletSvc)
@@ -147,6 +159,10 @@ func setupRouter(
 
 	// 分销处理器
 	distributionH := distributionHandler.NewHandler(distributorSvc, commissionSvc, inviteSvc, withdrawSvc)
+
+	// 营销处理器
+	couponH := marketingHandler.NewCouponHandler(couponSvc, userCouponSvc)
+	_ = campaignSvc // 活动服务将来用于扩展
 
 	// 全局中间件
 	r.Use(userMiddleware.Recovery(logger))
@@ -256,9 +272,20 @@ func setupRouter(
 			user.DELETE("/reviews/:id", reviewH.DeleteReview)
 
 			// 优惠券
-			user.GET("/coupons", placeholderHandler("获取可用优惠券"))
-			user.GET("/user/coupons", placeholderHandler("获取我的优惠券"))
-			user.POST("/coupons/:id/receive", placeholderHandler("领取优惠券"))
+			marketing := user.Group("/marketing")
+			{
+				// 可领取的优惠券
+				marketing.GET("/coupons", couponH.GetCouponList)
+				marketing.GET("/coupons/:id", couponH.GetCouponDetail)
+				marketing.POST("/coupons/:id/receive", couponH.ReceiveCoupon)
+
+				// 用户优惠券
+				marketing.GET("/user-coupons", couponH.GetUserCoupons)
+				marketing.GET("/user-coupons/available", couponH.GetAvailableCoupons)
+				marketing.GET("/user-coupons/for-order", couponH.GetAvailableCouponsForOrder)
+				marketing.GET("/user-coupons/count", couponH.GetCouponCountByStatus)
+				marketing.GET("/user-coupons/:id", couponH.GetUserCouponDetail)
+			}
 
 			// 酒店/预订相关
 			user.GET("/hotels", hotelH.GetHotelList)
@@ -335,6 +362,7 @@ func setupRouter(
 		productAdminSvc := adminService.NewProductAdminService(db, categoryRepo, productRepo, productSkuRepo)
 		hotelAdminSvc := adminService.NewHotelAdminService(db, hotelRepo, roomRepo, bookingRepo, roomTimeSlotRepo)
 		distributionAdminSvc := adminService.NewDistributionAdminService(distributorRepo, commissionRepo, withdrawalRepo, db)
+		marketingAdminSvc := adminService.NewMarketingAdminService(db, couponRepo, campaignRepo)
 
 		// 初始化管理员处理器
 		adminAuthH := adminHandler.NewAuthHandler(adminAuthSvc)
@@ -345,6 +373,7 @@ func setupRouter(
 		hotelAdminH := adminHandler.NewHotelHandler(hotelAdminSvc)
 		bookingVerifyH := adminHandler.NewBookingVerifyHandler(bookingSvc)
 		distributionAdminH := adminHandler.NewDistributionHandler(distributionAdminSvc)
+		marketingAdminH := adminHandler.NewMarketingHandler(marketingAdminSvc)
 
 		// 财务相关仓储和服务
 		settlementRepo := repository.NewSettlementRepository(db)
@@ -417,15 +446,24 @@ func setupRouter(
 			bookingVerifyH.RegisterRoutes(adminAuth)
 
 			// 营销管理
-			adminAuth.GET("/coupons", placeholderHandler("获取优惠券列表"))
-			adminAuth.POST("/coupons", placeholderHandler("添加优惠券"))
-			adminAuth.PUT("/coupons/:id", placeholderHandler("更新优惠券"))
-			adminAuth.DELETE("/coupons/:id", placeholderHandler("删除优惠券"))
+			marketingAdmin := adminAuth.Group("/marketing")
+			{
+				// 优惠券管理
+				marketingAdmin.GET("/coupons", marketingAdminH.GetCouponList)
+				marketingAdmin.POST("/coupons", marketingAdminH.CreateCoupon)
+				marketingAdmin.GET("/coupons/:id", marketingAdminH.GetCouponDetail)
+				marketingAdmin.PUT("/coupons/:id", marketingAdminH.UpdateCoupon)
+				marketingAdmin.PUT("/coupons/:id/status", marketingAdminH.UpdateCouponStatus)
+				marketingAdmin.DELETE("/coupons/:id", marketingAdminH.DeleteCoupon)
 
-			adminAuth.GET("/campaigns", placeholderHandler("获取活动列表"))
-			adminAuth.POST("/campaigns", placeholderHandler("添加活动"))
-			adminAuth.PUT("/campaigns/:id", placeholderHandler("更新活动"))
-			adminAuth.DELETE("/campaigns/:id", placeholderHandler("删除活动"))
+				// 活动管理
+				marketingAdmin.GET("/campaigns", marketingAdminH.GetCampaignList)
+				marketingAdmin.POST("/campaigns", marketingAdminH.CreateCampaign)
+				marketingAdmin.GET("/campaigns/:id", marketingAdminH.GetCampaignDetail)
+				marketingAdmin.PUT("/campaigns/:id", marketingAdminH.UpdateCampaign)
+				marketingAdmin.PUT("/campaigns/:id/status", marketingAdminH.UpdateCampaignStatus)
+				marketingAdmin.DELETE("/campaigns/:id", marketingAdminH.DeleteCampaign)
+			}
 
 			// 分销管理
 			distAdmin := adminAuth.Group("/distribution")

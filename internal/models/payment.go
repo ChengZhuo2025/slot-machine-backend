@@ -16,7 +16,7 @@ type Payment struct {
 	PaymentChannel  string     `gorm:"type:varchar(20);not null" json:"payment_channel"`
 	TransactionID   *string    `gorm:"type:varchar(64)" json:"transaction_id,omitempty"`
 	Status          int8       `gorm:"type:smallint;not null;default:0" json:"status"`
-	PaidAt          *time.Time `json:"paid_at,omitempty"`
+	PaidAt          *time.Time `gorm:"column:pay_time" json:"paid_at,omitempty"`
 	ExpiredAt       *time.Time `json:"expired_at,omitempty"`
 	CallbackData    JSON       `gorm:"type:jsonb" json:"callback_data,omitempty"`
 	ErrorMessage    *string    `gorm:"type:varchar(255)" json:"error_message,omitempty"`

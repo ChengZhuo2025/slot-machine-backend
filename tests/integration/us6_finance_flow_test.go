@@ -38,8 +38,11 @@ func setupFinanceIntegrationDB(t *testing.T) *gorm.DB {
 		&models.User{},
 		&models.UserWallet{},
 		&models.Merchant{},
+		&models.Venue{},
+		&models.Device{},
 		&models.Distributor{},
 		&models.Order{},
+		&models.Rental{},
 		&models.Payment{},
 		&models.Refund{},
 		&models.Settlement{},
@@ -110,6 +113,7 @@ func createTestOrder(t *testing.T, db *gorm.DB, userID int64, merchantID int64, 
 		OriginalAmount: amount,
 		ActualAmount:   amount,
 		PaidAt:         &now,
+		CompletedAt:    &now,
 	}
 	err := db.Create(order).Error
 	require.NoError(t, err)
@@ -165,12 +169,52 @@ func TestSettlementFlow_MerchantSettlement(t *testing.T) {
 	user := createTestUser(t, db)
 	merchant := createTestMerchant(t, db)
 
+	// 创建商户场地和设备（结算统计依赖 rentals -> devices -> venues -> merchants 链路）
+	venue := &models.Venue{
+		MerchantID: merchant.ID,
+		Name:       "测试场地",
+		Type:       models.VenueTypeMall,
+		Province:   "广东省",
+		City:       "深圳市",
+		District:   "南山区",
+		Address:    "科技园",
+		Status:     models.VenueStatusActive,
+	}
+	require.NoError(t, db.Create(venue).Error)
+
+	device := &models.Device{
+		DeviceNo:       fmt.Sprintf("DEV%d", time.Now().UnixNano()),
+		Name:           "测试设备",
+		Type:           models.DeviceTypeStandard,
+		VenueID:        venue.ID,
+		QRCode:         "test-qrcode",
+		ProductName:    "智能柜",
+		SlotCount:      1,
+		AvailableSlots: 1,
+		OnlineStatus:   models.DeviceOnline,
+		LockStatus:     models.DeviceLocked,
+		RentalStatus:   models.DeviceRentalFree,
+		Status:         models.DeviceStatusActive,
+	}
+	require.NoError(t, db.Create(device).Error)
+
 	// 创建多个已完成订单
 	periodStart := time.Now().AddDate(0, 0, -7)
 	periodEnd := time.Now()
 
 	for i := 0; i < 5; i++ {
-		createTestOrder(t, db, user.ID, merchant.ID, 100.00, models.OrderTypeRental)
+		order := createTestOrder(t, db, user.ID, merchant.ID, 100.00, models.OrderTypeRental)
+		rental := &models.Rental{
+			OrderID:       order.ID,
+			UserID:        user.ID,
+			DeviceID:      device.ID,
+			DurationHours: 24,
+			RentalFee:     100.00,
+			Deposit:       0,
+			OvertimeRate:  0,
+			Status:        models.RentalStatusCompleted,
+		}
+		require.NoError(t, db.Create(rental).Error)
 	}
 
 	// 1. 创建结算

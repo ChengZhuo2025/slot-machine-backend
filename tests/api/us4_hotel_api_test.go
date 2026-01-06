@@ -93,17 +93,12 @@ func setupUS4APIRouter(t *testing.T) (*gin.Engine, *gorm.DB, *jwt.Manager) {
 		v1.GET("/hotels", hotelH.GetHotelList)
 		v1.GET("/hotels/cities", hotelH.GetCities)
 
-		// 酒店路由组
-		hotels := v1.Group("/hotels")
-		{
-			hotels.GET("/:id", hotelH.GetHotelDetail)
-		}
-
-		// 酒店房间路由 - 使用单独的 hotel_id 路由
-		hotelRooms := v1.Group("/hotel")
-		{
-			hotelRooms.GET("/:hotel_id/rooms", hotelH.GetRoomList)
-		}
+			// 酒店路由组
+			hotels := v1.Group("/hotels")
+			{
+				hotels.GET("/:id", hotelH.GetHotelDetail)
+				hotels.GET("/:id/rooms", hotelH.GetRoomList)
+			}
 
 		// 房间路由
 		v1.GET("/rooms/:id", hotelH.GetRoomDetail)
@@ -351,7 +346,7 @@ func TestUS4API_GetRoomList(t *testing.T) {
 		db.Create(room)
 	}
 
-	req, _ := http.NewRequest("GET", "/api/v1/hotel/"+strconv.FormatInt(hotel.ID, 10)+"/rooms", nil)
+		req, _ := http.NewRequest("GET", "/api/v1/hotels/"+strconv.FormatInt(hotel.ID, 10)+"/rooms", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
@@ -956,7 +951,7 @@ func TestUS4API_FullBookingFlow(t *testing.T) {
 	t.Log("Step 3: 获取酒店详情成功")
 
 	// 4. 获取房间列表
-	roomsReq, _ := http.NewRequest("GET", "/api/v1/hotel/"+strconv.FormatInt(hotel.ID, 10)+"/rooms", nil)
+	roomsReq, _ := http.NewRequest("GET", "/api/v1/hotels/"+strconv.FormatInt(hotel.ID, 10)+"/rooms", nil)
 	roomsW := httptest.NewRecorder()
 	router.ServeHTTP(roomsW, roomsReq)
 	require.Equal(t, http.StatusOK, roomsW.Code)

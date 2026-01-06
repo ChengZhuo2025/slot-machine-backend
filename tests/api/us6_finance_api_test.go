@@ -46,8 +46,11 @@ func setupFinanceAPITestDB(t *testing.T) *gorm.DB {
 		&models.User{},
 		&models.UserWallet{},
 		&models.Merchant{},
+		&models.Venue{},
+		&models.Device{},
 		&models.Distributor{},
 		&models.Order{},
+		&models.Rental{},
 		&models.Payment{},
 		&models.Refund{},
 		&models.Settlement{},
@@ -138,7 +141,7 @@ func generateAdminTestToken(jwtManager *jwt.Manager, adminID int64) string {
 func createFinanceTestAdmin(t *testing.T, db *gorm.DB) *models.Admin {
 	admin := &models.Admin{
 		Username: fmt.Sprintf("admin_%d", time.Now().UnixNano()),
-		Password: "hashed_password",
+		PasswordHash: "hashed_password",
 		Name:     "测试管理员",
 		Status:   models.AdminStatusActive,
 	}

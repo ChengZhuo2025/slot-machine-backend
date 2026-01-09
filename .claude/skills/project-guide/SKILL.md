@@ -1,5 +1,5 @@
 ---
-name: Project Guide - 智能开锁管理系统
+name: Project Guide
 description: This skill should be used when the user asks about "project overview", "how to start", "project architecture", "which module", "what features", "development workflow", "project structure", "business logic", "system design", or needs guidance on understanding the smart locker system, navigating between modules, or making architectural decisions. This is the entry point skill for the project.
 version: 1.0.0
 ---

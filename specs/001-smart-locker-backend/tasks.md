@@ -451,32 +451,32 @@
 
 ### 会员模块
 
-- [ ] T186 [P] [US8] 定义 MemberPackage 模型 `internal/models/member.go`
-- [ ] T187 [US8] 实现会员等级 Repository `internal/repository/member_level_repo.go`
-- [ ] T188 [US8] 实现会员套餐 Repository `internal/repository/member_package_repo.go`
-- [ ] T189 [US8] 实现积分服务 `internal/service/user/points_service.go`
-- [ ] T190 [US8] 实现会员等级服务（升级检测）`internal/service/user/member_level_service.go`
-- [ ] T191 [US8] 实现会员套餐购买服务 `internal/service/user/member_package_service.go`
-- [ ] T192 [US8] 实现会员 API Handler `internal/handler/user/member_handler.go`
+- [x] T186 [P] [US8] 定义 MemberPackage 模型 `internal/models/member.go`
+- [x] T187 [US8] 实现会员等级 Repository `internal/repository/member_level_repo.go`
+- [x] T188 [US8] 实现会员套餐 Repository `internal/repository/member_package_repo.go`
+- [x] T189 [US8] 实现积分服务 `internal/service/user/points_service.go`
+- [x] T190 [US8] 实现会员等级服务（升级检测）`internal/service/user/member_level_service.go`
+- [x] T191 [US8] 实现会员套餐购买服务 `internal/service/user/member_package_service.go`
+- [x] T192 [US8] 实现会员 API Handler `internal/handler/user/member_handler.go`
 
 ### 会员管理（管理端）
 
-- [ ] T193 [US8] 实现会员管理服务 `internal/service/admin/member_admin_service.go`
-- [ ] T194 [US8] 实现会员管理 API Handler `internal/handler/admin/member_handler.go`
+- [x] T193 [US8] 实现会员管理服务 `internal/service/admin/member_admin_service.go`
+- [x] T194 [US8] 实现会员管理 API Handler `internal/handler/admin/member_handler.go`
 
 ### 订单完成触发积分
 
-- [ ] T195 [US8] 在订单完成时累加积分 `internal/service/order/points_hook.go`
+- [x] T195 [US8] 在订单完成时累加积分 `internal/service/order/points_hook.go`
 
 ### 会员折扣计算
 
-- [ ] T196 [US8] 在订单创建时应用会员折扣 `internal/service/order/member_discount.go`
+- [x] T196 [US8] 在订单创建时应用会员折扣 `internal/service/order/member_discount.go`
 
 ### 路由注册
 
-- [ ] T197 [US8] 注册 User Story 8 所有路由
+- [x] T197 [US8] 注册 User Story 8 所有路由
 
-**Checkpoint**: User Story 8 完成，会员体系可用
+**Checkpoint**: User Story 8 完成，会员体系可用 ✅
 
 ---
 
@@ -647,8 +647,8 @@
 - [x] T246 [P] 编写 order_service 单元测试 `internal/service/order/order_service_test.go`
 - [x] T247 [P] 编写 booking_service 单元测试 `internal/service/hotel/booking_service_test.go`
 - [x] T248 [P] 编写 commission_service 单元测试 `internal/service/distribution/commission_service_test.go`
-- [ ] T249 [P] 编写 wallet_service 单元测试 `internal/service/user/wallet_service_test.go`
-- [ ] T250 [P] 编写 coupon_service 单元测试 `internal/service/marketing/coupon_service_test.go`
+- [x] T249 [P] 编写 wallet_service 单元测试 `internal/service/user/wallet_service_test.go`
+- [x] T250 [P] 编写 coupon_service 单元测试 `internal/service/marketing/coupon_service_test.go`
 
 ### 单元测试 - Repository 层
 

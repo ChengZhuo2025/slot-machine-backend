@@ -90,6 +90,10 @@ func setupRouter(
 	userCouponRepo := repository.NewUserCouponRepository(db)
 	campaignRepo := repository.NewCampaignRepository(db)
 
+	// 会员相关仓储
+	memberLevelRepo := repository.NewMemberLevelRepository(db)
+	memberPackageRepo := repository.NewMemberPackageRepository(db)
+
 	// 初始化外部服务客户端
 	smsClient := sms.NewMockClient(cfg.SMS.SignName) // 开发环境使用 Mock，生产环境使用阿里云
 	wechatPayClient, _ := wechatpay.NewClient(&wechatpay.Config{})
@@ -104,6 +108,11 @@ func setupRouter(
 
 	userSvc := userService.NewUserService(db, userRepo)
 	walletSvc := userService.NewWalletService(db, userRepo)
+
+	// 会员相关服务
+	pointsSvc := userService.NewPointsService(db, userRepo, memberLevelRepo)
+	memberLevelSvc := userService.NewMemberLevelService(db, userRepo, memberLevelRepo)
+	memberPackageSvc := userService.NewMemberPackageService(db, userRepo, memberPackageRepo, memberLevelRepo, orderRepo, pointsSvc)
 
 	deviceSvc := deviceService.NewDeviceService(db, deviceRepo, venueRepo)
 	venueSvc := deviceService.NewVenueService(db, venueRepo, deviceRepo)
@@ -140,6 +149,7 @@ func setupRouter(
 	// 初始化处理器
 	authH := authHandler.NewHandler(authSvc, wechatSvc, codeService)
 	userH := userHandler.NewHandler(userSvc, walletSvc)
+	memberH := userHandler.NewMemberHandler(memberLevelSvc, memberPackageSvc, pointsSvc)
 	deviceH := deviceHandler.NewHandler(deviceSvc, venueSvc)
 	rentalH := rentalHandler.NewHandler(rentalSvc)
 	paymentH := paymentHandler.NewHandler(paymentSvc)
@@ -230,6 +240,9 @@ func setupRouter(
 
 			// 用户路由
 			userH.RegisterRoutes(user)
+
+			// 会员路由
+			memberH.RegisterRoutes(user)
 
 			// 租借路由
 			rentalH.RegisterRoutes(user)
@@ -363,6 +376,7 @@ func setupRouter(
 		hotelAdminSvc := adminService.NewHotelAdminService(db, hotelRepo, roomRepo, bookingRepo, roomTimeSlotRepo)
 		distributionAdminSvc := adminService.NewDistributionAdminService(distributorRepo, commissionRepo, withdrawalRepo, db)
 		marketingAdminSvc := adminService.NewMarketingAdminService(db, couponRepo, campaignRepo)
+		memberAdminSvc := adminService.NewMemberAdminService(db, memberLevelRepo, memberPackageRepo, userRepo)
 
 		// 初始化管理员处理器
 		adminAuthH := adminHandler.NewAuthHandler(adminAuthSvc)
@@ -374,6 +388,7 @@ func setupRouter(
 		bookingVerifyH := adminHandler.NewBookingVerifyHandler(bookingSvc)
 		distributionAdminH := adminHandler.NewDistributionHandler(distributionAdminSvc)
 		marketingAdminH := adminHandler.NewMarketingHandler(marketingAdminSvc)
+		memberAdminH := adminHandler.NewMemberHandler(memberAdminSvc)
 
 		// 财务相关仓储和服务
 		settlementRepo := repository.NewSettlementRepository(db)
@@ -464,6 +479,9 @@ func setupRouter(
 				marketingAdmin.PUT("/campaigns/:id/status", marketingAdminH.UpdateCampaignStatus)
 				marketingAdmin.DELETE("/campaigns/:id", marketingAdminH.DeleteCampaign)
 			}
+
+			// 会员管理
+			memberAdminH.RegisterRoutes(adminAuth)
 
 			// 分销管理
 			distAdmin := adminAuth.Group("/distribution")

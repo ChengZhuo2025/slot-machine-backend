@@ -6,18 +6,17 @@ import (
 
 // Article 文章/公告
 type Article struct {
-	ID          int64      `gorm:"primaryKey;autoIncrement" json:"id"`
-	Type        string     `gorm:"type:varchar(20);not null;index" json:"type"`
-	Title       string     `gorm:"type:varchar(200);not null" json:"title"`
-	Content     string     `gorm:"type:text;not null" json:"content"`
-	Cover       *string    `gorm:"type:varchar(255)" json:"cover,omitempty"`
-	Author      *string    `gorm:"type:varchar(50)" json:"author,omitempty"`
-	ViewCount   int        `gorm:"not null;default:0" json:"view_count"`
-	Sort        int        `gorm:"not null;default:0" json:"sort"`
-	Status      int8       `gorm:"type:smallint;not null;default:1" json:"status"`
-	PublishedAt *time.Time `json:"published_at,omitempty"`
-	CreatedAt   time.Time  `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt   time.Time  `gorm:"autoUpdateTime" json:"updated_at"`
+	ID          int64      `gorm:"primaryKey;autoIncrement;column:id" json:"id"`
+	Category    string     `gorm:"type:varchar(20);not null;index;column:category" json:"category"`
+	Title       string     `gorm:"type:varchar(200);not null;column:title" json:"title"`
+	Content     string     `gorm:"type:text;not null;column:content" json:"content"`
+	CoverImage  *string    `gorm:"type:varchar(255);column:cover_image" json:"cover_image,omitempty"`
+	Sort        int        `gorm:"not null;default:0;column:sort" json:"sort"`
+	ViewCount   int        `gorm:"not null;default:0;column:view_count" json:"view_count"`
+	IsPublished bool       `gorm:"not null;default:true;column:is_published" json:"is_published"`
+	PublishedAt *time.Time `gorm:"column:published_at" json:"published_at,omitempty"`
+	CreatedAt   time.Time  `gorm:"autoCreateTime;column:created_at" json:"created_at"`
+	UpdatedAt   time.Time  `gorm:"autoUpdateTime;column:updated_at" json:"updated_at"`
 }
 
 // TableName 表名
@@ -25,12 +24,12 @@ func (Article) TableName() string {
 	return "articles"
 }
 
-// ArticleType 文章类型
+// ArticleCategory 文章分类
 const (
-	ArticleTypeAnnouncement = "announcement" // 公告
-	ArticleTypeHelp         = "help"         // 帮助
-	ArticleTypeAgreement    = "agreement"    // 协议
-	ArticleTypeAbout        = "about"        // 关于
+	ArticleCategoryHelp   = "help"   // 帮助中心
+	ArticleCategoryFAQ    = "faq"    // 常见问题
+	ArticleCategoryNotice = "notice" // 公告通知
+	ArticleCategoryAbout  = "about"  // 关于我们
 )
 
 // ArticleStatus 文章状态
@@ -41,15 +40,15 @@ const (
 
 // Notification 通知消息
 type Notification struct {
-	ID          int64      `gorm:"primaryKey;autoIncrement" json:"id"`
-	UserID      int64      `gorm:"index;not null" json:"user_id"`
-	Type        string     `gorm:"type:varchar(20);not null" json:"type"`
-	Title       string     `gorm:"type:varchar(100);not null" json:"title"`
-	Content     string     `gorm:"type:text;not null" json:"content"`
-	ExtraData   JSON       `gorm:"type:jsonb" json:"extra_data,omitempty"`
-	IsRead      bool       `gorm:"not null;default:false" json:"is_read"`
-	ReadAt      *time.Time `json:"read_at,omitempty"`
-	CreatedAt   time.Time  `gorm:"autoCreateTime" json:"created_at"`
+	ID        int64      `gorm:"primaryKey;autoIncrement;column:id" json:"id"`
+	UserID    *int64     `gorm:"index;column:user_id" json:"user_id,omitempty"`
+	Type      string     `gorm:"type:varchar(20);not null;column:type" json:"type"`
+	Title     string     `gorm:"type:varchar(100);not null;column:title" json:"title"`
+	Content   string     `gorm:"type:text;not null;column:content" json:"content"`
+	Link      *string    `gorm:"type:varchar(255);column:link" json:"link,omitempty"`
+	IsRead    bool       `gorm:"not null;default:false;column:is_read" json:"is_read"`
+	ReadAt    *time.Time `gorm:"column:read_at" json:"read_at,omitempty"`
+	CreatedAt time.Time  `gorm:"autoCreateTime;column:created_at" json:"created_at"`
 
 	// 关联
 	User *User `gorm:"foreignKey:UserID" json:"user,omitempty"`
@@ -62,24 +61,21 @@ func (Notification) TableName() string {
 
 // NotificationType 通知类型
 const (
-	NotificationTypeSystem  = "system"  // 系统通知
-	NotificationTypeOrder   = "order"   // 订单通知
-	NotificationTypeRental  = "rental"  // 租借通知
-	NotificationTypePromo   = "promo"   // 促销通知
+	NotificationTypeSystem    = "system"    // 系统通知
+	NotificationTypeOrder     = "order"     // 订单通知
+	NotificationTypeMarketing = "marketing" // 营销通知
 )
 
 // MessageTemplate 消息模板
 type MessageTemplate struct {
-	ID        int64     `gorm:"primaryKey;autoIncrement" json:"id"`
-	Code      string    `gorm:"type:varchar(50);uniqueIndex;not null" json:"code"`
-	Name      string    `gorm:"type:varchar(100);not null" json:"name"`
-	Type      string    `gorm:"type:varchar(20);not null" json:"type"`
-	Title     *string   `gorm:"type:varchar(200)" json:"title,omitempty"`
-	Content   string    `gorm:"type:text;not null" json:"content"`
-	Variables JSON      `gorm:"type:jsonb" json:"variables,omitempty"`
-	Status    int8      `gorm:"type:smallint;not null;default:1" json:"status"`
-	CreatedAt time.Time `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt time.Time `gorm:"autoUpdateTime" json:"updated_at"`
+	ID        int64     `gorm:"primaryKey;autoIncrement;column:id" json:"id"`
+	Code      string    `gorm:"type:varchar(50);uniqueIndex;not null;column:code" json:"code"`
+	Name      string    `gorm:"type:varchar(100);not null;column:name" json:"name"`
+	Type      string    `gorm:"type:varchar(20);not null;column:type" json:"type"`
+	Content   string    `gorm:"type:text;not null;column:content" json:"content"`
+	Variables JSON      `gorm:"type:jsonb;column:variables" json:"variables,omitempty"`
+	IsActive  bool      `gorm:"not null;default:true;column:is_active" json:"is_active"`
+	CreatedAt time.Time `gorm:"autoCreateTime;column:created_at" json:"created_at"`
 }
 
 // TableName 表名
@@ -89,32 +85,22 @@ func (MessageTemplate) TableName() string {
 
 // MessageTemplateType 模板类型
 const (
-	MessageTemplateTypeSMS      = "sms"      // 短信
-	MessageTemplateTypeWechat   = "wechat"   // 微信
-	MessageTemplateTypeEmail    = "email"    // 邮件
-	MessageTemplateTypeInApp    = "in_app"   // 站内信
-)
-
-// MessageTemplateStatus 模板状态
-const (
-	MessageTemplateStatusDisabled = 0 // 禁用
-	MessageTemplateStatusActive   = 1 // 启用
+	MessageTemplateTypeSMS    = "sms"    // 短信
+	MessageTemplateTypePush   = "push"   // 推送
+	MessageTemplateTypeWechat = "wechat" // 微信
 )
 
 // SystemConfig 系统配置
 type SystemConfig struct {
-	ID          int64     `gorm:"primaryKey;autoIncrement" json:"id"`
-	Key         string    `gorm:"type:varchar(100);uniqueIndex;not null" json:"key"`
-	Value       string    `gorm:"type:text;not null" json:"value"`
-	Type        string    `gorm:"type:varchar(20);not null;default:'string'" json:"type"`
-	Group       string    `gorm:"type:varchar(50);not null;default:'general'" json:"group"`
-	Name        string    `gorm:"type:varchar(100);not null" json:"name"`
-	Description *string   `gorm:"type:varchar(255)" json:"description,omitempty"`
-	Options     JSON      `gorm:"type:jsonb" json:"options,omitempty"`
-	Sort        int       `gorm:"not null;default:0" json:"sort"`
-	IsPublic    bool      `gorm:"not null;default:false" json:"is_public"`
-	CreatedAt   time.Time `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt   time.Time `gorm:"autoUpdateTime" json:"updated_at"`
+	ID          int64     `gorm:"primaryKey;autoIncrement;column:id" json:"id"`
+	Group       string    `gorm:"type:varchar(50);not null;column:group" json:"group"`
+	Key         string    `gorm:"type:varchar(100);not null;column:key" json:"key"`
+	Value       string    `gorm:"type:text;not null;column:value" json:"value"`
+	Type        string    `gorm:"type:varchar(20);not null;default:'string';column:type" json:"type"`
+	Description *string   `gorm:"type:varchar(255);column:description" json:"description,omitempty"`
+	IsPublic    bool      `gorm:"not null;default:false;column:is_public" json:"is_public"`
+	CreatedAt   time.Time `gorm:"autoCreateTime;column:created_at" json:"created_at"`
+	UpdatedAt   time.Time `gorm:"autoUpdateTime;column:updated_at" json:"updated_at"`
 }
 
 // TableName 表名
@@ -142,18 +128,19 @@ const (
 
 // Banner 轮播图
 type Banner struct {
-	ID        int64      `gorm:"primaryKey;autoIncrement" json:"id"`
-	Position  string     `gorm:"type:varchar(50);not null;index" json:"position"`
-	Title     string     `gorm:"type:varchar(100);not null" json:"title"`
-	Image     string     `gorm:"type:varchar(255);not null" json:"image"`
-	LinkType  string     `gorm:"type:varchar(20);not null;default:'none'" json:"link_type"`
-	LinkValue *string    `gorm:"type:varchar(255)" json:"link_value,omitempty"`
-	Sort      int        `gorm:"not null;default:0" json:"sort"`
-	Status    int8       `gorm:"type:smallint;not null;default:1" json:"status"`
-	StartTime *time.Time `json:"start_time,omitempty"`
-	EndTime   *time.Time `json:"end_time,omitempty"`
-	CreatedAt time.Time  `gorm:"autoCreateTime" json:"created_at"`
-	UpdatedAt time.Time  `gorm:"autoUpdateTime" json:"updated_at"`
+	ID         int64      `gorm:"primaryKey;autoIncrement;column:id" json:"id"`
+	Title      string     `gorm:"type:varchar(100);not null;column:title" json:"title"`
+	Image      string     `gorm:"type:varchar(255);not null;column:image" json:"image"`
+	LinkType   *string    `gorm:"type:varchar(20);column:link_type" json:"link_type,omitempty"`
+	LinkValue  *string    `gorm:"type:varchar(255);column:link_value" json:"link_value,omitempty"`
+	Position   string     `gorm:"type:varchar(20);not null;index;column:position" json:"position"`
+	Sort       int        `gorm:"not null;default:0;column:sort" json:"sort"`
+	StartTime  *time.Time `gorm:"column:start_time" json:"start_time,omitempty"`
+	EndTime    *time.Time `gorm:"column:end_time" json:"end_time,omitempty"`
+	IsActive   bool       `gorm:"not null;default:true;column:is_active" json:"is_active"`
+	ClickCount int        `gorm:"not null;default:0;column:click_count" json:"click_count"`
+	CreatedAt  time.Time  `gorm:"autoCreateTime;column:created_at" json:"created_at"`
+	UpdatedAt  time.Time  `gorm:"autoUpdateTime;column:updated_at" json:"updated_at"`
 }
 
 // TableName 表名
@@ -178,21 +165,21 @@ const (
 
 // BannerStatus 轮播图状态
 const (
-	BannerStatusDisabled = 0 // 禁用
-	BannerStatusActive   = 1 // 启用
+	BannerStatusInactive = false // 禁用
+	BannerStatusActive   = true  // 启用
 )
 
 // SmsCode 短信验证码
 type SmsCode struct {
-	ID        int64     `gorm:"primaryKey;autoIncrement" json:"id"`
-	Phone     string    `gorm:"type:varchar(20);not null;index" json:"phone"`
-	Code      string    `gorm:"type:varchar(10);not null" json:"code"`
-	Type      string    `gorm:"type:varchar(20);not null" json:"type"`
-	IP        string    `gorm:"type:varchar(45);not null" json:"ip"`
-	IsUsed    bool      `gorm:"not null;default:false" json:"is_used"`
-	UsedAt    *time.Time `json:"used_at,omitempty"`
-	ExpiredAt time.Time `gorm:"not null" json:"expired_at"`
-	CreatedAt time.Time `gorm:"autoCreateTime" json:"created_at"`
+	ID        int64      `gorm:"primaryKey;autoIncrement;column:id" json:"id"`
+	Phone     string     `gorm:"type:varchar(20);not null;index;column:phone" json:"phone"`
+	Code      string     `gorm:"type:varchar(10);not null;column:code" json:"code"`
+	Type      string     `gorm:"type:varchar(20);not null;column:type" json:"type"`
+	ExpireAt  time.Time  `gorm:"not null;column:expire_at" json:"expire_at"`
+	IsUsed    bool       `gorm:"not null;default:false;column:is_used" json:"is_used"`
+	UsedAt    *time.Time `gorm:"column:used_at" json:"used_at,omitempty"`
+	IP        *string    `gorm:"type:varchar(45);column:ip" json:"ip,omitempty"`
+	CreatedAt time.Time  `gorm:"autoCreateTime;column:created_at" json:"created_at"`
 }
 
 // TableName 表名

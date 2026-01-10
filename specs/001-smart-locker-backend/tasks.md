@@ -486,90 +486,90 @@
 
 ### 仪表盘
 
-- [ ] T198 [P] 实现平台管理员仪表盘数据服务 `internal/service/admin/dashboard_service.go`
-- [ ] T199 [P] 实现分销商仪表盘数据服务 `internal/service/distribution/dashboard_service.go`
-- [ ] T200 [P] 实现财务仪表盘数据服务 `internal/service/finance/dashboard_service.go`
-- [ ] T201 [P] 实现运营仪表盘数据服务 `internal/service/admin/operation_dashboard_service.go`
-- [ ] T202 实现仪表盘 API Handler `internal/handler/admin/dashboard_handler.go`
+- [x] T198 [P] 实现平台管理员仪表盘数据服务 `internal/service/admin/dashboard_service.go`
+- [x] T199 [P] 实现分销商仪表盘数据服务 `internal/service/distribution/dashboard_service.go`
+- [x] T200 [P] 实现财务仪表盘数据服务 `internal/service/finance/dashboard_service.go`
+- [x] T201 [P] 实现运营仪表盘数据服务 `internal/service/admin/operation_dashboard_service.go`
+- [x] T202 实现仪表盘 API Handler `internal/handler/admin/dashboard_handler.go`
 
 ### 内容管理
 
-- [ ] T203 [P] 定义 Article/Notification/MessageTemplate 模型 `internal/models/content.go`
-- [ ] T204 [P] 实现文章 Repository `internal/repository/article_repo.go`
-- [ ] T205 [P] 实现通知 Repository `internal/repository/notification_repo.go`
-- [ ] T206 实现内容服务 `internal/service/content/content_service.go`
-- [ ] T207 实现通知服务 `internal/service/content/notification_service.go`
-- [ ] T208 实现内容 API Handler `internal/handler/content/content_handler.go`
+- [x] T203 [P] 定义 Article/Notification/MessageTemplate 模型 `internal/models/system.go`
+- [x] T204 [P] 实现文章 Repository `internal/repository/article_repo.go`
+- [x] T205 [P] 实现通知 Repository `internal/repository/notification_repo.go`
+- [x] T206 实现内容服务 `internal/service/content/content_service.go`
+- [x] T207 实现通知服务 `internal/service/content/notification_service.go`
+- [x] T208 实现内容 API Handler `internal/handler/content/content_handler.go`
 
 ### 系统管理
 
-- [ ] T209 [P] 定义 SystemConfig 模型 `internal/models/system_config.go`
-- [ ] T210 实现系统配置 Repository `internal/repository/system_config_repo.go`
-- [ ] T211 实现系统配置服务 `internal/service/admin/system_config_service.go`
-- [ ] T212 实现系统管理 API Handler `internal/handler/admin/system_handler.go`
+- [x] T209 [P] 定义 SystemConfig 模型 `internal/models/system_config.go`
+- [x] T210 实现系统配置 Repository `internal/repository/system_config_repo.go`
+- [x] T211 实现系统配置服务 `internal/service/admin/system_config_service.go`
+- [x] T212 实现系统管理 API Handler `internal/handler/admin/system_handler.go`
 
 ### 用户管理（管理端）
 
-- [ ] T213 实现用户管理服务 `internal/service/admin/user_admin_service.go`
-- [ ] T214 实现用户管理 API Handler `internal/handler/admin/user_handler.go`
+- [x] T213 实现用户管理服务 `internal/service/admin/user_admin_service.go`
+- [x] T214 实现用户管理 API Handler `internal/handler/admin/user_handler.go`
 
 ### 订单管理（管理端）
 
-- [ ] T215 实现订单管理服务 `internal/service/admin/order_admin_service.go`
-- [ ] T216 实现订单管理 API Handler `internal/handler/admin/order_handler.go`
+- [x] T215 实现订单管理服务 `internal/service/admin/order_admin_service.go`
+- [x] T216 实现订单管理 API Handler `internal/handler/admin/order_handler.go`
 
 ### 用户反馈
 
-- [ ] T217 [P] 定义 UserFeedback 模型 `internal/models/feedback.go`
-- [ ] T218 实现反馈 Repository `internal/repository/feedback_repo.go`
-- [ ] T219 实现反馈服务 `internal/service/user/feedback_service.go`
-- [ ] T220 实现反馈 API Handler `internal/handler/user/feedback_handler.go`
+- [x] T217 [P] 定义 UserFeedback 模型 `internal/models/feedback.go`
+- [x] T218 实现反馈 Repository `internal/repository/feedback_repo.go`
+- [x] T219 实现反馈服务 `internal/service/user/feedback_service.go`
+- [x] T220 实现反馈 API Handler `internal/handler/user/feedback_handler.go`
 
 ### 用户收货地址
 
-- [ ] T221 [P] 定义 Address 模型 `internal/models/address.go`
-- [ ] T222 实现 Address Repository `internal/repository/address_repo.go`
-- [ ] T223 实现地址服务（CRUD/设置默认）`internal/service/user/address_service.go`
-- [ ] T224 实现地址 API Handler `internal/handler/user/address_handler.go`
+- [x] T221 [P] 定义 Address 模型 `internal/models/address.go`
+- [x] T222 实现 Address Repository `internal/repository/address_repo.go`
+- [x] T223 实现地址服务（CRUD/设置默认）`internal/service/user/address_service.go`
+- [x] T224 实现地址 API Handler `internal/handler/user/address_handler.go`
 
 ### Banner 轮播图管理
 
-- [ ] T225 [P] 定义 Banner 模型 `internal/models/banner.go`
-- [ ] T226 实现 Banner Repository `internal/repository/banner_repo.go`
-- [ ] T227 实现 Banner 服务（用户端查询）`internal/service/content/banner_service.go`
-- [ ] T228 实现 Banner 管理服务（管理端 CRUD）`internal/service/admin/banner_admin_service.go`
-- [ ] T229 实现 Banner API Handler（用户端）`internal/handler/content/banner_handler.go`
-- [ ] T230 实现 Banner 管理 API Handler `internal/handler/admin/banner_handler.go`
+- [x] T225 [P] 定义 Banner 模型 `internal/models/banner.go`
+- [x] T226 实现 Banner Repository `internal/repository/banner_repo.go`
+- [x] T227 实现 Banner 服务（用户端查询）`internal/service/content/banner_service.go`
+- [x] T228 实现 Banner 管理服务（管理端 CRUD）`internal/service/admin/banner_admin_service.go`
+- [x] T229 实现 Banner API Handler（用户端）`internal/handler/content/banner_handler.go`
+- [x] T230 实现 Banner 管理 API Handler `internal/handler/admin/banner_handler.go`
 
 ### 消息推送
 
-- [ ] T231 实现短信推送服务 `pkg/sms/sender.go`
-- [ ] T232 实现消息模板服务 `internal/service/content/template_service.go`
+- [x] T231 实现短信推送服务 `pkg/sms/sender.go`
+- [x] T232 实现消息模板服务 `internal/service/content/template_service.go`
 
 ### 对象存储
 
-- [ ] T233 实现阿里云 OSS 上传 `pkg/oss/aliyun.go`
+- [x] T233 实现阿里云 OSS 上传 `pkg/oss/aliyun.go`
 
 ### 可观测性
 
-- [ ] T233a [P] 集成 Prometheus 指标收集 `internal/common/metrics/prometheus.go`，暴露 `/metrics` 端点，收集 API 请求量、响应时间、错误率、数据库连接池状态等核心指标
-- [ ] T233b [P] 集成 OpenTelemetry 分布式追踪 `internal/common/tracing/opentelemetry.go`，支持请求链路追踪、跨服务调用追踪、数据库查询追踪
-- [ ] T233c [P] 实现追踪中间件 `internal/common/middleware/tracing.go`，自动为每个请求生成 Trace ID 并传递到下游
+- [x] T233a [P] 集成 Prometheus 指标收集 `internal/common/metrics/prometheus.go`，暴露 `/metrics` 端点，收集 API 请求量、响应时间、错误率、数据库连接池状态等核心指标
+- [x] T233b [P] 集成 OpenTelemetry 分布式追踪 `internal/common/tracing/opentelemetry.go`，支持请求链路追踪、跨服务调用追踪、数据库查询追踪
+- [x] T233c [P] 实现追踪中间件 `internal/common/middleware/tracing.go`，自动为每个请求生成 Trace ID 并传递到下游
 
 ### API 文档
 
-- [ ] T234 集成 Swagger 文档生成 `cmd/api-gateway/swagger.go`
-- [ ] T235 生成 OpenAPI 文档到 `docs/`
+- [x] T234 集成 Swagger 文档生成 `cmd/api-gateway/swagger.go`
+- [x] T235 生成 OpenAPI 文档到 `docs/`
 
 ### 部署配置
 
-- [ ] T236 [P] 创建 Dockerfile `deployments/docker/Dockerfile`
-- [ ] T237 [P] 创建 Kubernetes 部署配置 `deployments/k8s/deployment.yaml`
-- [ ] T238 [P] 创建 Kubernetes Service 配置 `deployments/k8s/service.yaml`
+- [x] T236 [P] 创建 Dockerfile `deployments/docker/Dockerfile`
+- [x] T237 [P] 创建 Kubernetes 部署配置 `deployments/k8s/deployment.yaml`
+- [x] T238 [P] 创建 Kubernetes Service 配置 `deployments/k8s/service.yaml`
 
 ### 文档完善
 
-- [ ] T239 更新 quickstart.md 验证所有功能
+- [x] T239 更新 quickstart.md 验证所有功能
 
 ---
 
@@ -587,40 +587,40 @@
 
 ### 📋 开发前检查 (必须完成)
 
-- [ ] 已查阅 `specs/001-smart-locker-backend/data-model.md` 对应表的完整定义
-- [ ] 已查看对应的 `migrations/000XXX_create_xxx.up.sql` 文件
-- [ ] 理解了表的业务含义和字段用途
-- [ ] 了解了该表与其他表的关联关系
+- 已查阅 `specs/001-smart-locker-backend/data-model.md` 对应表的完整定义
+- 已查看对应的 `migrations/000XXX_create_xxx.up.sql` 文件
+- 理解了表的业务含义和字段用途
+- 了解了该表与其他表的关联关系
 
 ### 📝 编码中检查 (逐项验证)
 
-- [ ] Model中**所有字段**都添加了 `column:` 标签
-- [ ] 字段名与数据库列名**完全一致**
-- [ ] 字段类型与数据库类型正确映射:
-  - [ ] VARCHAR → string
-  - [ ] BIGINT → int64
-  - [ ] INT → int
-  - [ ] DECIMAL → float64
-  - [ ] BOOLEAN → bool
-  - [ ] TIMESTAMP (必填) → time.Time
-  - [ ] TIMESTAMP (可空) → *time.Time
-- [ ] 状态字段使用 `string` 类型(而非int/int8)
-- [ ] 所有NOT NULL字段都定义为值类型
-- [ ] 所有NULLABLE字段都定义为指针类型
-- [ ] 没有添加数据库中不存在的字段
-- [ ] 没有遗漏数据库中的必填字段
-- [ ] 外键字段正确定义了关联关系
-- [ ] TableName()方法返回正确的表名
+- Model中**所有字段**都添加了 `column:` 标签
+- 字段名与数据库列名**完全一致**
+- 字段类型与数据库类型正确映射:
+  - VARCHAR → string
+  - BIGINT → int64
+  - INT → int
+  - DECIMAL → float64
+  - BOOLEAN → bool
+  - TIMESTAMP (必填) → time.Time
+  - TIMESTAMP (可空) → *time.Time
+- 状态字段使用 `string` 类型(而非int/int8)
+- 所有NOT NULL字段都定义为值类型
+- 所有NULLABLE字段都定义为指针类型
+- 没有添加数据库中不存在的字段
+- 没有遗漏数据库中的必填字段
+- 外键字段正确定义了关联关系
+- TableName()方法返回正确的表名
 
 ### ✅ 开发后检查 (必须通过)
 
-- [ ] 已运行 `go build ./internal/models/...` 验证编译通过
-- [ ] 已编写基础CRUD单元测试
-- [ ] 单元测试能够成功插入数据
-- [ ] 单元测试能够成功查询数据
-- [ ] 单元测试能够成功更新数据
-- [ ] 所有测试用例通过
-- [ ] 已手动测试在实际数据库中的CRUD操作
+- 已运行 `go build ./internal/models/...` 验证编译通过
+- 已编写基础CRUD单元测试
+- 单元测试能够成功插入数据
+- 单元测试能够成功查询数据
+- 单元测试能够成功更新数据
+- 所有测试用例通过
+- 已手动测试在实际数据库中的CRUD操作
 
 ### 📚 必读参考文档
 
@@ -682,8 +682,8 @@
 ### 测试覆盖率报告
 
 - [x] T268 配置测试覆盖率收集和报告 `scripts/coverage.sh`
-- [ ] T269 更新 Makefile 添加 `make test`, `make test-unit`, `make test-integration`, `make coverage` 命令
-- [ ] T270 实现覆盖率门禁验证脚本 `scripts/coverage-gate.sh`，验证：（1）整体单元测试覆盖率 ≥ 80%；（2）关键业务模块（auth/payment/order/rental/booking）覆盖率 ≥ 90%；不满足条件时返回非零退出码阻止 CI/CD 流水线继续执行
+- [x] T269 更新 Makefile 添加 `make test`, `make test-unit`, `make test-integration`, `make coverage` 命令
+- [x] T270 实现覆盖率门禁验证脚本 `scripts/coverage-gate.sh`，验证：（1）整体单元测试覆盖率 ≥ 80%；（2）关键业务模块（auth/payment/order/rental/booking）覆盖率 ≥ 90%；不满足条件时返回非零退出码阻止 CI/CD 流水线继续执行
 
 **Checkpoint**: 测试覆盖率达标（单测 > 80%，关键业务 > 90%）
 

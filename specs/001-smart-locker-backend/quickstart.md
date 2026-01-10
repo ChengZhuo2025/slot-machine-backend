@@ -96,6 +96,18 @@ make build
 # 运行测试
 make test
 
+# 运行单元测试
+make test-unit
+
+# 运行集成测试
+make test-integration
+
+# 生成测试覆盖率报告
+make coverage
+
+# 验证覆盖率门限
+make coverage-gate
+
 # 生成 API 文档
 make swagger
 
@@ -103,7 +115,7 @@ make swagger
 make lint
 
 # 数据库迁移
-make migrate-up
+make migrate
 make migrate-down
 
 # Docker 构建
@@ -305,6 +317,47 @@ docker-compose logs -f backend
 
 # 查看特定服务
 docker-compose logs -f postgres
+```
+
+## 部署
+
+### Docker 部署
+
+```bash
+# 构建镜像
+make docker-build
+
+# 运行容器
+docker run -d \
+  --name smart-locker-api \
+  -p 8080:8080 \
+  -e DB_HOST=postgres \
+  -e REDIS_HOST=redis \
+  smart-locker:latest
+```
+
+### Kubernetes 部署
+
+```bash
+# 应用配置
+kubectl apply -f deployments/kubernetes/deployment.yaml
+kubectl apply -f deployments/kubernetes/service.yaml
+
+# 检查状态
+kubectl get pods -l app=smart-locker
+kubectl get svc smart-locker-api
+```
+
+### 监控启用
+
+```bash
+# 启动 Prometheus + Grafana
+docker-compose --profile monitoring up -d
+
+# 访问
+# Prometheus: http://localhost:9090
+# Grafana: http://localhost:3000 (admin/admin123)
+# Jaeger: http://localhost:16686
 ```
 
 ## 参考资料

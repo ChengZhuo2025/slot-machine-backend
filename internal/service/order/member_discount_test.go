@@ -42,7 +42,7 @@ func setupMemberDiscountTestDB(t *testing.T) *gorm.DB {
 	return db
 }
 
-func createDiscountTestUser(db *gorm.DB, memberLevelID int64) *models.User {
+func createMemberDiscountTestUser(db *gorm.DB, memberLevelID int64) *models.User {
 	phone := fmt.Sprintf("136%08d", time.Now().UnixNano()%100000000)
 	user := &models.User{
 		Phone:         &phone,
@@ -69,7 +69,7 @@ func TestMemberDiscountService_CalculateMemberDiscount(t *testing.T) {
 	})
 
 	t.Run("无会员折扣不打折", func(t *testing.T) {
-		user := createDiscountTestUser(db, 1)
+		user := createMemberDiscountTestUser(db, 1)
 		r, err := svc.CalculateMemberDiscount(ctx, user.ID, 100)
 		require.NoError(t, err)
 		assert.Equal(t, 100.0, r.FinalAmount)
@@ -77,7 +77,7 @@ func TestMemberDiscountService_CalculateMemberDiscount(t *testing.T) {
 	})
 
 	t.Run("有会员折扣向下保留两位小数", func(t *testing.T) {
-		user := createDiscountTestUser(db, 2) // 0.9
+		user := createMemberDiscountTestUser(db, 2) // 0.9
 		r, err := svc.CalculateMemberDiscount(ctx, user.ID, 99.99)
 		require.NoError(t, err)
 		assert.True(t, r.HasMemberDiscount)

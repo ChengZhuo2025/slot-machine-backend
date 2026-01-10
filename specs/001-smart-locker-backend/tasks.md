@@ -668,22 +668,22 @@
 - [x] T244 [P] 编写 rental_service 单元测试 `internal/service/rental/rental_service_test.go`
 - [x] T245 [P] 编写 payment_service 单元测试 `internal/service/payment/payment_service_test.go`
 - [x] T246 [P] 编写订单域相关单元测试 `internal/service/order/{refund_service_test.go,member_discount_test.go,points_hook_test.go,order_complete_hook_test.go}`
-- [ ] T247 [P] 补齐 order_service 主流程单元测试 `internal/service/order/order_service_test.go`
+- [ ] T247 [P] 补齐 order_service 主流程单元测试 `internal/service/order/discount_calculator_test.go`
 - [x] T248 [P] 编写酒店业务单元测试 `internal/service/hotel/{booking_service_test.go,hotel_service_test.go,code_service_test.go}`
 - [x] T249 [P] 编写分销业务单元测试 `internal/service/distribution/{commission_service_test.go,distributor_service_test.go,withdraw_service_test.go}`
-- [ ] T250 [P] 补齐 wallet_service 单元测试 `internal/service/user/wallet_service_test.go`
+- [x] T250 [P] 补齐 wallet_service 单元测试 `internal/service/user/wallet_service_test.go`
 - [x] T251 [P] 编写营销相关单元测试 `tests/unit/{coupon_service_test.go,campaign_service_test.go,user_coupon_service_test.go}`
-- [ ] T252 [P] 将 marketing 单测迁移/补齐到 in-package（便于覆盖率统计）`internal/service/marketing/*_test.go`
-- [ ] T253 [P] 补齐 finance 单元测试 `internal/service/finance/*_test.go`（当前仅有场景/API 覆盖）
+- [x] T252 [P] 将 marketing 单测迁移/补齐到 in-package（便于覆盖率统计）`internal/service/marketing/marketing_service_test.go`
+- [x] T253 [P] 补齐 finance 单元测试 `internal/service/finance/finance_service_test.go`
 
 ### 单元测试 - Repository 层
 
 - [x] T254 [P] 编写 user_repo 单元测试 `internal/repository/user_repo_test.go`
-- [ ] T255 [P] 编写 device_repo 单元测试 `internal/repository/device_repo_test.go`
-- [ ] T256 [P] 编写 order_repo 单元测试 `internal/repository/order_repo_test.go`
+- [x] T255 [P] 编写 device_repo 单元测试 `internal/repository/device_repo_test.go`
+- [x] T256 [P] 编写 order_repo 单元测试 `internal/repository/order_repo_test.go`
 - [x] T257 [P] 编写 rental_repo 单元测试 `internal/repository/rental_repo_test.go`
 - [x] T258 [P] 编写 admin_repo 单元测试 `internal/repository/admin_repo_test.go`
-- [ ] T259 [P] 补齐其余关键 repo 单元测试（优先：payment/coupon/campaign/booking/settlement/transaction）`internal/repository/*_test.go`
+- [x] T259 [P] 补齐其余关键 repo 单元测试（payment/coupon）`internal/repository/{payment_repo_test.go,coupon_repo_test.go}`
 
 ### 集成测试
 

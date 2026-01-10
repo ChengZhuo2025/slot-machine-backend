@@ -76,22 +76,20 @@ func (c *DiscountCalculator) CalculateOrderDiscount(ctx context.Context, userID 
 	afterCampaignAmount := orderAmount - campaignDiscount
 
 	if userCouponID != nil {
-		// 用户指定了优惠券
-		bestCoupon, couponDiscount, err := c.couponService.GetBestCouponForOrder(ctx, userID, orderType, afterCampaignAmount)
+		// 用户指定了优惠券：若该券对当前订单可用，则按该券计算；否则不使用优惠券且不报错。
+		userCoupon, couponDiscount, err := c.couponService.GetUserCouponForOrder(ctx, userID, *userCouponID, orderType, afterCampaignAmount)
 		if err != nil {
 			return nil, err
 		}
-
-		// 验证用户指定的优惠券
-		if bestCoupon != nil && bestCoupon.ID == *userCouponID {
+		if userCoupon != nil && couponDiscount > 0 {
 			result.CouponDiscount = couponDiscount
-			result.UserCoupon = bestCoupon
-			if bestCoupon.Coupon != nil {
+			result.UserCoupon = userCoupon
+			if userCoupon.Coupon != nil {
 				result.DiscountDetails = append(result.DiscountDetails, &DiscountDetail{
 					Type:        "coupon",
-					Name:        bestCoupon.Coupon.Name,
+					Name:        userCoupon.Coupon.Name,
 					Amount:      couponDiscount,
-					Description: c.getCouponDescription(bestCoupon.Coupon),
+					Description: c.getCouponDescription(userCoupon.Coupon),
 				})
 			}
 		}

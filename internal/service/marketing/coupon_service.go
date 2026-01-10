@@ -3,6 +3,7 @@ package marketing
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"gorm.io/gorm"
@@ -281,4 +282,52 @@ func (s *CouponService) GetBestCouponForOrder(ctx context.Context, userID int64,
 	}
 
 	return bestCoupon, maxDiscount, nil
+}
+
+// GetUserCouponForOrder 获取指定的用户优惠券并计算其对订单的优惠金额。
+// 若优惠券不可用/不匹配当前订单，则返回 (nil, 0, nil)。
+func (s *CouponService) GetUserCouponForOrder(ctx context.Context, userID int64, userCouponID int64, orderType string, orderAmount float64) (*models.UserCoupon, float64, error) {
+	userCoupon, err := s.userCouponRepo.GetByIDWithCoupon(ctx, userCouponID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, 0, nil
+		}
+		return nil, 0, err
+	}
+
+	if userCoupon.UserID != userID {
+		return nil, 0, nil
+	}
+	if userCoupon.Status != models.UserCouponStatusUnused {
+		return nil, 0, nil
+	}
+
+	now := time.Now()
+	if !userCoupon.ExpiredAt.After(now) {
+		return nil, 0, nil
+	}
+
+	coupon := userCoupon.Coupon
+	if coupon == nil {
+		return nil, 0, nil
+	}
+
+	if coupon.Status != models.CouponStatusActive {
+		return nil, 0, nil
+	}
+	if now.Before(coupon.StartTime) || now.After(coupon.EndTime) {
+		return nil, 0, nil
+	}
+	if orderAmount < coupon.MinAmount {
+		return nil, 0, nil
+	}
+	if coupon.ApplicableScope != models.CouponScopeAll && coupon.ApplicableScope != orderType {
+		return nil, 0, nil
+	}
+
+	discount := s.CalculateDiscount(coupon, orderAmount)
+	if discount <= 0 {
+		return nil, 0, nil
+	}
+	return userCoupon, discount, nil
 }

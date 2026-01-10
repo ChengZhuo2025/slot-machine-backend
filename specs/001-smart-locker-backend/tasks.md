@@ -596,13 +596,26 @@
 
 ### 当前测试资产盘点（已创建）
 
-- 业务单元测试（in-package）：`internal/service/{admin,auth,content,device,distribution,hotel,mall,order,payment,rental,user}/*_test.go`
-- Repository 单元测试：仅 `internal/repository/{admin_repo,rental_repo,user_repo}_test.go` 已存在，其余 repo 暂缺
+- 业务单元测试（in-package）：`internal/service/{admin,auth,content,device,distribution,finance,hotel,mall,marketing,order,payment,rental,user}/*_test.go`
+- 公共模块单元测试：`internal/common/{metrics,middleware,tracing}/*_test.go`
+- Repository 单元测试（已覆盖关键 Repo）：`internal/repository/{admin_repo,coupon_repo,device_repo,order_repo,payment_repo,rental_repo,user_repo}_test.go`（其余 repo 仍可按需补齐）
 - 端到端/场景测试：
   - API 测试：`tests/api/*_test.go`（`//go:build api`）
   - 集成测试：`tests/integration/*_test.go`（`//go:build integration`）
   - E2E 测试：`tests/e2e/*_test.go`（`//go:build e2e`）
   - 额外单测（tests 目录内）：`tests/unit/*_test.go`（无 build tag）
+
+### 当前覆盖率现状（实测）
+
+> 说明：以下为本仓库内置脚本的实测结果（以当前代码为准），用于 Phase 12 的“达标/差距”追踪。
+
+- 单测覆盖率（`make coverage`）：`32.8%`
+- 覆盖率门禁（`make coverage-gate`；key modules = auth/payment/order/rental/booking）：整体 `51.43%`，模块：
+  - auth `14.59%`
+  - payment `40.00%`
+  - order `56.37%`
+  - rental `55.92%`
+  - booking `64.02%`
 
 ## ⚠️ CRITICAL: Model开发验证Checklist
 
@@ -665,68 +678,84 @@
 ### 单元测试 - 核心业务
 
 - [x] T243 [P] 编写 auth_service 单元测试 `internal/service/auth/auth_service_test.go`
-- [x] T244 [P] 编写 rental_service 单元测试 `internal/service/rental/rental_service_test.go`
-- [x] T245 [P] 编写 payment_service 单元测试 `internal/service/payment/payment_service_test.go`
-- [x] T246 [P] 编写订单域相关单元测试 `internal/service/order/{refund_service_test.go,member_discount_test.go,points_hook_test.go,order_complete_hook_test.go}`
-- [ ] T247 [P] 补齐 order_service 主流程单元测试 `internal/service/order/discount_calculator_test.go`
-- [x] T248 [P] 编写酒店业务单元测试 `internal/service/hotel/{booking_service_test.go,hotel_service_test.go,code_service_test.go}`
-- [x] T249 [P] 编写分销业务单元测试 `internal/service/distribution/{commission_service_test.go,distributor_service_test.go,withdraw_service_test.go}`
-- [x] T250 [P] 补齐 wallet_service 单元测试 `internal/service/user/wallet_service_test.go`
-- [x] T251 [P] 编写营销相关单元测试 `tests/unit/{coupon_service_test.go,campaign_service_test.go,user_coupon_service_test.go}`
-- [x] T252 [P] 将 marketing 单测迁移/补齐到 in-package（便于覆盖率统计）`internal/service/marketing/marketing_service_test.go`
-- [x] T253 [P] 补齐 finance 单元测试 `internal/service/finance/finance_service_test.go`
+- [ ] T244 [P] 补齐验证码发送/校验单元测试（频率限制/每日上限/发送失败回滚/一次性校验）`internal/service/auth/code_service_test.go`
+- [ ] T245 [P] 补齐微信登录/绑定手机号单元测试（code2Session 成功/失败、老用户更新/新用户创建、邀请码、绑定手机号冲突）`internal/service/auth/wechat_service_test.go`
+- [x] T246 [P] 编写 rental_service 单元测试 `internal/service/rental/rental_service_test.go`
+- [ ] T247 [P] 补齐租借核心流程边界测试（CancelRental/GetRental/ListRentals/GenerateRentalNo/超时与异常分支）`internal/service/rental/rental_service_test.go`
+- [x] T248 [P] 编写 payment_service 单元测试 `internal/service/payment/payment_service_test.go`
+- [ ] T249 [P] 补齐支付回调与状态机单元测试（HandlePaymentCallback、重复回调幂等、失败分支）`internal/service/payment/payment_service_test.go`
+- [x] T250 [P] 编写订单域相关单元测试 `internal/service/order/{refund_service_test.go,member_discount_test.go,points_hook_test.go,order_complete_hook_test.go}`
+- [x] T251 [P] 补齐 order_service 主流程单元测试 `internal/service/order/discount_calculator_test.go`
+- [ ] T252 [P] 补齐订单折扣/积分/退款关键分支（CalculateWithMemberDiscount、积分Hook组合器、退款审核通过/拒绝/列表/详情）`internal/service/order/{member_discount_test.go,points_hook_test.go,refund_service_test.go}`
+- [x] T253 [P] 编写酒店业务单元测试 `internal/service/hotel/{booking_service_test.go,hotel_service_test.go,code_service_test.go}`
+- [ ] T254 [P] 补齐酒店预订关键分支（GetBookingByNo/UnlockByCode/到期与完成任务处理/jsonToStringSlice）`internal/service/hotel/{booking_service_test.go,hotel_service_test.go}`
+- [x] T255 [P] 编写分销业务单元测试 `internal/service/distribution/{commission_service_test.go,distributor_service_test.go,withdraw_service_test.go}`
+- [ ] T256 [P] 补齐分销邀请/推广链路单元测试 `internal/service/distribution/invite_service_test.go`
+- [x] T257 [P] 补齐 wallet_service 单元测试 `internal/service/user/wallet_service_test.go`
+- [ ] T258 [P] 补齐用户核心服务单元测试（user_service 关键分支：注册资料/状态/手机号等）`internal/service/user/user_service_test.go`
+- [x] T259 [P] 编写营销相关单元测试 `tests/unit/{coupon_service_test.go,campaign_service_test.go,user_coupon_service_test.go}`
+- [x] T260 [P] 将 marketing 单测迁移/补齐到 in-package（便于覆盖率统计）`internal/service/marketing/marketing_service_test.go`
+- [x] T261 [P] 补齐 finance 单元测试 `internal/service/finance/finance_service_test.go`
+- [ ] T262 [P] 补齐管理端后台核心服务单元测试（dashboard/permission/merchant/hotel/member/product/marketing 等）`internal/service/admin/*_test.go`
+- [ ] T263 [P] 补齐商城订单/搜索服务单元测试（mall_order_service/search_service）`internal/service/mall/*_test.go`
+- [ ] T264 [P] 补齐内容/通知服务单元测试（content_service/notification_service）`internal/service/content/*_test.go`
+- [ ] T265 [P] 补齐通用基础模块单元测试（config/cache/crypto/jwt/logger/response/errors/utils/qrcode/database）`internal/common/*_test.go`
 
 ### 单元测试 - Repository 层
 
-- [x] T254 [P] 编写 user_repo 单元测试 `internal/repository/user_repo_test.go`
-- [x] T255 [P] 编写 device_repo 单元测试 `internal/repository/device_repo_test.go`
-- [x] T256 [P] 编写 order_repo 单元测试 `internal/repository/order_repo_test.go`
-- [x] T257 [P] 编写 rental_repo 单元测试 `internal/repository/rental_repo_test.go`
-- [x] T258 [P] 编写 admin_repo 单元测试 `internal/repository/admin_repo_test.go`
-- [x] T259 [P] 补齐其余关键 repo 单元测试（payment/coupon）`internal/repository/{payment_repo_test.go,coupon_repo_test.go}`
+- [x] T266 [P] 编写 user_repo 单元测试 `internal/repository/user_repo_test.go`
+- [x] T267 [P] 编写 device_repo 单元测试 `internal/repository/device_repo_test.go`
+- [x] T268 [P] 编写 order_repo 单元测试 `internal/repository/order_repo_test.go`
+- [x] T269 [P] 编写 rental_repo 单元测试 `internal/repository/rental_repo_test.go`
+- [x] T270 [P] 编写 admin_repo 单元测试 `internal/repository/admin_repo_test.go`
+- [x] T271 [P] 补齐其余关键 repo 单元测试（payment/coupon）`internal/repository/{payment_repo_test.go,coupon_repo_test.go}`
+- [ ] T272 [P] 补齐剩余 repository 单元测试（按仓储文件逐一补齐 CRUD/列表/过滤/排序/边界条件）`internal/repository/*_repo_test.go`
+  - 缺失清单（当前无对应 `*_test.go`）：`address_repo`、`article_repo`、`banner_repo`、`booking_repo`、`campaign_repo`、`cart_repo`、`category_repo`、`commission_repo`、`device_alert_repo`、`device_log_repo`、`distributor_repo`、`feedback_repo`、`hotel_repo`、`member_level_repo`、`member_package_repo`、`merchant_repo`、`message_template_repo`、`notification_repo`、`operation_log_repo`、`product_repo`、`review_repo`、`role_repo`、`room_repo`、`settlement_repo`、`system_config_repo`、`transaction_repo`、`user_coupon_repo`、`venue_repo`、`withdrawal_repo`
 
 ### 集成测试
 
-- [x] T260 [P] 编写租借流程集成测试（扫码→支付→开锁→归还）`tests/integration/rental_flow_test.go`
-- [x] T261 [P] 编写支付流程集成测试（创建→回调→状态更新）`tests/integration/payment_flow_test.go`
-- [x] T262 [P] 编写酒店预订集成测试（预订→核销→开锁）`tests/integration/us4_hotel_booking_flow_test.go`
-- [x] T263 [P] 编写商城订单集成测试（加购→下单→支付）`tests/integration/us3_mall_order_flow_test.go`
-- [x] T264 [P] 编写分销流程集成测试（推广→消费→计算佣金）`tests/integration/distribution_flow_test.go`
-- [x] T265 [P] 编写管理端基础流程集成测试 `tests/integration/admin_flow_test.go`
-- [x] T266 [P] 编写 US2 权限/设备监控集成测试 `tests/integration/{us2_permission_flow_test.go,us2_device_monitoring_flow_test.go}`
-- [x] T267 [P] 编写 US6 财务/US7 营销/US8 会员集成测试 `tests/integration/{us6_finance_flow_test.go,us7_marketing_flow_test.go,us8_membership_flow_test.go}`
+- [x] T273 [P] 编写租借流程集成测试（扫码→支付→开锁→归还）`tests/integration/rental_flow_test.go`
+- [x] T274 [P] 编写支付流程集成测试（创建→回调→状态更新）`tests/integration/payment_flow_test.go`
+- [x] T275 [P] 编写酒店预订集成测试（预订→核销→开锁）`tests/integration/us4_hotel_booking_flow_test.go`
+- [x] T276 [P] 编写商城订单集成测试（加购→下单→支付）`tests/integration/us3_mall_order_flow_test.go`
+- [x] T277 [P] 编写分销流程集成测试（推广→消费→计算佣金）`tests/integration/distribution_flow_test.go`
+- [x] T278 [P] 编写管理端基础流程集成测试 `tests/integration/admin_flow_test.go`
+- [x] T279 [P] 编写 US2 权限/设备监控集成测试 `tests/integration/{us2_permission_flow_test.go,us2_device_monitoring_flow_test.go}`
+- [x] T280 [P] 编写 US6 财务/US7 营销/US8 会员集成测试 `tests/integration/{us6_finance_flow_test.go,us7_marketing_flow_test.go,us8_membership_flow_test.go}`
 
 ### E2E 测试
 
-- [x] T268 [P] 编写扫码租借完整流程 E2E 测试 `tests/e2e/us1_scan_rent_flow_test.go`
-- [x] T269 [P] 编写酒店预订完整流程 E2E 测试 `tests/e2e/us4_hotel_booking_flow_test.go`
-- [x] T270 [P] 编写商城购物完整流程 E2E 测试 `tests/e2e/us3_mall_shopping_flow_test.go`
-- [x] T271 [P] 编写 US2 管理端设备管理 E2E 测试 `tests/e2e/us2_admin_device_monitor_manage_flow_test.go`
-- [x] T272 [P] 编写 US5 分销推广 E2E 测试 `tests/e2e/us5_distribution_flow_test.go`
-- [x] T273 [P] 编写 US6 财务结算 E2E 测试 `tests/e2e/us6_finance_settlement_flow_test.go`
-- [x] T274 [P] 编写 US7 营销优惠 E2E 测试 `tests/e2e/us7_marketing_flow_test.go`
-- [x] T275 [P] 编写 US8 会员体系 E2E 测试 `tests/e2e/us8_membership_flow_test.go`
+- [x] T281 [P] 编写扫码租借完整流程 E2E 测试 `tests/e2e/us1_scan_rent_flow_test.go`
+- [x] T282 [P] 编写酒店预订完整流程 E2E 测试 `tests/e2e/us4_hotel_booking_flow_test.go`
+- [x] T283 [P] 编写商城购物完整流程 E2E 测试 `tests/e2e/us3_mall_shopping_flow_test.go`
+- [x] T284 [P] 编写 US2 管理端设备管理 E2E 测试 `tests/e2e/us2_admin_device_monitor_manage_flow_test.go`
+- [x] T285 [P] 编写 US5 分销推广 E2E 测试 `tests/e2e/us5_distribution_flow_test.go`
+- [x] T286 [P] 编写 US6 财务结算 E2E 测试 `tests/e2e/us6_finance_settlement_flow_test.go`
+- [x] T287 [P] 编写 US7 营销优惠 E2E 测试 `tests/e2e/us7_marketing_flow_test.go`
+- [x] T288 [P] 编写 US8 会员体系 E2E 测试 `tests/e2e/us8_membership_flow_test.go`
 
 ### API 测试
 
-- [x] T276 编写 Auth API 测试 `tests/api/auth_api_test.go`
-- [x] T277 [P] 编写管理端 Auth API 测试 `tests/api/admin_auth_api_test.go`
-- [x] T278 [P] 编写 US1 租借 API 测试 `tests/api/us1_rental_api_test.go`
-- [x] T279 [P] 编写 US2 管理端设备/商户/场地 API 测试 `tests/api/{admin_device_api_test.go,us2_admin_merchant_venue_api_test.go}`
-- [x] T280 [P] 编写 US3 商城 API 测试 `tests/api/us3_mall_api_test.go`
-- [x] T281 [P] 编写 US4 酒店 API 测试 `tests/api/us4_hotel_api_test.go`
-- [x] T282 [P] 编写 US5 分销 API 测试 `tests/api/us5_distribution_api_test.go`
-- [x] T283 [P] 编写 US6 财务 API 测试 `tests/api/us6_finance_api_test.go`
-- [x] T284 [P] 编写 US7 营销 API 测试 `tests/api/us7_marketing_api_test.go`
-- [x] T285 [P] 编写 US8 会员（用户端/管理端）API 测试 `tests/api/{us8_member_api_test.go,us8_member_admin_api_test.go}`
-- [ ] T286 [P] 补齐内容/通知相关 API 测试（Banner/Article/Notification）`tests/api/*_test.go`
+- [x] T289 编写 Auth API 测试 `tests/api/auth_api_test.go`
+- [x] T290 [P] 编写管理端 Auth API 测试 `tests/api/admin_auth_api_test.go`
+- [x] T291 [P] 编写 US1 租借 API 测试 `tests/api/us1_rental_api_test.go`
+- [x] T292 [P] 编写 US2 管理端设备/商户/场地 API 测试 `tests/api/{admin_device_api_test.go,us2_admin_merchant_venue_api_test.go}`
+- [x] T293 [P] 编写 US3 商城 API 测试 `tests/api/us3_mall_api_test.go`
+- [x] T294 [P] 编写 US4 酒店 API 测试 `tests/api/us4_hotel_api_test.go`
+- [x] T295 [P] 编写 US5 分销 API 测试 `tests/api/us5_distribution_api_test.go`
+- [x] T296 [P] 编写 US6 财务 API 测试 `tests/api/us6_finance_api_test.go`
+- [x] T297 [P] 编写 US7 营销 API 测试 `tests/api/us7_marketing_api_test.go`
+- [x] T298 [P] 编写 US8 会员（用户端/管理端）API 测试 `tests/api/{us8_member_api_test.go,us8_member_admin_api_test.go}`
+- [x] T299 [P] 补齐内容/通知相关 API 测试（Banner/Article/Notification）`tests/api/*_test.go`
 
 ### 测试覆盖率报告
 
-- [x] T287 配置测试覆盖率收集和报告 `scripts/coverage.sh`
-- [x] T288 更新 Makefile 添加 `make test`, `make test-unit`, `make test-integration`, `make coverage` 命令
-- [x] T289 实现覆盖率门禁验证脚本 `scripts/coverage-gate.sh`，验证：（1）整体单元测试覆盖率 ≥ 80%；（2）关键业务模块（auth/payment/order/rental/booking）覆盖率 ≥ 90%；不满足条件时返回非零退出码阻止 CI/CD 流水线继续执行
-- [x] T290 跑通并达标覆盖率门禁：`make coverage-gate`（补齐缺失的单测/场景测试，直到满足阈值）
+- [x] T300 配置测试覆盖率收集和报告 `scripts/coverage.sh`
+- [x] T301 更新 Makefile 添加 `make test`, `make test-unit`, `make test-integration`, `make coverage` 命令
+- [x] T302 实现覆盖率门禁验证脚本 `scripts/coverage-gate.sh`，验证：（1）整体单元测试覆盖率 ≥ 80%；（2）关键业务模块（auth/payment/order/rental/booking）覆盖率 ≥ 90%；不满足条件时返回非零退出码阻止 CI/CD 流水线继续执行
+- [ ] T303 跑通并达标覆盖率门禁：`make coverage-gate`（补齐缺失的单测/场景测试，直到满足阈值）
+- [ ] T304 关键模块覆盖率冲刺：将 auth/payment/order/rental/booking 单测覆盖率提升到 ≥ 90%（以 `make coverage-gate` 为准）
+- [ ] T305 整体单测覆盖率冲刺：将 `make coverage` 覆盖率提升到 ≥ 80%（补齐低覆盖包：admin/user/mall/content/finance/repository/pkg 等）
 
 **Checkpoint**: 测试覆盖率达标（单测 > 80%，关键业务 > 90%）
 

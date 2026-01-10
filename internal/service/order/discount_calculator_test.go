@@ -149,7 +149,7 @@ func TestDiscountCalculator_CalculateOrderDiscount(t *testing.T) {
 		}
 		require.NoError(t, db.Create(userCoupon).Error)
 
-		result, err := calc.CalculateOrderDiscount(ctx, user.ID, models.CouponScopeAll, 100.0, nil)
+		result, err := calc.CalculateOrderDiscount(ctx, user.ID, models.OrderTypeMall, 100.0, nil)
 		require.NoError(t, err)
 		assert.Equal(t, 100.0, result.OriginalAmount)
 		assert.Equal(t, 15.0, result.CouponDiscount)
@@ -192,13 +192,13 @@ func TestDiscountCalculator_CalculateOrderDiscount(t *testing.T) {
 		require.NoError(t, db.Create(userCoupon2).Error)
 
 		// 指定使用第一张优惠券
-		result, err := calc.CalculateWithSpecificCoupon(ctx, user.ID, models.CouponScopeAll, 150.0, userCoupon1.ID)
+		result, err := calc.CalculateWithSpecificCoupon(ctx, user.ID, models.OrderTypeMall, 150.0, userCoupon1.ID)
 		require.NoError(t, err)
 
-		// 系统会选择最优优惠券(减20的)，如果用户指定了就用指定的
-		// 注意：当前实现中如果用户指定的优惠券不是最优的，仍会使用最优的
 		assert.Equal(t, 150.0, result.OriginalAmount)
-		assert.True(t, result.CouponDiscount > 0)
+		assert.Equal(t, 10.0, result.CouponDiscount)
+		assert.NotNil(t, result.UserCoupon)
+		assert.Equal(t, userCoupon1.ID, result.UserCoupon.ID)
 	})
 
 	t.Run("最终金额不为负", func(t *testing.T) {
@@ -218,7 +218,7 @@ func TestDiscountCalculator_CalculateOrderDiscount(t *testing.T) {
 		}
 		require.NoError(t, db.Create(userCoupon).Error)
 
-		result, err := calc.CalculateOrderDiscount(ctx, user.ID, models.CouponScopeAll, 30.0, nil)
+		result, err := calc.CalculateOrderDiscount(ctx, user.ID, models.OrderTypeMall, 30.0, nil)
 		require.NoError(t, err)
 		assert.Equal(t, 30.0, result.OriginalAmount)
 		// 优惠金额不能超过订单金额
@@ -242,7 +242,7 @@ func TestDiscountCalculator_PreviewDiscount(t *testing.T) {
 	t.Run("有满减活动时计算优惠", func(t *testing.T) {
 		// 创建满减活动
 		rules := models.JSON{
-			"conditions": []map[string]interface{}{
+			"rules": []map[string]interface{}{
 				{"min_amount": 100.0, "discount": 10.0},
 				{"min_amount": 200.0, "discount": 30.0},
 			},

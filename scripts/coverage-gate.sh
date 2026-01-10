@@ -29,12 +29,19 @@ NR == 1 { next } # mode line
 		if (!ok) next
 	}
 
-	stmts = $2 + 0
-	count = $3 + 0
-	total += stmts
-	if (count > 0) covered += stmts
+	# With -coverpkg and multi-package go test runs, coverprofiles may contain duplicate blocks.
+	# Deduplicate by block range ($1) + statement count ($2) and aggregate counts across duplicates.
+	key = $1 " " $2
+	if (!(key in stmt_map)) {
+		stmt_map[key] = ($2 + 0)
+	}
+	cnt_map[key] += ($3 + 0)
 }
 END {
+	for (k in stmt_map) {
+		total += stmt_map[k]
+		if (cnt_map[k] > 0) covered += stmt_map[k]
+	}
 	if (total == 0) {
 		printf "0.00 0 0\n"
 		exit 0

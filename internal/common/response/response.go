@@ -22,6 +22,14 @@ type PageData struct {
 	PageSize int         `json:"page_size"`
 }
 
+// ListData 列表数据结构 (Swagger文档使用)
+type ListData struct {
+	List     interface{} `json:"list"`
+	Total    int64       `json:"total"`
+	Page     int         `json:"page"`
+	PageSize int         `json:"page_size"`
+}
+
 // Success 成功响应
 func Success(c *gin.Context, data interface{}) {
 	c.JSON(http.StatusOK, Response{
@@ -57,6 +65,28 @@ func SuccessPage(c *gin.Context, list interface{}, total int64, page, pageSize i
 // SuccessWithPage 分页成功响应（别名）
 func SuccessWithPage(c *gin.Context, list interface{}, total int64, page, pageSize int) {
 	SuccessPage(c, list, total, page, pageSize)
+}
+
+// SuccessList 列表成功响应（支持可变参数）
+// 调用方式1: SuccessList(c, list, total) - 不带分页
+// 调用方式2: SuccessList(c, list, total, page, pageSize) - 带分页
+func SuccessList(c *gin.Context, list interface{}, total int64, pageInfo ...int) {
+	page := 1
+	pageSize := 20
+	if len(pageInfo) >= 2 {
+		page = pageInfo[0]
+		pageSize = pageInfo[1]
+	}
+	c.JSON(http.StatusOK, Response{
+		Code:    0,
+		Message: "success",
+		Data: ListData{
+			List:     list,
+			Total:    total,
+			Page:     page,
+			PageSize: pageSize,
+		},
+	})
 }
 
 // Error 错误响应

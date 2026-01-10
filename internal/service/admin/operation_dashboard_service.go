@@ -237,11 +237,11 @@ func (s *OperationDashboardService) GetCouponUsageStats(ctx context.Context, lim
 			CouponName:  coupon.Name,
 			Type:        coupon.Type,
 			TotalCount:  int64(coupon.TotalCount),
-			IssuedCount: int64(coupon.IssuedCount),
+			IssuedCount: int64(coupon.ReceivedCount),
 			UsedCount:   int64(coupon.UsedCount),
 		}
-		if coupon.IssuedCount > 0 {
-			results[i].UsageRate = float64(coupon.UsedCount) / float64(coupon.IssuedCount) * 100
+		if coupon.ReceivedCount > 0 {
+			results[i].UsageRate = float64(coupon.UsedCount) / float64(coupon.ReceivedCount) * 100
 		}
 	}
 
@@ -332,8 +332,8 @@ func (s *OperationDashboardService) GetDistributorRank(ctx context.Context, limi
 			TeamCount:       d.TeamCount,
 			TotalCommission: d.TotalCommission,
 		}
-		if d.User != nil {
-			results[i].UserPhone = d.User.Phone
+		if d.User != nil && d.User.Phone != nil {
+			results[i].UserPhone = *d.User.Phone
 		}
 
 		// 获取本月佣金

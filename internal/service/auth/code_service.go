@@ -114,7 +114,7 @@ func (s *CodeService) SendCode(ctx context.Context, phone string, codeType CodeT
 
 	// 发送短信
 	templateCode := s.getTemplateCode(codeType)
-	if err := s.smsSender.SendCode(ctx, phone, code, templateCode); err != nil {
+	if err := s.smsSender.Send(ctx, phone, string(templateCode), map[string]string{"code": code}); err != nil {
 		// 发送失败，删除存储的验证码
 		s.redis.Del(ctx, codeKey)
 		return fmt.Errorf("failed to send sms: %w", err)

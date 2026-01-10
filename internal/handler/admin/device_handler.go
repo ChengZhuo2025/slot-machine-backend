@@ -102,8 +102,8 @@ func (h *DeviceHandler) Update(c *gin.Context) {
 	response.Success(c, nil)
 }
 
-// UpdateStatusRequest 更新状态请求
-type UpdateStatusRequest struct {
+// DeviceUpdateStatusRequest 更新设备状态请求
+type DeviceUpdateStatusRequest struct {
 	Status int8 `json:"status" binding:"oneof=0 1 2 3"`
 }
 
@@ -114,7 +114,7 @@ type UpdateStatusRequest struct {
 // @Produce json
 // @Security Bearer
 // @Param id path int true "设备ID"
-// @Param request body UpdateStatusRequest true "请求参数"
+// @Param request body DeviceUpdateStatusRequest true "请求参数"
 // @Success 200 {object} response.Response
 // @Router /admin/devices/{id}/status [put]
 func (h *DeviceHandler) UpdateStatus(c *gin.Context) {
@@ -131,7 +131,7 @@ func (h *DeviceHandler) UpdateStatus(c *gin.Context) {
 		return
 	}
 
-	var req UpdateStatusRequest
+	var req DeviceUpdateStatusRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, "参数错误")
 		return

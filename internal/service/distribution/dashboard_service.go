@@ -270,14 +270,14 @@ func (s *DashboardService) GetRecentCommissions(ctx context.Context, distributor
 			OrderAmount: commission.OrderAmount,
 			Rate:        commission.Rate,
 			Amount:      commission.Amount,
-			Status:      commission.Status,
+			Status:      int8(commission.Status),
 			CreatedAt:   commission.CreatedAt,
 		}
 		if commission.Order != nil {
 			results[i].OrderNo = commission.Order.OrderNo
 		}
-		if commission.FromUser != nil {
-			results[i].FromUserPhone = commission.FromUser.Phone
+		if commission.FromUser != nil && commission.FromUser.Phone != nil {
+			results[i].FromUserPhone = *commission.FromUser.Phone
 		}
 	}
 

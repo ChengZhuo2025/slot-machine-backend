@@ -95,7 +95,7 @@ func setupRouter(
 	memberPackageRepo := repository.NewMemberPackageRepository(db)
 
 	// 初始化外部服务客户端
-	smsClient := sms.NewMockClient(cfg.SMS.SignName) // 开发环境使用 Mock，生产环境使用阿里云
+	smsClient := sms.NewMockSender() // 开发环境使用 Mock，生产环境使用阿里云
 	wechatPayClient, _ := wechatpay.NewClient(&wechatpay.Config{})
 
 	// 初始化服务

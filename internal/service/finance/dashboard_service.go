@@ -401,8 +401,8 @@ func (s *FinanceDashboardService) GetPendingWithdrawals(ctx context.Context, lim
 			WithdrawTo:   w.WithdrawTo,
 			CreatedAt:    w.CreatedAt,
 		}
-		if w.User != nil {
-			results[i].UserPhone = w.User.Phone
+		if w.User != nil && w.User.Phone != nil {
+			results[i].UserPhone = *w.User.Phone
 		}
 	}
 

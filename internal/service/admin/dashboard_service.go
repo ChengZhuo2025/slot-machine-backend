@@ -114,7 +114,7 @@ func (s *DashboardService) GetPlatformOverview(ctx context.Context) (*PlatformOv
 		Where("online_status = ?", models.DeviceOffline).
 		Count(&overview.OfflineDevices)
 	s.db.WithContext(ctx).Model(&models.Device{}).
-		Where("status = ?", models.DeviceStatusFaulty).
+		Where("status = ?", models.DeviceStatusFault).
 		Count(&overview.FaultyDevices)
 
 	// 商户统计
@@ -240,13 +240,13 @@ func (s *DashboardService) GetDeviceStatusSummary(ctx context.Context) ([]Device
 	// 设备状态
 	var normalCount, maintainCount, faultyCount int64
 	s.db.WithContext(ctx).Model(&models.Device{}).
-		Where("status = ?", models.DeviceStatusNormal).
+		Where("status = ?", models.DeviceStatusActive).
 		Count(&normalCount)
 	s.db.WithContext(ctx).Model(&models.Device{}).
 		Where("status = ?", models.DeviceStatusMaintenance).
 		Count(&maintainCount)
 	s.db.WithContext(ctx).Model(&models.Device{}).
-		Where("status = ?", models.DeviceStatusFaulty).
+		Where("status = ?", models.DeviceStatusFault).
 		Count(&faultyCount)
 
 	results = append(results,
@@ -258,7 +258,7 @@ func (s *DashboardService) GetDeviceStatusSummary(ctx context.Context) ([]Device
 	// 租借状态
 	var idleCount, inUseCount int64
 	s.db.WithContext(ctx).Model(&models.Device{}).
-		Where("rental_status = ?", models.DeviceRentalIdle).
+		Where("rental_status = ?", models.DeviceRentalFree).
 		Count(&idleCount)
 	s.db.WithContext(ctx).Model(&models.Device{}).
 		Where("rental_status = ?", models.DeviceRentalInUse).
@@ -327,7 +327,7 @@ func (s *DashboardService) GetTopVenues(ctx context.Context, limit int, startDat
 		`).
 		Joins("JOIN devices d ON r.device_id = d.id").
 		Joins("JOIN venues v ON d.venue_id = v.id").
-		Where("r.status != ?", models.RentalStatusPendingUnlock).
+		Where("r.status != ?", models.RentalStatusPaid).
 		Group("d.venue_id, v.name, v.merchant_id").
 		Order("revenue DESC").
 		Limit(limit)
@@ -383,8 +383,8 @@ func (s *DashboardService) GetRecentOrders(ctx context.Context, limit int) ([]Re
 			Status:    order.Status,
 			CreatedAt: order.CreatedAt,
 		}
-		if order.User != nil {
-			results[i].UserPhone = order.User.Phone
+		if order.User != nil && order.User.Phone != nil {
+			results[i].UserPhone = *order.User.Phone
 		}
 	}
 
@@ -412,7 +412,7 @@ func (s *DashboardService) GetAlerts(ctx context.Context, limit int) ([]AlertInf
 	// 查询离线设备告警
 	var offlineDevices []models.Device
 	err := s.db.WithContext(ctx).Model(&models.Device{}).
-		Where("online_status = ? AND status = ?", models.DeviceOffline, models.DeviceStatusNormal).
+		Where("online_status = ? AND status = ?", models.DeviceOffline, models.DeviceStatusActive).
 		Where("last_heartbeat_at < ?", time.Now().Add(-10*time.Minute)).
 		Limit(5).
 		Find(&offlineDevices).Error
@@ -433,7 +433,7 @@ func (s *DashboardService) GetAlerts(ctx context.Context, limit int) ([]AlertInf
 	// 查询故障设备告警
 	var faultyDevices []models.Device
 	err = s.db.WithContext(ctx).Model(&models.Device{}).
-		Where("status = ?", models.DeviceStatusFaulty).
+		Where("status = ?", models.DeviceStatusFault).
 		Limit(5).
 		Find(&faultyDevices).Error
 
@@ -453,7 +453,7 @@ func (s *DashboardService) GetAlerts(ctx context.Context, limit int) ([]AlertInf
 	// 查询超时租借告警
 	var overtimeRentals []models.Rental
 	err = s.db.WithContext(ctx).Model(&models.Rental{}).
-		Where("status = ?", models.RentalStatusOvertime).
+		Where("status = ?", models.RentalStatusOverdue).
 		Limit(5).
 		Find(&overtimeRentals).Error
 

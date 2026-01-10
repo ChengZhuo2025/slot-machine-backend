@@ -201,7 +201,8 @@ SWAG ?= $(shell go env GOPATH)/bin/swag
 
 swagger: ## Generate swagger documentation
 	@echo "Generating swagger documentation..."
-	$(SWAG) init --parseInternal --parseDependency --dir ./cmd/api-gateway,./internal/handler -g main.go -o docs
+	@mkdir -p .cache/go-build
+	GOCACHE=$(CURDIR)/.cache/go-build $(SWAG) init --parseInternal --parseDependency --packagePrefix github.com/dumeirei/smart-locker-backend --dir ./cmd/api-gateway,./internal/handler -g main.go -o docs
 
 # =========================================
 # Clean

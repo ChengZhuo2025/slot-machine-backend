@@ -678,12 +678,12 @@
 ### 单元测试 - 核心业务
 
 - [x] T243 [P] 编写 auth_service 单元测试 `internal/service/auth/auth_service_test.go`
-- [ ] T244 [P] 补齐验证码发送/校验单元测试（频率限制/每日上限/发送失败回滚/一次性校验）`internal/service/auth/code_service_test.go`
-- [ ] T245 [P] 补齐微信登录/绑定手机号单元测试（code2Session 成功/失败、老用户更新/新用户创建、邀请码、绑定手机号冲突）`internal/service/auth/wechat_service_test.go`
+- [x] T244 [P] 补齐验证码发送/校验单元测试（频率限制/每日上限/发送失败回滚/一次性校验）`internal/service/auth/code_service_test.go`
+- [x] T245 [P] 补齐微信登录/绑定手机号单元测试（code2Session 成功/失败、老用户更新/新用户创建、邀请码、绑定手机号冲突）`internal/service/auth/wechat_service_test.go`
 - [x] T246 [P] 编写 rental_service 单元测试 `internal/service/rental/rental_service_test.go`
-- [ ] T247 [P] 补齐租借核心流程边界测试（CancelRental/GetRental/ListRentals/GenerateRentalNo/超时与异常分支）`internal/service/rental/rental_service_test.go`
+- [x] T247 [P] 补齐租借核心流程边界测试（CancelRental/GetRental/ListRentals/GenerateRentalNo/超时与异常分支）`internal/service/rental/{rental_service_test.go,rental_service_extra_test.go}`
 - [x] T248 [P] 编写 payment_service 单元测试 `internal/service/payment/payment_service_test.go`
-- [ ] T249 [P] 补齐支付回调与状态机单元测试（HandlePaymentCallback、重复回调幂等、失败分支）`internal/service/payment/payment_service_test.go`
+- [x] T249 [P] 补齐支付回调与状态机单元测试（HandlePaymentCallback、重复回调幂等、失败分支）`internal/service/payment/payment_service_test.go`
 - [x] T250 [P] 编写订单域相关单元测试 `internal/service/order/{refund_service_test.go,member_discount_test.go,points_hook_test.go,order_complete_hook_test.go}`
 - [x] T251 [P] 补齐 order_service 主流程单元测试 `internal/service/order/discount_calculator_test.go`
 - [ ] T252 [P] 补齐订单折扣/积分/退款关键分支（CalculateWithMemberDiscount、积分Hook组合器、退款审核通过/拒绝/列表/详情）`internal/service/order/{member_discount_test.go,points_hook_test.go,refund_service_test.go}`

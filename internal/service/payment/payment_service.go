@@ -43,21 +43,21 @@ func NewPaymentService(
 
 // CreatePaymentRequest 创建支付请求
 type CreatePaymentRequest struct {
-	OrderID       int64   `json:"order_id" binding:"required"`
-	OrderNo       string  `json:"order_no" binding:"required"`
-	OrderType     string  `json:"order_type" binding:"required"` // rental, order
-	Amount        float64 `json:"amount" binding:"required"`
-	PaymentMethod string  `json:"payment_method" binding:"required"`
-	PaymentChannel string `json:"payment_channel" binding:"required"`
-	OpenID        string  `json:"openid,omitempty"`
-	Description   string  `json:"description,omitempty"`
+	OrderID        int64   `json:"order_id" binding:"required"`
+	OrderNo        string  `json:"order_no" binding:"required"`
+	OrderType      string  `json:"order_type" binding:"required"` // rental, order
+	Amount         float64 `json:"amount" binding:"required"`
+	PaymentMethod  string  `json:"payment_method" binding:"required"`
+	PaymentChannel string  `json:"payment_channel" binding:"required"`
+	OpenID         string  `json:"openid,omitempty"`
+	Description    string  `json:"description,omitempty"`
 }
 
 // CreatePaymentResponse 创建支付响应
 type CreatePaymentResponse struct {
-	PaymentNo string                       `json:"payment_no"`
+	PaymentNo string                          `json:"payment_no"`
 	PayParams *wechatpay.UnifiedOrderResponse `json:"pay_params,omitempty"`
-	ExpiredAt time.Time                    `json:"expired_at"`
+	ExpiredAt time.Time                       `json:"expired_at"`
 }
 
 // CreatePayment 创建支付
@@ -137,9 +137,9 @@ func (s *PaymentService) HandlePaymentCallback(ctx context.Context, payload []by
 	}
 
 	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		// 获取支付记录
-		payment, err := s.paymentRepo.GetByPaymentNo(ctx, resource.OutTradeNo)
-		if err != nil {
+		// 获取支付记录（在事务内使用 tx，确保一致性）
+		var payment models.Payment
+		if err := tx.WithContext(ctx).Where("payment_no = ?", resource.OutTradeNo).First(&payment).Error; err != nil {
 			if err == gorm.ErrRecordNotFound {
 				return errors.ErrPaymentNotFound
 			}
@@ -170,7 +170,7 @@ func (s *PaymentService) HandlePaymentCallback(ctx context.Context, payload []by
 			payment.ErrorMessage = &errMsg
 		}
 
-		if err := tx.Save(payment).Error; err != nil {
+		if err := tx.Save(&payment).Error; err != nil {
 			return errors.ErrDatabaseError.WithError(err)
 		}
 
@@ -178,7 +178,7 @@ func (s *PaymentService) HandlePaymentCallback(ctx context.Context, payload []by
 		if payment.Status == models.PaymentStatusSuccess {
 			// 更新租借订单状态
 			if err := tx.Model(&models.Rental{}).
-				Where("rental_no = ?", payment.OrderNo).
+				Where("order_id = ?", payment.OrderID).
 				Update("status", models.RentalStatusPaid).Error; err != nil {
 				return errors.ErrDatabaseError.WithError(err)
 			}

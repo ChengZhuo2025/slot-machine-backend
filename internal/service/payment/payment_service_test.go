@@ -3,6 +3,7 @@ package payment
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -12,8 +13,10 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
+	appErrors "github.com/dumeirei/smart-locker-backend/internal/common/errors"
 	"github.com/dumeirei/smart-locker-backend/internal/models"
 	"github.com/dumeirei/smart-locker-backend/internal/repository"
+	"github.com/dumeirei/smart-locker-backend/pkg/wechatpay"
 )
 
 // setupTestDB 创建测试数据库
@@ -336,4 +339,235 @@ func TestPaymentService_toPaymentInfo(t *testing.T) {
 	assert.Equal(t, "支付成功", info.StatusName)
 	assert.Equal(t, &transactionID, info.TransactionID)
 	assert.NotNil(t, info.PaidAt)
+}
+
+func TestPaymentService_HandlePaymentCallback(t *testing.T) {
+	ctx := context.Background()
+
+	t.Run("wechat client not initialized", func(t *testing.T) {
+		svc := setupTestPaymentService(t)
+		err := svc.HandlePaymentCallback(ctx, []byte(`{}`))
+		require.Error(t, err)
+		var appErr *appErrors.AppError
+		require.ErrorAs(t, err, &appErr)
+		assert.Equal(t, appErrors.ErrPaymentCallbackError.Code, appErr.Code)
+	})
+
+	t.Run("invalid payload", func(t *testing.T) {
+		svc := setupTestPaymentService(t)
+		wp, err := wechatpay.NewClient(&wechatpay.Config{})
+		require.NoError(t, err)
+		svc.wechatPay = wp
+
+		err = svc.HandlePaymentCallback(ctx, []byte(`not-json`))
+		require.Error(t, err)
+		var appErr *appErrors.AppError
+		require.ErrorAs(t, err, &appErr)
+		assert.Equal(t, appErrors.ErrPaymentCallbackError.Code, appErr.Code)
+	})
+
+	t.Run("payment not found", func(t *testing.T) {
+		svc := setupTestPaymentService(t)
+		wp, err := wechatpay.NewClient(&wechatpay.Config{})
+		require.NoError(t, err)
+		svc.wechatPay = wp
+
+		resource := map[string]any{
+			"out_trade_no":   "P_NOT_EXISTS",
+			"transaction_id": "wx_txn",
+			"trade_type":     "JSAPI",
+			"trade_state":    wechatpay.TradeStateSuccess,
+			"success_time":   time.Now().Format(time.RFC3339),
+			"payer":          map[string]any{"openid": "o_x"},
+			"amount":         map[string]any{"total": 6000, "payer_total": 6000, "currency": "CNY"},
+		}
+		payload, _ := json.Marshal(map[string]any{
+			"id":            "1",
+			"create_time":   time.Now().Format(time.RFC3339),
+			"resource_type": "encrypt-resource",
+			"event_type":    "TRANSACTION.SUCCESS",
+			"summary":       "ok",
+			"resource":      resource,
+		})
+
+		err = svc.HandlePaymentCallback(ctx, payload)
+		require.Error(t, err)
+		var appErr *appErrors.AppError
+		require.ErrorAs(t, err, &appErr)
+		assert.Equal(t, appErrors.ErrPaymentNotFound.Code, appErr.Code)
+	})
+
+	t.Run("success callback updates payment and rental, duplicate is idempotent", func(t *testing.T) {
+		svc := setupTestPaymentService(t)
+		user := createTestUser(t, svc.db)
+		wp, err := wechatpay.NewClient(&wechatpay.Config{})
+		require.NoError(t, err)
+		svc.wechatPay = wp
+
+		payment := &models.Payment{
+			PaymentNo:      "P_CB_SUCCESS",
+			OrderID:        1001,
+			OrderNo:        "O1001",
+			UserID:         user.ID,
+			Amount:         60.0,
+			PaymentMethod:  models.PaymentMethodWechat,
+			PaymentChannel: models.PaymentChannelMiniProgram,
+			Status:         models.PaymentStatusPending,
+		}
+		require.NoError(t, svc.db.Create(payment).Error)
+		require.NoError(t, svc.db.Create(&models.Rental{
+			OrderID:       payment.OrderID,
+			UserID:        user.ID,
+			DeviceID:      1,
+			DurationHours: 1,
+			RentalFee:     10,
+			Deposit:       50,
+			OvertimeRate:  1.5,
+			OvertimeFee:   0,
+			Status:        models.RentalStatusPending,
+		}).Error)
+
+		resource := map[string]any{
+			"out_trade_no":   payment.PaymentNo,
+			"transaction_id": "wx_txn_1",
+			"trade_type":     "JSAPI",
+			"trade_state":    wechatpay.TradeStateSuccess,
+			"success_time":   time.Now().Format(time.RFC3339),
+			"payer":          map[string]any{"openid": "o_x"},
+			"amount":         map[string]any{"total": 6000, "payer_total": 6000, "currency": "CNY"},
+		}
+		payload, _ := json.Marshal(map[string]any{
+			"id":            "1",
+			"create_time":   time.Now().Format(time.RFC3339),
+			"resource_type": "encrypt-resource",
+			"event_type":    "TRANSACTION.SUCCESS",
+			"summary":       "ok",
+			"resource":      resource,
+		})
+
+		require.NoError(t, svc.HandlePaymentCallback(ctx, payload))
+
+		var updated models.Payment
+		require.NoError(t, svc.db.Where("payment_no = ?", payment.PaymentNo).First(&updated).Error)
+		assert.EqualValues(t, models.PaymentStatusSuccess, updated.Status)
+		require.NotNil(t, updated.TransactionID)
+		assert.Equal(t, "wx_txn_1", *updated.TransactionID)
+		require.NotNil(t, updated.PaidAt)
+
+		var rental models.Rental
+		require.NoError(t, svc.db.Where("order_id = ?", payment.OrderID).First(&rental).Error)
+		assert.Equal(t, models.RentalStatusPaid, rental.Status)
+
+		// duplicate callback is idempotent
+		require.NoError(t, svc.HandlePaymentCallback(ctx, payload))
+	})
+
+	t.Run("amount mismatch returns callback error and does not update payment", func(t *testing.T) {
+		svc := setupTestPaymentService(t)
+		user := createTestUser(t, svc.db)
+		wp, err := wechatpay.NewClient(&wechatpay.Config{})
+		require.NoError(t, err)
+		svc.wechatPay = wp
+
+		payment := &models.Payment{
+			PaymentNo:      "P_CB_MISMATCH",
+			OrderID:        1002,
+			OrderNo:        "O1002",
+			UserID:         user.ID,
+			Amount:         60.0,
+			PaymentMethod:  models.PaymentMethodWechat,
+			PaymentChannel: models.PaymentChannelMiniProgram,
+			Status:         models.PaymentStatusPending,
+		}
+		require.NoError(t, svc.db.Create(payment).Error)
+
+		resource := map[string]any{
+			"out_trade_no":   payment.PaymentNo,
+			"transaction_id": "wx_txn_2",
+			"trade_type":     "JSAPI",
+			"trade_state":    wechatpay.TradeStateSuccess,
+			"success_time":   time.Now().Format(time.RFC3339),
+			"payer":          map[string]any{"openid": "o_x"},
+			"amount":         map[string]any{"total": 6100, "payer_total": 6100, "currency": "CNY"},
+		}
+		payload, _ := json.Marshal(map[string]any{
+			"id":            "1",
+			"create_time":   time.Now().Format(time.RFC3339),
+			"resource_type": "encrypt-resource",
+			"event_type":    "TRANSACTION.SUCCESS",
+			"summary":       "ok",
+			"resource":      resource,
+		})
+
+		err = svc.HandlePaymentCallback(ctx, payload)
+		require.Error(t, err)
+		var appErr *appErrors.AppError
+		require.ErrorAs(t, err, &appErr)
+		assert.Equal(t, appErrors.ErrPaymentCallbackError.Code, appErr.Code)
+
+		var updated models.Payment
+		require.NoError(t, svc.db.Where("payment_no = ?", payment.PaymentNo).First(&updated).Error)
+		assert.EqualValues(t, models.PaymentStatusPending, updated.Status)
+	})
+
+	t.Run("failed trade state sets payment failed and does not update rental", func(t *testing.T) {
+		svc := setupTestPaymentService(t)
+		user := createTestUser(t, svc.db)
+		wp, err := wechatpay.NewClient(&wechatpay.Config{})
+		require.NoError(t, err)
+		svc.wechatPay = wp
+
+		payment := &models.Payment{
+			PaymentNo:      "P_CB_FAIL",
+			OrderID:        1003,
+			OrderNo:        "O1003",
+			UserID:         user.ID,
+			Amount:         60.0,
+			PaymentMethod:  models.PaymentMethodWechat,
+			PaymentChannel: models.PaymentChannelMiniProgram,
+			Status:         models.PaymentStatusPending,
+		}
+		require.NoError(t, svc.db.Create(payment).Error)
+		require.NoError(t, svc.db.Create(&models.Rental{
+			OrderID:       payment.OrderID,
+			UserID:        user.ID,
+			DeviceID:      1,
+			DurationHours: 1,
+			RentalFee:     10,
+			Deposit:       50,
+			OvertimeRate:  1.5,
+			OvertimeFee:   0,
+			Status:        models.RentalStatusPending,
+		}).Error)
+
+		resource := map[string]any{
+			"out_trade_no":   payment.PaymentNo,
+			"transaction_id": "wx_txn_3",
+			"trade_type":     "JSAPI",
+			"trade_state":    wechatpay.TradeStateClosed,
+			"success_time":   time.Now().Format(time.RFC3339),
+			"payer":          map[string]any{"openid": "o_x"},
+			"amount":         map[string]any{"total": 6000, "payer_total": 6000, "currency": "CNY"},
+		}
+		payload, _ := json.Marshal(map[string]any{
+			"id":            "1",
+			"create_time":   time.Now().Format(time.RFC3339),
+			"resource_type": "encrypt-resource",
+			"event_type":    "TRANSACTION.SUCCESS",
+			"summary":       "ok",
+			"resource":      resource,
+		})
+
+		require.NoError(t, svc.HandlePaymentCallback(ctx, payload))
+
+		var updated models.Payment
+		require.NoError(t, svc.db.Where("payment_no = ?", payment.PaymentNo).First(&updated).Error)
+		assert.EqualValues(t, models.PaymentStatusFailed, updated.Status)
+		require.NotNil(t, updated.ErrorMessage)
+		assert.Equal(t, wechatpay.TradeStateClosed, *updated.ErrorMessage)
+
+		var rental models.Rental
+		require.NoError(t, svc.db.Where("order_id = ?", payment.OrderID).First(&rental).Error)
+		assert.Equal(t, models.RentalStatusPending, rental.Status)
+	})
 }

@@ -14,10 +14,19 @@ import (
 
 // CodeService 验证码服务
 type CodeService struct {
-	redis     *redis.Client
+	redis     redisCmdable
 	smsSender sms.Sender
 	codeLen   int
 	expireIn  time.Duration
+}
+
+type redisCmdable interface {
+	Exists(ctx context.Context, keys ...string) *redis.IntCmd
+	Incr(ctx context.Context, key string) *redis.IntCmd
+	ExpireAt(ctx context.Context, key string, tm time.Time) *redis.BoolCmd
+	Set(ctx context.Context, key string, value interface{}, expiration time.Duration) *redis.StatusCmd
+	Del(ctx context.Context, keys ...string) *redis.IntCmd
+	Get(ctx context.Context, key string) *redis.StringCmd
 }
 
 // CodeType 验证码类型
@@ -45,12 +54,12 @@ func DefaultCodeServiceConfig() *CodeServiceConfig {
 }
 
 // NewCodeService 创建验证码服务
-func NewCodeService(redis *redis.Client, smsSender sms.Sender, cfg *CodeServiceConfig) *CodeService {
+func NewCodeService(store redisCmdable, smsSender sms.Sender, cfg *CodeServiceConfig) *CodeService {
 	if cfg == nil {
 		cfg = DefaultCodeServiceConfig()
 	}
 	return &CodeService{
-		redis:     redis,
+		redis:     store,
 		smsSender: smsSender,
 		codeLen:   cfg.CodeLength,
 		expireIn:  cfg.ExpireIn,

@@ -129,8 +129,8 @@ func (c *MockClient) SendNotification(ctx context.Context, phone string, templat
 	return nil
 }
 
-// Sender 短信发送接口
-type Sender interface {
+// SMSSender 短信发送接口（aliyun.go）
+type SMSSender interface {
 	SendCode(ctx context.Context, phone string, code string, templateCode TemplateCode) error
 	SendNotification(ctx context.Context, phone string, templateCode TemplateCode, params map[string]string) error
 }

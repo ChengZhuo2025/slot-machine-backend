@@ -13,7 +13,7 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -138,7 +138,8 @@ func (t *Tracer) Shutdown(ctx context.Context) error {
 // Start 开始一个新的 span
 func (t *Tracer) Start(ctx context.Context, spanName string, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
 	if t.tracer == nil {
-		return ctx, noopSpan{}
+		// 返回上下文中的空 span（使用 OpenTelemetry 内置的 noop span）
+		return ctx, trace.SpanFromContext(ctx)
 	}
 	return t.tracer.Start(ctx, spanName, opts...)
 }
@@ -146,7 +147,8 @@ func (t *Tracer) Start(ctx context.Context, spanName string, opts ...trace.SpanS
 // StartSpan 开始一个带属性的 span
 func (t *Tracer) StartSpan(ctx context.Context, name string, attrs ...attribute.KeyValue) (context.Context, trace.Span) {
 	if t.tracer == nil {
-		return ctx, noopSpan{}
+		// 返回上下文中的空 span（使用 OpenTelemetry 内置的 noop span）
+		return ctx, trace.SpanFromContext(ctx)
 	}
 	return t.tracer.Start(ctx, name, trace.WithAttributes(attrs...))
 }
@@ -173,20 +175,6 @@ func SetAttributes(ctx context.Context, attrs ...attribute.KeyValue) {
 	span := trace.SpanFromContext(ctx)
 	span.SetAttributes(attrs...)
 }
-
-// noopSpan 空操作 span（追踪未启用时使用）
-type noopSpan struct{}
-
-func (noopSpan) End(...trace.SpanEndOption)                                 {}
-func (noopSpan) AddEvent(string, ...trace.EventOption)                      {}
-func (noopSpan) IsRecording() bool                                           { return false }
-func (noopSpan) RecordError(error, ...trace.EventOption)                    {}
-func (noopSpan) SpanContext() trace.SpanContext                              { return trace.SpanContext{} }
-func (noopSpan) SetStatus(trace.Status)                                      {}
-func (noopSpan) SetName(string)                                              {}
-func (noopSpan) SetAttributes(...attribute.KeyValue)                         {}
-func (noopSpan) TracerProvider() trace.TracerProvider                        { return nil }
-func (noopSpan) AddLink(trace.Link)                                          {}
 
 // 常用属性键
 var (

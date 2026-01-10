@@ -90,6 +90,7 @@ func TestOrderAdminService_List(t *testing.T) {
 		results, total, err := service.List(ctx, 1, 10, filters)
 		require.NoError(t, err)
 		assert.Equal(t, int64(4), total)
+		assert.Len(t, results, 4)
 	})
 
 	t.Run("按类型筛选", func(t *testing.T) {
@@ -97,6 +98,7 @@ func TestOrderAdminService_List(t *testing.T) {
 		results, total, err := service.List(ctx, 1, 10, filters)
 		require.NoError(t, err)
 		assert.Equal(t, int64(2), total)
+		assert.Len(t, results, 2)
 	})
 
 	t.Run("按状态筛选", func(t *testing.T) {
@@ -104,6 +106,7 @@ func TestOrderAdminService_List(t *testing.T) {
 		results, total, err := service.List(ctx, 1, 10, filters)
 		require.NoError(t, err)
 		assert.Equal(t, int64(1), total)
+		assert.Len(t, results, 1)
 	})
 
 	t.Run("按用户ID筛选", func(t *testing.T) {
@@ -111,6 +114,7 @@ func TestOrderAdminService_List(t *testing.T) {
 		results, total, err := service.List(ctx, 1, 10, filters)
 		require.NoError(t, err)
 		assert.Equal(t, int64(4), total)
+		assert.Len(t, results, 4)
 	})
 
 	t.Run("分页", func(t *testing.T) {

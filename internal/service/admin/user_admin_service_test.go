@@ -93,6 +93,7 @@ func TestUserAdminService_List(t *testing.T) {
 		results, total, err := service.List(ctx, 1, 10, filters)
 		require.NoError(t, err)
 		assert.Equal(t, int64(3), total)
+		assert.Len(t, results, 3)
 	})
 
 	t.Run("按状态筛选", func(t *testing.T) {
@@ -101,6 +102,7 @@ func TestUserAdminService_List(t *testing.T) {
 		results, total, err := service.List(ctx, 1, 10, filters)
 		require.NoError(t, err)
 		assert.Equal(t, int64(4), total)
+		assert.Len(t, results, 4)
 	})
 
 	t.Run("分页", func(t *testing.T) {
@@ -284,7 +286,12 @@ func TestUserAdminService_GetStatistics(t *testing.T) {
 		Status:        models.UserStatusDisabled,
 		MemberLevelID: 1,
 	}
-	db.Create(disabledUser)
+	require.NoError(t, db.Create(disabledUser).Error)
+	// With `default` tags, GORM can override/omit zero-values on Create; force status to disabled.
+	require.NoError(t, db.Model(&models.User{}).Where("id = ?", disabledUser.ID).Update("status", models.UserStatusDisabled).Error)
+	var disabled models.User
+	require.NoError(t, db.First(&disabled, disabledUser.ID).Error)
+	require.Equal(t, int8(models.UserStatusDisabled), disabled.Status)
 
 	stats, err := service.GetStatistics(ctx)
 	require.NoError(t, err)

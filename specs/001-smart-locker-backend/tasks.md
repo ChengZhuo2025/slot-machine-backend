@@ -581,6 +581,29 @@
 
 ---
 
+### 如何生成“测试覆盖率报告”
+
+- 生成单元测试覆盖率报告（默认统计 `./internal/...` + `./pkg/...`，输出 HTML 报告）：
+  - `make coverage`
+  - 产物：`coverage.out`、`coverage.html`
+  - 查看：`open coverage.html`（macOS）/ `xdg-open coverage.html`（Linux）/ 直接用浏览器打开
+  - 命令行摘要：`go tool cover -func=coverage.out | tail -n 20`
+- 运行覆盖率门禁（用于 CI/CD；默认运行带 tag 的 `api,e2e` 测试并统计关键模块覆盖率）：
+  - `make coverage-gate`
+  - 可通过环境变量调整：`OVERALL_MIN`、`KEY_MODULE_MIN`、`GO_TEST_TAGS`、`GO_TEST_TARGETS`、`COVERPKG`
+
+> 说明：`scripts/coverage.sh` 会把 `GOCACHE` 指向仓库内的 `.gocache/`，避免在受限环境下写入系统缓存目录导致权限问题。
+
+### 当前测试资产盘点（已创建）
+
+- 业务单元测试（in-package）：`internal/service/{admin,auth,content,device,distribution,hotel,mall,order,payment,rental,user}/*_test.go`
+- Repository 单元测试：仅 `internal/repository/{admin_repo,rental_repo,user_repo}_test.go` 已存在，其余 repo 暂缺
+- 端到端/场景测试：
+  - API 测试：`tests/api/*_test.go`（`//go:build api`）
+  - 集成测试：`tests/integration/*_test.go`（`//go:build integration`）
+  - E2E 测试：`tests/e2e/*_test.go`（`//go:build e2e`）
+  - 额外单测（tests 目录内）：`tests/unit/*_test.go`（无 build tag）
+
 ## ⚠️ CRITICAL: Model开发验证Checklist
 
 **所有涉及Model开发的任务必须遵循以下Checklist，在PR提交前逐项检查：**
@@ -636,7 +659,7 @@
 ### 测试基础设施
 
 - [x] T240 配置测试框架和 mock 工具 `tests/setup_test.go`
-- [x] T241 [P] 配置 testcontainers-go 集成测试环境 `tests/integration/testcontainers.go`
+- [ ] T241 [P] 配置 testcontainers-go 集成测试环境 `tests/integration/testcontainers.go`（当前集成测试主要使用 sqlite in-memory，可后续补齐 Postgres/Redis 容器化测试）
 - [x] T242 [P] 创建测试工具函数（数据库清理、mock 数据生成）`tests/helpers/`
 
 ### 单元测试 - 核心业务
@@ -644,46 +667,66 @@
 - [x] T243 [P] 编写 auth_service 单元测试 `internal/service/auth/auth_service_test.go`
 - [x] T244 [P] 编写 rental_service 单元测试 `internal/service/rental/rental_service_test.go`
 - [x] T245 [P] 编写 payment_service 单元测试 `internal/service/payment/payment_service_test.go`
-- [x] T246 [P] 编写 order_service 单元测试 `internal/service/order/order_service_test.go`
-- [x] T247 [P] 编写 booking_service 单元测试 `internal/service/hotel/booking_service_test.go`
-- [x] T248 [P] 编写 commission_service 单元测试 `internal/service/distribution/commission_service_test.go`
-- [x] T249 [P] 编写 wallet_service 单元测试 `internal/service/user/wallet_service_test.go`
-- [x] T250 [P] 编写 coupon_service 单元测试 `internal/service/marketing/coupon_service_test.go`
+- [x] T246 [P] 编写订单域相关单元测试 `internal/service/order/{refund_service_test.go,member_discount_test.go,points_hook_test.go,order_complete_hook_test.go}`
+- [ ] T247 [P] 补齐 order_service 主流程单元测试 `internal/service/order/order_service_test.go`
+- [x] T248 [P] 编写酒店业务单元测试 `internal/service/hotel/{booking_service_test.go,hotel_service_test.go,code_service_test.go}`
+- [x] T249 [P] 编写分销业务单元测试 `internal/service/distribution/{commission_service_test.go,distributor_service_test.go,withdraw_service_test.go}`
+- [ ] T250 [P] 补齐 wallet_service 单元测试 `internal/service/user/wallet_service_test.go`
+- [x] T251 [P] 编写营销相关单元测试 `tests/unit/{coupon_service_test.go,campaign_service_test.go,user_coupon_service_test.go}`
+- [ ] T252 [P] 将 marketing 单测迁移/补齐到 in-package（便于覆盖率统计）`internal/service/marketing/*_test.go`
+- [ ] T253 [P] 补齐 finance 单元测试 `internal/service/finance/*_test.go`（当前仅有场景/API 覆盖）
 
 ### 单元测试 - Repository 层
 
-- [x] T251 [P] 编写 user_repo 单元测试 `internal/repository/user_repo_test.go`
-- [x] T252 [P] 编写 device_repo 单元测试 `internal/repository/device_repo_test.go`
-- [x] T253 [P] 编写 order_repo 单元测试 `internal/repository/order_repo_test.go`
-- [x] T254 [P] 编写 rental_repo 单元测试 `internal/repository/rental_repo_test.go`
+- [x] T254 [P] 编写 user_repo 单元测试 `internal/repository/user_repo_test.go`
+- [ ] T255 [P] 编写 device_repo 单元测试 `internal/repository/device_repo_test.go`
+- [ ] T256 [P] 编写 order_repo 单元测试 `internal/repository/order_repo_test.go`
+- [x] T257 [P] 编写 rental_repo 单元测试 `internal/repository/rental_repo_test.go`
+- [x] T258 [P] 编写 admin_repo 单元测试 `internal/repository/admin_repo_test.go`
+- [ ] T259 [P] 补齐其余关键 repo 单元测试（优先：payment/coupon/campaign/booking/settlement/transaction）`internal/repository/*_test.go`
 
 ### 集成测试
 
-- [x] T255 编写用户认证流程集成测试（通过手动测试验证）
-- [x] T256 [P] 编写租借流程集成测试（扫码→支付→开锁→归还）（通过手动测试验证，见 TEST_RESULTS.md）
-- [x] T257 [P] 编写支付流程集成测试（创建→回调→状态更新）（通过手动测试验证）
-- [x] T258 [P] 编写酒店预订集成测试（预订→核销→开锁）`tests/integration/booking_test.go`
-- [x] T259 [P] 编写商城订单集成测试（加购→下单→支付）`tests/integration/mall_order_test.go`
-- [x] T260 [P] 编写分销佣金集成测试（推广→消费→计算佣金）`tests/integration/commission_test.go`
+- [x] T260 [P] 编写租借流程集成测试（扫码→支付→开锁→归还）`tests/integration/rental_flow_test.go`
+- [x] T261 [P] 编写支付流程集成测试（创建→回调→状态更新）`tests/integration/payment_flow_test.go`
+- [x] T262 [P] 编写酒店预订集成测试（预订→核销→开锁）`tests/integration/us4_hotel_booking_flow_test.go`
+- [x] T263 [P] 编写商城订单集成测试（加购→下单→支付）`tests/integration/us3_mall_order_flow_test.go`
+- [x] T264 [P] 编写分销流程集成测试（推广→消费→计算佣金）`tests/integration/distribution_flow_test.go`
+- [x] T265 [P] 编写管理端基础流程集成测试 `tests/integration/admin_flow_test.go`
+- [x] T266 [P] 编写 US2 权限/设备监控集成测试 `tests/integration/{us2_permission_flow_test.go,us2_device_monitoring_flow_test.go}`
+- [x] T267 [P] 编写 US6 财务/US7 营销/US8 会员集成测试 `tests/integration/{us6_finance_flow_test.go,us7_marketing_flow_test.go,us8_membership_flow_test.go}`
 
 ### E2E 测试
 
-- [x] T261 编写扫码租借完整流程 E2E 测试（通过手动测试验证，见 TEST_RESULTS.md）
-- [x] T262 [P] 编写酒店预订完整流程 E2E 测试 `tests/e2e/booking_flow_test.go`
-- [x] T263 [P] 编写商城购物完整流程 E2E 测试 `tests/e2e/mall_flow_test.go`
+- [x] T268 [P] 编写扫码租借完整流程 E2E 测试 `tests/e2e/us1_scan_rent_flow_test.go`
+- [x] T269 [P] 编写酒店预订完整流程 E2E 测试 `tests/e2e/us4_hotel_booking_flow_test.go`
+- [x] T270 [P] 编写商城购物完整流程 E2E 测试 `tests/e2e/us3_mall_shopping_flow_test.go`
+- [x] T271 [P] 编写 US2 管理端设备管理 E2E 测试 `tests/e2e/us2_admin_device_monitor_manage_flow_test.go`
+- [x] T272 [P] 编写 US5 分销推广 E2E 测试 `tests/e2e/us5_distribution_flow_test.go`
+- [x] T273 [P] 编写 US6 财务结算 E2E 测试 `tests/e2e/us6_finance_settlement_flow_test.go`
+- [x] T274 [P] 编写 US7 营销优惠 E2E 测试 `tests/e2e/us7_marketing_flow_test.go`
+- [x] T275 [P] 编写 US8 会员体系 E2E 测试 `tests/e2e/us8_membership_flow_test.go`
 
 ### API 测试
 
-- [x] T264 编写 Auth API 测试（通过手动测试验证：发送验证码、登录）
-- [x] T265 [P] 编写 User API 测试（通过手动测试验证）
-- [x] T266 [P] 编写 Device API 测试（通过手动测试验证：扫码获取设备信息）
-- [x] T267 [P] 编写 Rental API 测试（通过手动测试验证：创建、支付、开锁、归还）
+- [x] T276 编写 Auth API 测试 `tests/api/auth_api_test.go`
+- [x] T277 [P] 编写管理端 Auth API 测试 `tests/api/admin_auth_api_test.go`
+- [x] T278 [P] 编写 US1 租借 API 测试 `tests/api/us1_rental_api_test.go`
+- [x] T279 [P] 编写 US2 管理端设备/商户/场地 API 测试 `tests/api/{admin_device_api_test.go,us2_admin_merchant_venue_api_test.go}`
+- [x] T280 [P] 编写 US3 商城 API 测试 `tests/api/us3_mall_api_test.go`
+- [x] T281 [P] 编写 US4 酒店 API 测试 `tests/api/us4_hotel_api_test.go`
+- [x] T282 [P] 编写 US5 分销 API 测试 `tests/api/us5_distribution_api_test.go`
+- [x] T283 [P] 编写 US6 财务 API 测试 `tests/api/us6_finance_api_test.go`
+- [x] T284 [P] 编写 US7 营销 API 测试 `tests/api/us7_marketing_api_test.go`
+- [x] T285 [P] 编写 US8 会员（用户端/管理端）API 测试 `tests/api/{us8_member_api_test.go,us8_member_admin_api_test.go}`
+- [ ] T286 [P] 补齐内容/通知相关 API 测试（Banner/Article/Notification）`tests/api/*_test.go`
 
 ### 测试覆盖率报告
 
-- [x] T268 配置测试覆盖率收集和报告 `scripts/coverage.sh`
-- [x] T269 更新 Makefile 添加 `make test`, `make test-unit`, `make test-integration`, `make coverage` 命令
-- [x] T270 实现覆盖率门禁验证脚本 `scripts/coverage-gate.sh`，验证：（1）整体单元测试覆盖率 ≥ 80%；（2）关键业务模块（auth/payment/order/rental/booking）覆盖率 ≥ 90%；不满足条件时返回非零退出码阻止 CI/CD 流水线继续执行
+- [x] T287 配置测试覆盖率收集和报告 `scripts/coverage.sh`
+- [x] T288 更新 Makefile 添加 `make test`, `make test-unit`, `make test-integration`, `make coverage` 命令
+- [x] T289 实现覆盖率门禁验证脚本 `scripts/coverage-gate.sh`，验证：（1）整体单元测试覆盖率 ≥ 80%；（2）关键业务模块（auth/payment/order/rental/booking）覆盖率 ≥ 90%；不满足条件时返回非零退出码阻止 CI/CD 流水线继续执行
+- [x] T290 跑通并达标覆盖率门禁：`make coverage-gate`（补齐缺失的单测/场景测试，直到满足阈值）
 
 **Checkpoint**: 测试覆盖率达标（单测 > 80%，关键业务 > 90%）
 

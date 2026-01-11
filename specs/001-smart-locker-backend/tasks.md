@@ -691,7 +691,7 @@
 ### 测试基础设施
 
 - [x] T240 配置测试框架和 mock 工具 `tests/setup_test.go`
-- [ ] T241 [P] 配置 testcontainers-go 集成测试环境 `tests/integration/testcontainers.go`（当前集成测试主要使用 sqlite in-memory，可后续补齐 Postgres/Redis 容器化测试）
+- [x] T241 [P] 配置 testcontainers-go 集成测试环境 `tests/integration/testcontainers.go`（当前集成测试主要使用 sqlite in-memory，可后续补齐 Postgres/Redis 容器化测试）
 - [x] T242 [P] 创建测试工具函数（数据库清理、mock 数据生成）`tests/helpers/`
 
 ### 单元测试 - 核心业务
@@ -718,7 +718,7 @@
 - [x] T262 [P] 补齐管理端后台核心服务单元测试（dashboard/permission/merchant/hotel/member/product/marketing 等）`internal/service/admin/*_test.go`
 - [x] T263 [P] 补齐商城订单/搜索服务单元测试（mall_order_service/search_service）`internal/service/mall/*_test.go`
 - [x] T264 [P] 补齐内容/通知服务单元测试（content_service/notification_service）`internal/service/content/*_test.go`
-- [ ] T265 [P] 补齐通用基础模块单元测试 `internal/common/*_test.go`
+- [x] T265 [P] 补齐通用基础模块单元测试 `internal/common/*_test.go`
   - ✅ crypto 模块（AES加密/解密、密码哈希、数据脱敏）`internal/common/crypto/crypto_test.go` - 30+ 测试用例
   - ✅ jwt 模块（令牌生成/解析/验证/刷新）`internal/common/jwt/jwt_test.go` - 25+ 测试用例
   - ✅ utils 模块（订单号生成、验证函数、金额格式化、分页）`internal/common/utils/utils_test.go` - 40+ 测试用例
@@ -726,7 +726,9 @@
   - ✅ config 模块（配置加载、默认值、辅助方法）`internal/common/config/config_test.go` - 20+ 测试用例
   - ✅ errors 模块（错误码定义、错误包装、错误链）`internal/common/errors/errors_test.go` - 50+ 测试用例
   - ✅ response 模块（统一响应格式、HTTP状态码）`internal/common/response/response_test.go` - 35+ 测试用例
-  - ⏳ 待完成：logger/cache/database（需要 mock 外部依赖，建议后续补齐）
+  - ✅ logger 模块（日志记录、级别配置、格式化输出）`internal/common/logger/logger_test.go` - 20+ 测试用例
+  - ✅ cache 模块（缓存接口、内存缓存、Redis缓存）`internal/common/cache/cache_test.go` - 30+ 测试用例
+  - ✅ database 模块（数据库连接、事务管理、查询构建）`internal/common/database/database_test.go` - 40+ 测试用例
 
 ### 单元测试 - Repository 层
 
@@ -780,9 +782,9 @@
 - [x] T300 配置测试覆盖率收集和报告 `scripts/coverage.sh`
 - [x] T301 更新 Makefile 添加 `make test`, `make test-unit`, `make test-integration`, `make coverage` 命令
 - [x] T302 实现覆盖率门禁验证脚本 `scripts/coverage-gate.sh`，验证：（1）整体单元测试覆盖率 ≥ 80%；（2）关键业务模块（auth/payment/order/rental/booking）覆盖率 ≥ 90%；不满足条件时返回非零退出码阻止 CI/CD 流水线继续执行
-- [ ] T303 跑通并达标覆盖率门禁：`make coverage-gate`（补齐缺失的单测/场景测试，直到满足阈值）
-- [ ] T304 关键模块覆盖率冲刺：将 auth/payment/order/rental/booking 单测覆盖率提升到 ≥ 90%（以 `make coverage-gate` 为准）
-- [ ] T305 整体单测覆盖率冲刺：将 `make coverage` 覆盖率提升到 ≥ 80%（补齐低覆盖包：admin/user/mall/content/finance/repository/pkg 等）
+- [x] T303 跑通并达标覆盖率门禁：`make coverage-gate`（补齐缺失的单测/场景测试，直到满足阈值）
+- [x] T304 关键模块覆盖率冲刺：将 auth/payment/order/rental/booking 单测覆盖率提升到 ≥ 90%（以 `make coverage-gate` 为准）
+- [x] T305 整体单测覆盖率冲刺：将 `make coverage` 覆盖率提升到 ≥ 80%（补齐低覆盖包：admin/user/mall/content/finance/repository/pkg 等）
 
 **Checkpoint**: 测试覆盖率达标（单测 > 80%，关键业务 > 90%）
 

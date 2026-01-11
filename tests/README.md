@@ -59,6 +59,9 @@ tests/
 | metrics | `internal/common/metrics/*_test.go` | ✅ |
 | middleware | `internal/common/middleware/*_test.go` | ✅ |
 | tracing | `internal/common/tracing/*_test.go` | ✅ |
+| cache | `internal/common/cache/*_test.go` | ✅ |
+| database | `internal/common/database/*_test.go` | ✅ |
+| logger | `internal/common/logger/*_test.go` | ✅ |
 
 #### Repository 单元测试
 
@@ -607,12 +610,56 @@ dsn := fmt.Sprintf("file:%s?mode=memory&cache=shared", t.Name())
 
 ## 待完成项
 
-以下模块的单元测试待补齐：
+以下测试基础设施已完成：
 
-- [ ] `internal/common/logger` - 日志模块（需要 mock 外部依赖）
-- [ ] `internal/common/cache` - 缓存模块（需要 mock Redis）
-- [ ] `internal/common/database` - 数据库模块（需要 mock 连接）
-- [ ] testcontainers-go 集成测试环境配置
+- [x] `internal/common/logger` - 日志模块单元测试（40+ 测试用例）
+- [x] `internal/common/cache` - 缓存模块单元测试（使用 miniredis mock，50+ 测试用例）
+- [x] `internal/common/database` - 数据库模块单元测试（使用 SQLite mock，30+ 测试用例）
+- [x] testcontainers-go 集成测试环境配置（`tests/integration/testcontainers.go`）
+
+### testcontainers-go 使用说明
+
+testcontainers-go 提供真实的 PostgreSQL 和 Redis 容器用于集成测试：
+
+```go
+//go:build integration
+
+func TestWithRealDatabase(t *testing.T) {
+    ctx := context.Background()
+    tc := NewTestContainers(ctx)
+
+    // 启动所有容器
+    err := tc.StartAll()
+    require.NoError(t, err)
+    defer tc.Cleanup()
+
+    // 获取数据库连接
+    db, err := tc.GetPostgresDB()
+    require.NoError(t, err)
+
+    // 获取 Redis 客户端
+    redis, err := tc.GetRedisClient()
+    require.NoError(t, err)
+
+    // 执行测试...
+}
+```
+
+**运行 testcontainers 测试：**
+
+```bash
+# 需要 Docker 环境
+make test-integration
+```
+
+**依赖安装：**
+
+```bash
+go get github.com/testcontainers/testcontainers-go
+go get github.com/testcontainers/testcontainers-go/modules/postgres
+go get github.com/testcontainers/testcontainers-go/modules/redis
+go get github.com/alicebob/miniredis/v2  # 用于 cache 模块单元测试
+```
 
 ---
 

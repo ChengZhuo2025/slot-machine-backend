@@ -12,6 +12,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
+	appErrors "github.com/dumeirei/smart-locker-backend/internal/common/errors"
 	"github.com/dumeirei/smart-locker-backend/internal/models"
 	"github.com/dumeirei/smart-locker-backend/internal/repository"
 )
@@ -23,6 +24,11 @@ func setupTestDB(t *testing.T) *gorm.DB {
 	})
 	require.NoError(t, err)
 
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+	sqlDB.SetMaxOpenConns(1)
+	sqlDB.SetMaxIdleConns(1)
+
 	err = db.AutoMigrate(
 		&models.User{},
 		&models.UserWallet{},
@@ -32,6 +38,7 @@ func setupTestDB(t *testing.T) *gorm.DB {
 		&models.Room{},
 		&models.RoomTimeSlot{},
 		&models.Booking{},
+		&models.Device{},
 	)
 	require.NoError(t, err)
 
@@ -747,6 +754,284 @@ func TestBookingService_OnPaymentSuccess(t *testing.T) {
 		err := svc.OnPaymentSuccess(ctx, order.ID)
 		require.NoError(t, err)
 	})
+}
+
+func TestBookingService_GetBookingByNo(t *testing.T) {
+	svc := setupTestBookingService(t)
+	ctx := context.Background()
+
+	user, hotel, room, _ := createTestBookingData(t, svc.db)
+
+	order := &models.Order{
+		OrderNo:        "TEST_GET_BY_NO",
+		UserID:         user.ID,
+		Type:           models.OrderTypeHotel,
+		OriginalAmount: 100.0,
+		ActualAmount:   100.0,
+		Status:         models.OrderStatusPending,
+	}
+	svc.db.Create(order)
+
+	checkInTime := time.Now().Add(1 * time.Hour)
+	bookingNo := "B_GET_BY_NO"
+	booking := &models.Booking{
+		BookingNo:        bookingNo,
+		OrderID:          order.ID,
+		UserID:           user.ID,
+		HotelID:          hotel.ID,
+		RoomID:           room.ID,
+		CheckInTime:      checkInTime,
+		CheckOutTime:     checkInTime.Add(2 * time.Hour),
+		DurationHours:    2,
+		Amount:           100.0,
+		VerificationCode: "V_GET_BY_NO_XXXXXXXXX",
+		UnlockCode:       "123456",
+		QRCode:           "/api/v1/hotel/verify/B_GET_BY_NO?code=V_GET_BY_NO_XXXXXXXXX",
+		Status:           models.BookingStatusPaid,
+	}
+	require.NoError(t, svc.db.Create(booking).Error)
+
+	t.Run("获取预订成功", func(t *testing.T) {
+		info, err := svc.GetBookingByNo(ctx, bookingNo, user.ID)
+		require.NoError(t, err)
+		require.NotNil(t, info)
+		assert.Equal(t, bookingNo, info.BookingNo)
+		assert.Equal(t, models.BookingStatusPaid, info.Status)
+		// 已支付状态应该显示敏感信息
+		assert.NotEmpty(t, info.VerificationCode)
+		assert.NotEmpty(t, info.UnlockCode)
+	})
+
+	t.Run("获取不属于自己的预订失败", func(t *testing.T) {
+		_, err := svc.GetBookingByNo(ctx, bookingNo, 999999)
+		assert.Error(t, err)
+	})
+
+	t.Run("预订不存在", func(t *testing.T) {
+		_, err := svc.GetBookingByNo(ctx, "NOT_EXISTS", user.ID)
+		assert.Error(t, err)
+	})
+}
+
+func TestBookingService_UnlockByCode(t *testing.T) {
+	svc := setupTestBookingService(t)
+	ctx := context.Background()
+
+	user, hotel, room, _ := createTestBookingData(t, svc.db)
+	deviceID := int64(1)
+
+	// 让 booking.DeviceID 非空，使 UnlockByCode 能匹配到记录
+	require.NoError(t, svc.db.Model(&models.Room{}).Where("id = ?", room.ID).Update("device_id", deviceID).Error)
+
+	createBooking := func(t *testing.T, status string, checkIn, checkOut time.Time, unlockCode string) *models.Booking {
+		t.Helper()
+
+		order := &models.Order{
+			OrderNo:        "UNLOCK_" + status + "_" + unlockCode,
+			UserID:         user.ID,
+			Type:           models.OrderTypeHotel,
+			OriginalAmount: 100.0,
+			ActualAmount:   100.0,
+			Status:         models.OrderStatusPaid,
+		}
+		require.NoError(t, svc.db.Create(order).Error)
+
+		booking := &models.Booking{
+			BookingNo:        "B_UNLOCK_" + status + "_" + unlockCode,
+			OrderID:          order.ID,
+			UserID:           user.ID,
+			HotelID:          hotel.ID,
+			RoomID:           room.ID,
+			DeviceID:         &deviceID,
+			CheckInTime:      checkIn,
+			CheckOutTime:     checkOut,
+			DurationHours:    int(checkOut.Sub(checkIn).Hours()),
+			Amount:           100.0,
+			VerificationCode: "V_UNLOCK_" + unlockCode + "XXXXXX",
+			UnlockCode:       unlockCode,
+			QRCode:           "/qr/unlock",
+			Status:           status,
+		}
+		require.NoError(t, svc.db.Create(booking).Error)
+		return booking
+	}
+
+	t.Run("开锁码格式不正确", func(t *testing.T) {
+		_, err := svc.UnlockByCode(ctx, deviceID, "bad")
+		require.Error(t, err)
+		appErr, ok := err.(*appErrors.AppError)
+		require.True(t, ok)
+		assert.Equal(t, appErrors.ErrUnlockCodeInvalid.Code, appErr.Code)
+	})
+
+	t.Run("找不到对应预订返回开锁码无效", func(t *testing.T) {
+		_, err := svc.UnlockByCode(ctx, deviceID, "123456")
+		require.Error(t, err)
+		appErr, ok := err.(*appErrors.AppError)
+		require.True(t, ok)
+		assert.Equal(t, appErrors.ErrUnlockCodeInvalid.Code, appErr.Code)
+	})
+
+	t.Run("已开锁状态返回已开锁", func(t *testing.T) {
+		checkIn := time.Now().Add(-time.Hour)
+		checkOut := time.Now().Add(time.Hour)
+		createBooking(t, models.BookingStatusInUse, checkIn, checkOut, "111111")
+
+		_, err := svc.UnlockByCode(ctx, deviceID, "111111")
+		require.Error(t, err)
+		appErr, ok := err.(*appErrors.AppError)
+		require.True(t, ok)
+		assert.Equal(t, appErrors.ErrBookingStatusError.Code, appErr.Code)
+		assert.Contains(t, appErr.Message, "已开锁")
+	})
+
+	t.Run("未到入住时间", func(t *testing.T) {
+		checkIn := time.Now().Add(2 * time.Hour)
+		checkOut := time.Now().Add(3 * time.Hour)
+		createBooking(t, models.BookingStatusVerified, checkIn, checkOut, "222222")
+
+		_, err := svc.UnlockByCode(ctx, deviceID, "222222")
+		require.Error(t, err)
+		appErr, ok := err.(*appErrors.AppError)
+		require.True(t, ok)
+		assert.Equal(t, appErrors.ErrBookingTimeNotArrived.Code, appErr.Code)
+	})
+
+	t.Run("超过退房时间开锁码过期", func(t *testing.T) {
+		checkIn := time.Now().Add(-3 * time.Hour)
+		checkOut := time.Now().Add(-1 * time.Hour)
+		createBooking(t, models.BookingStatusVerified, checkIn, checkOut, "333333")
+
+		_, err := svc.UnlockByCode(ctx, deviceID, "333333")
+		require.Error(t, err)
+		appErr, ok := err.(*appErrors.AppError)
+		require.True(t, ok)
+		assert.Equal(t, appErrors.ErrUnlockCodeExpired.Code, appErr.Code)
+	})
+
+	t.Run("开锁成功更新为使用中", func(t *testing.T) {
+		checkIn := time.Now().Add(-time.Hour)
+		checkOut := time.Now().Add(time.Hour)
+		booking := createBooking(t, models.BookingStatusVerified, checkIn, checkOut, "444444")
+
+		info, err := svc.UnlockByCode(ctx, deviceID, "444444")
+		require.NoError(t, err)
+		require.NotNil(t, info)
+		assert.Equal(t, models.BookingStatusInUse, info.Status)
+
+		var updated models.Booking
+		require.NoError(t, svc.db.First(&updated, booking.ID).Error)
+		assert.Equal(t, models.BookingStatusInUse, updated.Status)
+		assert.NotNil(t, updated.UnlockedAt)
+	})
+}
+
+func TestBookingService_ProcessExpiredBookings(t *testing.T) {
+	svc := setupTestBookingService(t)
+	ctx := context.Background()
+
+	user, hotel, room, _ := createTestBookingData(t, svc.db)
+
+	createPaidBooking := func(t *testing.T, checkIn time.Time) *models.Booking {
+		t.Helper()
+
+		order := &models.Order{
+			OrderNo:        "EXPIRED_" + checkIn.Format(time.RFC3339Nano),
+			UserID:         user.ID,
+			Type:           models.OrderTypeHotel,
+			OriginalAmount: 100.0,
+			ActualAmount:   100.0,
+			Status:         models.OrderStatusPaid,
+		}
+		require.NoError(t, svc.db.Create(order).Error)
+
+		booking := &models.Booking{
+			BookingNo:        "B_EXPIRED_" + order.OrderNo,
+			OrderID:          order.ID,
+			UserID:           user.ID,
+			HotelID:          hotel.ID,
+			RoomID:           room.ID,
+			CheckInTime:      checkIn,
+			CheckOutTime:     checkIn.Add(2 * time.Hour),
+			DurationHours:    2,
+			Amount:           100.0,
+			VerificationCode: "V_EXPIRED_XXXXXXXXXXX",
+			UnlockCode:       "555555",
+			QRCode:           "/qr/expired",
+			Status:           models.BookingStatusPaid,
+		}
+		require.NoError(t, svc.db.Create(booking).Error)
+		return booking
+	}
+
+	expired := createPaidBooking(t, time.Now().Add(-2*time.Hour))
+	notExpired := createPaidBooking(t, time.Now().Add(2*time.Hour))
+
+	require.NoError(t, svc.ProcessExpiredBookings(ctx))
+
+	var gotExpired models.Booking
+	require.NoError(t, svc.db.First(&gotExpired, expired.ID).Error)
+	assert.Equal(t, models.BookingStatusExpired, gotExpired.Status)
+
+	var gotNotExpired models.Booking
+	require.NoError(t, svc.db.First(&gotNotExpired, notExpired.ID).Error)
+	assert.Equal(t, models.BookingStatusPaid, gotNotExpired.Status)
+}
+
+func TestBookingService_ProcessCompletedBookings(t *testing.T) {
+	svc := setupTestBookingService(t)
+	ctx := context.Background()
+
+	user, hotel, room, _ := createTestBookingData(t, svc.db)
+
+	createToComplete := func(t *testing.T, status string) *models.Booking {
+		t.Helper()
+
+		order := &models.Order{
+			OrderNo:        "TO_COMPLETE_" + status + "_" + time.Now().Format(time.RFC3339Nano),
+			UserID:         user.ID,
+			Type:           models.OrderTypeHotel,
+			OriginalAmount: 100.0,
+			ActualAmount:   100.0,
+			Status:         models.OrderStatusPaid,
+		}
+		require.NoError(t, svc.db.Create(order).Error)
+
+		checkIn := time.Now().Add(-3 * time.Hour)
+		checkOut := time.Now().Add(-1 * time.Hour)
+		booking := &models.Booking{
+			BookingNo:        "B_TO_COMPLETE_" + order.OrderNo,
+			OrderID:          order.ID,
+			UserID:           user.ID,
+			HotelID:          hotel.ID,
+			RoomID:           room.ID,
+			CheckInTime:      checkIn,
+			CheckOutTime:     checkOut,
+			DurationHours:    2,
+			Amount:           100.0,
+			VerificationCode: "V_TO_COMPLETE_XXXXXXXX",
+			UnlockCode:       "666666",
+			QRCode:           "/qr/to_complete",
+			Status:           status,
+		}
+		require.NoError(t, svc.db.Create(booking).Error)
+		return booking
+	}
+
+	verified := createToComplete(t, models.BookingStatusVerified)
+	inUse := createToComplete(t, models.BookingStatusInUse)
+
+	require.NoError(t, svc.ProcessCompletedBookings(ctx))
+
+	var gotVerified models.Booking
+	require.NoError(t, svc.db.First(&gotVerified, verified.ID).Error)
+	assert.Equal(t, models.BookingStatusCompleted, gotVerified.Status)
+	assert.NotNil(t, gotVerified.CompletedAt)
+
+	var gotInUse models.Booking
+	require.NoError(t, svc.db.First(&gotInUse, inUse.ID).Error)
+	assert.Equal(t, models.BookingStatusCompleted, gotInUse.Status)
+	assert.NotNil(t, gotInUse.CompletedAt)
 }
 
 func TestBookingService_getStatusName(t *testing.T) {

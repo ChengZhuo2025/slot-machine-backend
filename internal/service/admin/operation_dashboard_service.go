@@ -133,12 +133,12 @@ func (s *OperationDashboardService) GetOperationOverview(ctx context.Context) (*
 	// 内容统计
 	s.db.WithContext(ctx).Model(&models.Article{}).Count(&overview.TotalArticles)
 	s.db.WithContext(ctx).Model(&models.Article{}).
-		Where("status = ?", models.ArticleStatusPublished).
+		Where("is_published = ?", true).
 		Count(&overview.PublishedArticles)
 
 	s.db.WithContext(ctx).Model(&models.Banner{}).Count(&overview.TotalBanners)
 	s.db.WithContext(ctx).Model(&models.Banner{}).
-		Where("status = ?", models.BannerStatusActive).
+		Where("is_active = ?", models.BannerStatusActive).
 		Count(&overview.ActiveBanners)
 
 	return overview, nil

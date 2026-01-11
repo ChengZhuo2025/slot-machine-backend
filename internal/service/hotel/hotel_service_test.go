@@ -195,6 +195,22 @@ func TestHotelService_GetHotelList(t *testing.T) {
 	})
 }
 
+func Test_jsonToStringSlice(t *testing.T) {
+	t.Run("nil 返回 nil", func(t *testing.T) {
+		assert.Nil(t, jsonToStringSlice(nil))
+	})
+
+	t.Run("只提取 string 值", func(t *testing.T) {
+		j := models.JSON{
+			"a": "wifi",
+			"b": 123,
+			"c": "parking",
+			"d": true,
+		}
+		assert.ElementsMatch(t, []string{"wifi", "parking"}, jsonToStringSlice(j))
+	})
+}
+
 func TestHotelService_GetHotelDetail(t *testing.T) {
 	svc := setupTestHotelService(t)
 	ctx := context.Background()

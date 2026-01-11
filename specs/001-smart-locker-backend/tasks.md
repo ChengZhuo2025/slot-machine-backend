@@ -686,20 +686,28 @@
 - [x] T249 [P] 补齐支付回调与状态机单元测试（HandlePaymentCallback、重复回调幂等、失败分支）`internal/service/payment/payment_service_test.go`
 - [x] T250 [P] 编写订单域相关单元测试 `internal/service/order/{refund_service_test.go,member_discount_test.go,points_hook_test.go,order_complete_hook_test.go}`
 - [x] T251 [P] 补齐 order_service 主流程单元测试 `internal/service/order/discount_calculator_test.go`
-- [ ] T252 [P] 补齐订单折扣/积分/退款关键分支（CalculateWithMemberDiscount、积分Hook组合器、退款审核通过/拒绝/列表/详情）`internal/service/order/{member_discount_test.go,points_hook_test.go,refund_service_test.go}`
+- [x] T252 [P] 补齐订单折扣/积分/退款关键分支（CalculateWithMemberDiscount、积分Hook组合器、退款审核通过/拒绝/列表/详情）`internal/service/order/{member_discount_test.go,points_hook_test.go,refund_service_test.go}`
 - [x] T253 [P] 编写酒店业务单元测试 `internal/service/hotel/{booking_service_test.go,hotel_service_test.go,code_service_test.go}`
-- [ ] T254 [P] 补齐酒店预订关键分支（GetBookingByNo/UnlockByCode/到期与完成任务处理/jsonToStringSlice）`internal/service/hotel/{booking_service_test.go,hotel_service_test.go}`
+- [x] T254 [P] 补齐酒店预订关键分支（GetBookingByNo/UnlockByCode/到期与完成任务处理/jsonToStringSlice）`internal/service/hotel/{booking_service_test.go,hotel_service_test.go}`
 - [x] T255 [P] 编写分销业务单元测试 `internal/service/distribution/{commission_service_test.go,distributor_service_test.go,withdraw_service_test.go}`
-- [ ] T256 [P] 补齐分销邀请/推广链路单元测试 `internal/service/distribution/invite_service_test.go`
+- [x] T256 [P] 补齐分销邀请/推广链路单元测试 `internal/service/distribution/invite_service_test.go`
 - [x] T257 [P] 补齐 wallet_service 单元测试 `internal/service/user/wallet_service_test.go`
-- [ ] T258 [P] 补齐用户核心服务单元测试（user_service 关键分支：注册资料/状态/手机号等）`internal/service/user/user_service_test.go`
+- [x] T258 [P] 补齐用户核心服务单元测试（user_service 关键分支：注册资料/状态/手机号等）`internal/service/user/user_service_test.go`
 - [x] T259 [P] 编写营销相关单元测试 `tests/unit/{coupon_service_test.go,campaign_service_test.go,user_coupon_service_test.go}`
 - [x] T260 [P] 将 marketing 单测迁移/补齐到 in-package（便于覆盖率统计）`internal/service/marketing/marketing_service_test.go`
 - [x] T261 [P] 补齐 finance 单元测试 `internal/service/finance/finance_service_test.go`
-- [ ] T262 [P] 补齐管理端后台核心服务单元测试（dashboard/permission/merchant/hotel/member/product/marketing 等）`internal/service/admin/*_test.go`
-- [ ] T263 [P] 补齐商城订单/搜索服务单元测试（mall_order_service/search_service）`internal/service/mall/*_test.go`
-- [ ] T264 [P] 补齐内容/通知服务单元测试（content_service/notification_service）`internal/service/content/*_test.go`
-- [ ] T265 [P] 补齐通用基础模块单元测试（config/cache/crypto/jwt/logger/response/errors/utils/qrcode/database）`internal/common/*_test.go`
+- [x] T262 [P] 补齐管理端后台核心服务单元测试（dashboard/permission/merchant/hotel/member/product/marketing 等）`internal/service/admin/*_test.go`
+- [x] T263 [P] 补齐商城订单/搜索服务单元测试（mall_order_service/search_service）`internal/service/mall/*_test.go`
+- [x] T264 [P] 补齐内容/通知服务单元测试（content_service/notification_service）`internal/service/content/*_test.go`
+- [ ] T265 [P] 补齐通用基础模块单元测试 `internal/common/*_test.go`
+  - ✅ crypto 模块（AES加密/解密、密码哈希、数据脱敏）`internal/common/crypto/crypto_test.go` - 30+ 测试用例
+  - ✅ jwt 模块（令牌生成/解析/验证/刷新）`internal/common/jwt/jwt_test.go` - 25+ 测试用例
+  - ✅ utils 模块（订单号生成、验证函数、金额格式化、分页）`internal/common/utils/utils_test.go` - 40+ 测试用例
+  - ✅ qrcode 模块（二维码生成、格式转换、批量生成）`internal/common/qrcode/qrcode_test.go` - 30+ 测试用例
+  - ✅ config 模块（配置加载、默认值、辅助方法）`internal/common/config/config_test.go` - 20+ 测试用例
+  - ✅ errors 模块（错误码定义、错误包装、错误链）`internal/common/errors/errors_test.go` - 50+ 测试用例
+  - ✅ response 模块（统一响应格式、HTTP状态码）`internal/common/response/response_test.go` - 35+ 测试用例
+  - ⏳ 待完成：logger/cache/database（需要 mock 外部依赖，建议后续补齐）
 
 ### 单元测试 - Repository 层
 
@@ -709,8 +717,8 @@
 - [x] T269 [P] 编写 rental_repo 单元测试 `internal/repository/rental_repo_test.go`
 - [x] T270 [P] 编写 admin_repo 单元测试 `internal/repository/admin_repo_test.go`
 - [x] T271 [P] 补齐其余关键 repo 单元测试（payment/coupon）`internal/repository/{payment_repo_test.go,coupon_repo_test.go}`
-- [ ] T272 [P] 补齐剩余 repository 单元测试（按仓储文件逐一补齐 CRUD/列表/过滤/排序/边界条件）`internal/repository/*_repo_test.go`
-  - 缺失清单（当前无对应 `*_test.go`）：`address_repo`、`article_repo`、`banner_repo`、`booking_repo`、`campaign_repo`、`cart_repo`、`category_repo`、`commission_repo`、`device_alert_repo`、`device_log_repo`、`distributor_repo`、`feedback_repo`、`hotel_repo`、`member_level_repo`、`member_package_repo`、`merchant_repo`、`message_template_repo`、`notification_repo`、`operation_log_repo`、`product_repo`、`review_repo`、`role_repo`、`room_repo`、`settlement_repo`、`system_config_repo`、`transaction_repo`、`user_coupon_repo`、`venue_repo`、`withdrawal_repo`
+- [x] T272 [P] 补齐剩余 repository 单元测试（按仓储文件逐一补齐 CRUD/列表/过滤/排序/边界条件）`internal/repository/*_repo_test.go`
+  - 补齐清单（当前对应 `*_test.go`）：`address_repo`、`article_repo`、`banner_repo`、`booking_repo`、`campaign_repo`、`cart_repo`、`category_repo`、`commission_repo`、`device_alert_repo`、`device_log_repo`、`distributor_repo`、`feedback_repo`、`hotel_repo`、`member_level_repo`、`member_package_repo`、`merchant_repo`、`message_template_repo`、`notification_repo`、`operation_log_repo`、`product_repo`、`review_repo`、`role_repo`、`room_repo`、`settlement_repo`、`system_config_repo`、`transaction_repo`、`user_coupon_repo`、`venue_repo`、`withdrawal_repo`
 
 ### 集成测试
 

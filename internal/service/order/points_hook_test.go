@@ -141,3 +141,67 @@ func TestPointsHook_OnOrderRefunded(t *testing.T) {
 	})
 }
 
+type stubOrderEventHandler struct {
+	onCompleted func(ctx context.Context, order *models.Order) error
+	onRefunded  func(ctx context.Context, order *models.Order) error
+}
+
+func (s *stubOrderEventHandler) OnOrderCompleted(ctx context.Context, order *models.Order) error {
+	if s.onCompleted == nil {
+		return nil
+	}
+	return s.onCompleted(ctx, order)
+}
+
+func (s *stubOrderEventHandler) OnOrderRefunded(ctx context.Context, order *models.Order) error {
+	if s.onRefunded == nil {
+		return nil
+	}
+	return s.onRefunded(ctx, order)
+}
+
+func TestCompositeOrderEventHandler(t *testing.T) {
+	ctx := context.Background()
+	order := &models.Order{ID: 1, OrderNo: "O1"}
+
+	t.Run("跳过 nil handler，且遇到错误继续执行", func(t *testing.T) {
+		var completedCalls []string
+		var refundedCalls []string
+
+		h := NewCompositeOrderEventHandler(
+			nil,
+			&stubOrderEventHandler{
+				onCompleted: func(ctx context.Context, order *models.Order) error {
+					completedCalls = append(completedCalls, "h1")
+					return errors.New("boom")
+				},
+				onRefunded: func(ctx context.Context, order *models.Order) error {
+					refundedCalls = append(refundedCalls, "h1")
+					return errors.New("boom")
+				},
+			},
+			&stubOrderEventHandler{
+				onCompleted: func(ctx context.Context, order *models.Order) error {
+					completedCalls = append(completedCalls, "h2")
+					return nil
+				},
+				onRefunded: func(ctx context.Context, order *models.Order) error {
+					refundedCalls = append(refundedCalls, "h2")
+					return nil
+				},
+			},
+		)
+
+		require.NoError(t, h.OnOrderCompleted(ctx, order))
+		require.NoError(t, h.OnOrderRefunded(ctx, order))
+
+		assert.Equal(t, []string{"h1", "h2"}, completedCalls)
+		assert.Equal(t, []string{"h1", "h2"}, refundedCalls)
+	})
+
+	t.Run("AddHandler 忽略 nil", func(t *testing.T) {
+		h := NewCompositeOrderEventHandler()
+		h.AddHandler(nil)
+		require.NoError(t, h.OnOrderCompleted(ctx, order))
+	})
+}

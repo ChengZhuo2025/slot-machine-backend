@@ -3,6 +3,80 @@
 **项目**: Smart Locker Backend
 **审计日期**: 2026-01-11
 **审计范围**: 所有 API Handler 实现
+**最后更新**: 2026-01-11
+
+---
+
+## 实施进度概览
+
+| 阶段 | 任务 | 状态 | 说明 |
+|------|------|------|------|
+| 准备 | 创建 Handler 辅助函数包 | ✅ 已完成 | `internal/common/handler/handler.go` |
+| 准备 | 编写单元测试 | ✅ 已完成 | 40个测试用例全部通过 |
+| 迁移 | 用户端 Handler 迁移 | ⏳ 待执行 | 13个文件待迁移 |
+| 迁移 | 管理端 Handler 迁移 | ⏳ 待执行 | 15+个文件待迁移 |
+
+---
+
+## 已创建的辅助函数包
+
+**文件位置**: `internal/common/handler/handler.go`
+
+### 可用函数列表
+
+| 函数 | 用途 | 替代模式 |
+|------|------|----------|
+| `HandleError(c, err)` | 统一错误处理 | H1: 错误处理模式 |
+| `MustSucceed(c, err, data)` | 成功响应封装 | H1: 错误处理模式 |
+| `MustSucceedPage(c, err, list, total, page, pageSize)` | 分页响应封装 | H1+H3 |
+| `RequireUserID(c)` | 用户认证检查 | H2: 认证检查 |
+| `RequireAdminID(c)` | 管理员认证检查 | H2: 认证检查 |
+| `ParseID(c, resourceName)` | 解析路径参数ID | M4: ID解析 |
+| `ParseParamID(c, paramName, resourceName)` | 解析指定路径参数 | M4: ID解析 |
+| `ParseQueryID(c, paramName, resourceName)` | 解析可选查询参数ID | M4: ID解析 |
+| `BindPagination(c)` | 绑定分页参数 | H3: 分页处理 |
+| `ParseQueryDateRange(c)` | 解析日期范围 | M1+M7: 时间解析 |
+| `RequireUserAndParseID(c, resourceName)` | 组合: 认证+ID解析 | H2+M4 |
+
+### 使用示例
+
+```go
+import "github.com/dumeirei/smart-locker-backend/internal/common/handler"
+
+// 重构前 (22行)
+func (h *Handler) GetBookingDetail(c *gin.Context) {
+    userID := middleware.GetUserID(c)
+    if userID == 0 {
+        response.Unauthorized(c, "请先登录")
+        return
+    }
+    bookingID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+    if err != nil {
+        response.BadRequest(c, "无效的预订ID")
+        return
+    }
+    booking, err := h.bookingService.GetBookingByID(c.Request.Context(), bookingID, userID)
+    if err != nil {
+        if appErr, ok := err.(*errors.AppError); ok {
+            response.Error(c, appErr.Code, appErr.Message)
+            return
+        }
+        response.InternalError(c, err.Error())
+        return
+    }
+    response.Success(c, booking)
+}
+
+// 重构后 (8行)
+func (h *Handler) GetBookingDetail(c *gin.Context) {
+    userID, bookingID, ok := handler.RequireUserAndParseID(c, "预订")
+    if !ok {
+        return
+    }
+    booking, err := h.bookingService.GetBookingByID(c.Request.Context(), bookingID, userID)
+    handler.MustSucceed(c, err, booking)
+}
+```
 
 ---
 
@@ -560,3 +634,190 @@ Smart Locker Backend 项目的 API 实现整体质量良好，遵循了 Go 和 G
 4. 消除重复代码，提高代码复用性
 
 通过这些改进，预计可以减少约 30% 的 Handler 代码量，同时提高代码的可读性和可维护性。
+
+---
+
+## 详细迁移计划
+
+### 批次一：用户端核心模块 (优先级: 高)
+
+以下文件建议优先迁移，因为它们是用户端核心功能。
+
+| 序号 | 文件路径 | 预计重复模式数 | 建议迁移函数 |
+|------|----------|---------------|-------------|
+| 1 | `internal/handler/auth/auth_handler.go` | 8 | HandleError, MustSucceed |
+| 2 | `internal/handler/user/user_handler.go` | 6 | RequireUserID, HandleError, BindPagination |
+| 3 | `internal/handler/user/member_handler.go` | 10 | RequireUserID, ParseID, BindPagination |
+| 4 | `internal/handler/rental/rental_handler.go` | 7 | RequireUserAndParseID, BindPagination |
+| 5 | `internal/handler/payment/payment_handler.go` | 4 | RequireUserID, HandleError |
+
+### 批次二：用户端业务模块 (优先级: 高)
+
+| 序号 | 文件路径 | 预计重复模式数 | 建议迁移函数 |
+|------|----------|---------------|-------------|
+| 6 | `internal/handler/hotel/hotel_handler.go` | 6 | ParseID, HandleError, ParseDateTime |
+| 7 | `internal/handler/hotel/booking_handler.go` | 8 | RequireUserAndParseID, ParseDateTime |
+| 8 | `internal/handler/mall/cart_handler.go` | 7 | RequireUserID, ParseID |
+| 9 | `internal/handler/mall/order_handler.go` | 6 | RequireUserAndParseID, BindPagination |
+| 10 | `internal/handler/mall/product_handler.go` | 4 | ParseID, HandleError |
+
+### 批次三：用户端扩展模块 (优先级: 中)
+
+| 序号 | 文件路径 | 预计重复模式数 | 建议迁移函数 |
+|------|----------|---------------|-------------|
+| 11 | `internal/handler/distribution/distribution_handler.go` | 12 | RequireUserID, BindPagination |
+| 12 | `internal/handler/marketing/coupon_handler.go` | 8 | RequireUserID, ParseID, BindPagination |
+| 13 | `internal/handler/order/refund_handler.go` | 4 | RequireUserAndParseID |
+| 14 | `internal/handler/device/device_handler.go` | 5 | ParseID, BindPagination |
+| 15 | `internal/handler/content/content_handler.go` | 10 | RequireUserID, BindPagination |
+| 16 | `internal/handler/user/feedback_handler.go` | 3 | RequireUserID, BindPagination |
+
+### 批次四：管理端模块 (优先级: 中)
+
+管理端文件位于 `internal/handler/admin/` 目录下。
+
+| 序号 | 文件路径 | 预计重复模式数 | 建议迁移函数 |
+|------|----------|---------------|-------------|
+| 17 | `admin/device_handler.go` | 8 | RequireAdminID, ParseID |
+| 18 | `admin/venue_handler.go` | 6 | RequireAdminID, ParseID, BindPagination |
+| 19 | `admin/user_handler.go` | 6 | RequireAdminID, ParseID, BindPagination |
+| 20 | `admin/product_handler.go` | 8 | RequireAdminAndParseID |
+| 21 | `admin/member_handler.go` | 10 | RequireAdminID, ParseID, BindPagination |
+| 22 | `admin/finance_handler.go` | 8 | RequireAdminID, ParseQueryDateRange |
+| 23 | `admin/distribution_handler.go` | 6 | RequireAdminID, BindPagination |
+| 24 | `admin/hotel_handler.go` | 6 | RequireAdminAndParseID |
+| 25 | `admin/booking_verify_handler.go` | 4 | RequireAdminID |
+| 26 | `admin/merchant_handler.go` | 5 | RequireAdminID, ParseID |
+| 27 | `admin/dashboard_handler.go` | 4 | RequireAdminID, ParseQueryDateRange |
+| 28 | `admin/banner_feedback_handler.go` | 5 | RequireAdminID, ParseID |
+| 29 | `admin/auth_handler.go` | 3 | HandleError |
+
+---
+
+## 迁移执行指南
+
+### 步骤 1: 添加导入
+
+```go
+import (
+    // ... 现有导入 ...
+    "github.com/dumeirei/smart-locker-backend/internal/common/handler"
+)
+```
+
+### 步骤 2: 替换错误处理模式
+
+**查找模式:**
+```go
+if err != nil {
+    if appErr, ok := err.(*errors.AppError); ok {
+        response.Error(c, appErr.Code, appErr.Message)
+        return
+    }
+    response.InternalError(c, err.Error())
+    return
+}
+response.Success(c, result)
+```
+
+**替换为:**
+```go
+handler.MustSucceed(c, err, result)
+return
+```
+
+### 步骤 3: 替换认证检查模式
+
+**查找模式:**
+```go
+userID := middleware.GetUserID(c)
+if userID == 0 {
+    response.Unauthorized(c, "请先登录")
+    return
+}
+```
+
+**替换为:**
+```go
+userID, ok := handler.RequireUserID(c)
+if !ok {
+    return
+}
+```
+
+### 步骤 4: 替换ID解析模式
+
+**查找模式:**
+```go
+id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+if err != nil {
+    response.BadRequest(c, "无效的XXX ID")
+    return
+}
+```
+
+**替换为:**
+```go
+id, ok := handler.ParseID(c, "XXX")
+if !ok {
+    return
+}
+```
+
+### 步骤 5: 替换分页模式
+
+**查找模式:**
+```go
+var pagination utils.Pagination
+pagination.Page, _ = strconv.Atoi(c.DefaultQuery("page", "1"))
+pagination.PageSize, _ = strconv.Atoi(c.DefaultQuery("page_size", "10"))
+pagination.Normalize()
+```
+
+**替换为:**
+```go
+p := handler.BindPagination(c)
+```
+
+### 步骤 6: 验证
+
+每个文件迁移完成后：
+1. 运行 `go build ./internal/handler/...` 确保编译通过
+2. 运行相关单元测试（如有）
+3. 手动测试关键 API 端点
+
+---
+
+## 迁移进度跟踪
+
+请在完成每个文件迁移后更新此表格：
+
+| 文件 | 状态 | 迁移日期 | 备注 |
+|------|------|----------|------|
+| auth/auth_handler.go | ⏳ 待迁移 | - | - |
+| user/user_handler.go | ⏳ 待迁移 | - | - |
+| user/member_handler.go | ⏳ 待迁移 | - | - |
+| rental/rental_handler.go | ⏳ 待迁移 | - | - |
+| payment/payment_handler.go | ⏳ 待迁移 | - | - |
+| hotel/hotel_handler.go | ⏳ 待迁移 | - | - |
+| hotel/booking_handler.go | ⏳ 待迁移 | - | - |
+| mall/cart_handler.go | ⏳ 待迁移 | - | - |
+| mall/order_handler.go | ⏳ 待迁移 | - | - |
+| mall/product_handler.go | ⏳ 待迁移 | - | - |
+| distribution/distribution_handler.go | ⏳ 待迁移 | - | - |
+| marketing/coupon_handler.go | ⏳ 待迁移 | - | - |
+| order/refund_handler.go | ⏳ 待迁移 | - | - |
+| device/device_handler.go | ⏳ 待迁移 | - | - |
+| content/content_handler.go | ⏳ 待迁移 | - | - |
+| admin/* (15个文件) | ⏳ 待迁移 | - | - |
+
+---
+
+## 预期成果
+
+完成所有迁移后预计：
+
+- **代码行数减少**: ~1,950 行 (约30%)
+- **重复模式消除**: 146处错误处理 + 88处认证检查 + 105处ID解析
+- **一致性提升**: 所有Handler使用统一的辅助函数
+- **可维护性提升**: 修改错误处理逻辑只需改一处

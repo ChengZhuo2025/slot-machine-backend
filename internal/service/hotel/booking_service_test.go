@@ -200,6 +200,98 @@ func TestBookingService_CreateBooking(t *testing.T) {
 		_, err := svc.CreateBooking(ctx, user.ID, req)
 		assert.Error(t, err)
 	})
+
+	t.Run("房间未上架创建失败", func(t *testing.T) {
+		// 创建一个未上架的房间
+		bedType := "单人床"
+		area := 20
+		disabledRoom := &models.Room{
+			HotelID:     room.HotelID,
+			RoomNo:      "999",
+			RoomType:    "标准房",
+			BedType:     &bedType,
+			Area:        &area,
+			MaxGuests:   1,
+			HourlyPrice: 50.0,
+			DailyPrice:  200.0,
+			Status:      models.RoomStatusDisabled,
+		}
+		svc.db.Create(disabledRoom)
+
+		checkInTime := time.Now().Add(1 * time.Hour)
+		req := &CreateBookingRequest{
+			RoomID:        disabledRoom.ID,
+			DurationHours: 2,
+			CheckInTime:   checkInTime,
+		}
+
+		_, err := svc.CreateBooking(ctx, user.ID, req)
+		assert.Error(t, err)
+	})
+
+	t.Run("时段不存在创建失败", func(t *testing.T) {
+		checkInTime := time.Now().Add(1 * time.Hour)
+		req := &CreateBookingRequest{
+			RoomID:        room.ID,
+			DurationHours: 999, // 不存在的时段
+			CheckInTime:   checkInTime,
+		}
+
+		_, err := svc.CreateBooking(ctx, user.ID, req)
+		assert.Error(t, err)
+	})
+
+	t.Run("酒店已下架创建失败", func(t *testing.T) {
+		// 创建一个下架的酒店和房间
+		disabledHotel := &models.Hotel{
+			Name:         "已下架酒店3",
+			Province:     "广东省",
+			City:         "深圳市",
+			District:     "南山区",
+			Address:      "测试路4号",
+			Phone:        "0755-12345681",
+			CheckInTime:  "14:00",
+			CheckOutTime: "12:00",
+			Status:       models.HotelStatusActive,
+		}
+		svc.db.Create(disabledHotel)
+		svc.db.Model(disabledHotel).Update("status", models.HotelStatusDisabled)
+
+		bedType := "大床"
+		area := 25
+		disabledHotelRoom := &models.Room{
+			HotelID:     disabledHotel.ID,
+			RoomNo:      "201",
+			RoomType:    models.RoomTypeStandard,
+			BedType:     &bedType,
+			Area:        &area,
+			MaxGuests:   2,
+			HourlyPrice: 60.0,
+			DailyPrice:  288.0,
+			Status:      models.RoomStatusActive,
+		}
+		svc.db.Create(disabledHotelRoom)
+
+		// 创建时段
+		timeSlot := &models.RoomTimeSlot{
+			RoomID:        disabledHotelRoom.ID,
+			DurationHours: 2,
+			Price:         100.0,
+			IsActive:      true,
+			Sort:          1,
+		}
+		svc.db.Create(timeSlot)
+
+		checkInTime := time.Now().Add(1 * time.Hour)
+		req := &CreateBookingRequest{
+			RoomID:        disabledHotelRoom.ID,
+			DurationHours: 2,
+			CheckInTime:   checkInTime,
+		}
+
+		_, err := svc.CreateBooking(ctx, user.ID, req)
+		assert.Error(t, err)
+	})
 }
 
 func TestBookingService_CreateBooking_RoomConflict(t *testing.T) {
@@ -365,6 +457,13 @@ func TestBookingService_GetUserBookings(t *testing.T) {
 			assert.Equal(t, models.BookingStatusPending, b.Status)
 		}
 	})
+
+	t.Run("默认分页参数", func(t *testing.T) {
+		bookings, total, err := svc.GetUserBookings(ctx, user.ID, 0, 0, nil)
+		require.NoError(t, err)
+		assert.Equal(t, int64(5), total)
+		assert.Len(t, bookings, 5)
+	})
 }
 
 func TestBookingService_CancelBooking(t *testing.T) {
@@ -476,6 +575,11 @@ func TestBookingService_CancelBooking(t *testing.T) {
 		err := svc.CancelBooking(ctx, booking.ID, 999999)
 		assert.Error(t, err)
 	})
+
+	t.Run("取消不存在的预订失败", func(t *testing.T) {
+		err := svc.CancelBooking(ctx, 999999, user.ID)
+		assert.Error(t, err)
+	})
 }
 
 func TestBookingService_VerifyBooking(t *testing.T) {
@@ -561,6 +665,181 @@ func TestBookingService_VerifyBooking(t *testing.T) {
 	t.Run("无效核销码", func(t *testing.T) {
 		adminID := int64(1)
 		_, err := svc.VerifyBooking(ctx, "INVALID_CODE", adminID)
+		assert.Error(t, err)
+	})
+
+	t.Run("核销已核销的预订失败", func(t *testing.T) {
+		order := &models.Order{
+			OrderNo:        "VERIFY003",
+			UserID:         user.ID,
+			Type:           models.OrderTypeHotel,
+			OriginalAmount: 100.0,
+			ActualAmount:   100.0,
+			Status:         models.OrderStatusPaid,
+		}
+		svc.db.Create(order)
+
+		checkInTime := time.Now().Add(1 * time.Hour)
+		verificationCode := "VVERIFY003XXXXXXXXX"
+		booking := &models.Booking{
+			BookingNo:        "BVERIFY003",
+			OrderID:          order.ID,
+			UserID:           user.ID,
+			HotelID:          hotel.ID,
+			RoomID:           room.ID,
+			CheckInTime:      checkInTime,
+			CheckOutTime:     checkInTime.Add(2 * time.Hour),
+			DurationHours:    2,
+			Amount:           100.0,
+			VerificationCode: verificationCode,
+			UnlockCode:       "666666",
+			QRCode:           "/qr/verify003",
+			Status:           models.BookingStatusVerified,
+		}
+		svc.db.Create(booking)
+
+		adminID := int64(1)
+		_, err := svc.VerifyBooking(ctx, verificationCode, adminID)
+		assert.Error(t, err)
+	})
+
+	t.Run("核销已取消的预订失败", func(t *testing.T) {
+		order := &models.Order{
+			OrderNo:        "VERIFY004",
+			UserID:         user.ID,
+			Type:           models.OrderTypeHotel,
+			OriginalAmount: 100.0,
+			ActualAmount:   100.0,
+			Status:         models.OrderStatusCancelled,
+		}
+		svc.db.Create(order)
+
+		checkInTime := time.Now().Add(1 * time.Hour)
+		verificationCode := "VVERIFY004XXXXXXXXX"
+		booking := &models.Booking{
+			BookingNo:        "BVERIFY004",
+			OrderID:          order.ID,
+			UserID:           user.ID,
+			HotelID:          hotel.ID,
+			RoomID:           room.ID,
+			CheckInTime:      checkInTime,
+			CheckOutTime:     checkInTime.Add(2 * time.Hour),
+			DurationHours:    2,
+			Amount:           100.0,
+			VerificationCode: verificationCode,
+			UnlockCode:       "777777",
+			QRCode:           "/qr/verify004",
+			Status:           models.BookingStatusCancelled,
+		}
+		svc.db.Create(booking)
+
+		adminID := int64(1)
+		_, err := svc.VerifyBooking(ctx, verificationCode, adminID)
+		assert.Error(t, err)
+	})
+
+	t.Run("核销已过期的预订失败", func(t *testing.T) {
+		order := &models.Order{
+			OrderNo:        "VERIFY005",
+			UserID:         user.ID,
+			Type:           models.OrderTypeHotel,
+			OriginalAmount: 100.0,
+			ActualAmount:   100.0,
+			Status:         models.OrderStatusPaid,
+		}
+		svc.db.Create(order)
+
+		checkInTime := time.Now().Add(-5 * time.Hour)
+		verificationCode := "VVERIFY005XXXXXXXXX"
+		booking := &models.Booking{
+			BookingNo:        "BVERIFY005",
+			OrderID:          order.ID,
+			UserID:           user.ID,
+			HotelID:          hotel.ID,
+			RoomID:           room.ID,
+			CheckInTime:      checkInTime,
+			CheckOutTime:     checkInTime.Add(-3 * time.Hour),
+			DurationHours:    2,
+			Amount:           100.0,
+			VerificationCode: verificationCode,
+			UnlockCode:       "888888",
+			QRCode:           "/qr/verify005",
+			Status:           models.BookingStatusPaid,
+		}
+		svc.db.Create(booking)
+
+		adminID := int64(1)
+		_, err := svc.VerifyBooking(ctx, verificationCode, adminID)
+		assert.Error(t, err)
+	})
+
+	t.Run("核销使用中的预订失败", func(t *testing.T) {
+		order := &models.Order{
+			OrderNo:        "VERIFY006",
+			UserID:         user.ID,
+			Type:           models.OrderTypeHotel,
+			OriginalAmount: 100.0,
+			ActualAmount:   100.0,
+			Status:         models.OrderStatusPaid,
+		}
+		svc.db.Create(order)
+
+		checkInTime := time.Now().Add(1 * time.Hour)
+		verificationCode := "VVERIFY006XXXXXXXXX"
+		booking := &models.Booking{
+			BookingNo:        "BVERIFY006",
+			OrderID:          order.ID,
+			UserID:           user.ID,
+			HotelID:          hotel.ID,
+			RoomID:           room.ID,
+			CheckInTime:      checkInTime,
+			CheckOutTime:     checkInTime.Add(2 * time.Hour),
+			DurationHours:    2,
+			Amount:           100.0,
+			VerificationCode: verificationCode,
+			UnlockCode:       "999999",
+			QRCode:           "/qr/verify006",
+			Status:           models.BookingStatusInUse,
+		}
+		svc.db.Create(booking)
+
+		adminID := int64(1)
+		_, err := svc.VerifyBooking(ctx, verificationCode, adminID)
+		assert.Error(t, err)
+	})
+
+	t.Run("核销已完成的预订失败", func(t *testing.T) {
+		order := &models.Order{
+			OrderNo:        "VERIFY007",
+			UserID:         user.ID,
+			Type:           models.OrderTypeHotel,
+			OriginalAmount: 100.0,
+			ActualAmount:   100.0,
+			Status:         models.OrderStatusCompleted,
+		}
+		svc.db.Create(order)
+
+		checkInTime := time.Now().Add(1 * time.Hour)
+		verificationCode := "VVERIFY007XXXXXXXXX"
+		booking := &models.Booking{
+			BookingNo:        "BVERIFY007",
+			OrderID:          order.ID,
+			UserID:           user.ID,
+			HotelID:          hotel.ID,
+			RoomID:           room.ID,
+			CheckInTime:      checkInTime,
+			CheckOutTime:     checkInTime.Add(2 * time.Hour),
+			DurationHours:    2,
+			Amount:           100.0,
+			VerificationCode: verificationCode,
+			UnlockCode:       "101010",
+			QRCode:           "/qr/verify007",
+			Status:           models.BookingStatusCompleted,
+		}
+		svc.db.Create(booking)
+
+		adminID := int64(1)
+		_, err := svc.VerifyBooking(ctx, verificationCode, adminID)
 		assert.Error(t, err)
 	})
 }
@@ -673,6 +952,11 @@ func TestBookingService_CompleteBooking(t *testing.T) {
 		svc.db.Create(booking)
 
 		err := svc.CompleteBooking(ctx, booking.ID)
+		assert.Error(t, err)
+	})
+
+	t.Run("完成不存在的预订失败", func(t *testing.T) {
+		err := svc.CompleteBooking(ctx, 999999)
 		assert.Error(t, err)
 	})
 }
@@ -909,6 +1193,21 @@ func TestBookingService_UnlockByCode(t *testing.T) {
 		assert.Equal(t, appErrors.ErrUnlockCodeExpired.Code, appErr.Code)
 	})
 
+	t.Run("非已核销状态查找不到预订", func(t *testing.T) {
+		// 创建一个已支付但未核销的预订
+		checkIn := time.Now().Add(-time.Hour)
+		checkOut := time.Now().Add(time.Hour)
+		createBooking(t, models.BookingStatusPaid, checkIn, checkOut, "555555")
+
+		// GetByUnlockCode 只查询 Verified 或 InUse 状态的预订
+		// 所以 Paid 状态会找不到记录，返回开锁码无效
+		_, err := svc.UnlockByCode(ctx, deviceID, "555555")
+		require.Error(t, err)
+		appErr, ok := err.(*appErrors.AppError)
+		require.True(t, ok)
+		assert.Equal(t, appErrors.ErrUnlockCodeInvalid.Code, appErr.Code)
+	})
+
 	t.Run("开锁成功更新为使用中", func(t *testing.T) {
 		checkIn := time.Now().Add(-time.Hour)
 		checkOut := time.Now().Add(time.Hour)
@@ -1056,4 +1355,95 @@ func TestBookingService_getStatusName(t *testing.T) {
 		name := svc.getStatusName(tt.status)
 		assert.Equal(t, tt.expected, name)
 	}
+}
+
+// TestBookingService_UnlockByCode_DBError 测试数据库错误路径
+func TestBookingService_UnlockByCode_DBError(t *testing.T) {
+	svc := setupTestBookingService(t)
+	ctx := context.Background()
+
+	// 关闭数据库连接模拟数据库错误
+	sqlDB, _ := svc.db.DB()
+	sqlDB.Close()
+
+	_, err := svc.UnlockByCode(ctx, 1, "123456")
+	require.Error(t, err)
+}
+
+// TestBookingService_ProcessExpiredBookings_DBError 测试过期预订处理数据库错误
+func TestBookingService_ProcessExpiredBookings_DBError(t *testing.T) {
+	svc := setupTestBookingService(t)
+	ctx := context.Background()
+
+	// 关闭数据库连接模拟数据库错误
+	sqlDB, _ := svc.db.DB()
+	sqlDB.Close()
+
+	err := svc.ProcessExpiredBookings(ctx)
+	require.Error(t, err)
+}
+
+// TestBookingService_ProcessCompletedBookings_DBError 测试完成预订处理数据库错误
+func TestBookingService_ProcessCompletedBookings_DBError(t *testing.T) {
+	svc := setupTestBookingService(t)
+	ctx := context.Background()
+
+	// 关闭数据库连接模拟数据库错误
+	sqlDB, _ := svc.db.DB()
+	sqlDB.Close()
+
+	err := svc.ProcessCompletedBookings(ctx)
+	require.Error(t, err)
+}
+
+// TestBookingService_GetBookingByNo_DBError 测试数据库错误
+func TestBookingService_GetBookingByNo_DBError(t *testing.T) {
+	svc := setupTestBookingService(t)
+	ctx := context.Background()
+
+	// 关闭数据库连接模拟数据库错误
+	sqlDB, _ := svc.db.DB()
+	sqlDB.Close()
+
+	_, err := svc.GetBookingByNo(ctx, "B123456", 1)
+	require.Error(t, err)
+}
+
+// TestBookingService_CompleteBooking_DBError 测试数据库错误
+func TestBookingService_CompleteBooking_DBError(t *testing.T) {
+	svc := setupTestBookingService(t)
+	ctx := context.Background()
+
+	// 关闭数据库连接模拟数据库错误
+	sqlDB, _ := svc.db.DB()
+	sqlDB.Close()
+
+	err := svc.CompleteBooking(ctx, 1)
+	require.Error(t, err)
+}
+
+// TestBookingService_OnPaymentSuccess_DBError 测试数据库错误
+func TestBookingService_OnPaymentSuccess_DBError(t *testing.T) {
+	svc := setupTestBookingService(t)
+	ctx := context.Background()
+
+	// 关闭数据库连接模拟数据库错误
+	sqlDB, _ := svc.db.DB()
+	sqlDB.Close()
+
+	err := svc.OnPaymentSuccess(ctx, 1)
+	require.Error(t, err)
+}
+
+// TestBookingService_GetBookingByID_DBError 测试数据库错误
+func TestBookingService_GetBookingByID_DBError(t *testing.T) {
+	svc := setupTestBookingService(t)
+	ctx := context.Background()
+
+	// 关闭数据库连接模拟数据库错误
+	sqlDB, _ := svc.db.DB()
+	sqlDB.Close()
+
+	_, err := svc.GetBookingByID(ctx, 1, 1)
+	require.Error(t, err)
 }

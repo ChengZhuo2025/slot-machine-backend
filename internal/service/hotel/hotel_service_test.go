@@ -193,6 +193,47 @@ func TestHotelService_GetHotelList(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotNil(t, hotels)
 	})
+
+	t.Run("PageSize超过最大值限制为50", func(t *testing.T) {
+		req := &HotelListRequest{
+			Page:     1,
+			PageSize: 100, // 应该被限制为50
+		}
+		_, _, err := svc.GetHotelList(ctx, req)
+		require.NoError(t, err)
+	})
+
+	t.Run("按区域过滤", func(t *testing.T) {
+		req := &HotelListRequest{
+			Page:     1,
+			PageSize: 10,
+			City:     "深圳市",
+			District: "中心区",
+		}
+		hotels, total, err := svc.GetHotelList(ctx, req)
+		require.NoError(t, err)
+		assert.Equal(t, int64(1), total)
+		assert.Len(t, hotels, 1)
+	})
+
+	t.Run("按星级过滤", func(t *testing.T) {
+		req := &HotelListRequest{
+			Page:       1,
+			PageSize:   10,
+			StarRating: 3,
+		}
+		hotels, _, err := svc.GetHotelList(ctx, req)
+		require.NoError(t, err)
+		assert.NotEmpty(t, hotels)
+		for _, h := range hotels {
+			assert.NotNil(t, h.StarRating)
+			assert.Equal(t, 3, *h.StarRating)
+		}
+	})
+
+	// 注意：附近搜索功能需要数据库支持地理距离计算函数（如 MySQL 的 ST_Distance_Sphere）
+	// SQLite 不支持这些函数，因此在单元测试中跳过附近搜索功能的测试
+	// 实际项目中应使用 MySQL/PostgreSQL 数据库并在集成测试中验证此功能
 }
 
 func Test_jsonToStringSlice(t *testing.T) {
@@ -300,6 +341,26 @@ func TestHotelService_GetRoomList(t *testing.T) {
 
 	t.Run("酒店不存在", func(t *testing.T) {
 		_, err := svc.GetRoomList(ctx, 999999)
+		assert.Error(t, err)
+	})
+
+	t.Run("下架酒店不可查看房间", func(t *testing.T) {
+		// 创建一个下架的酒店
+		disabledHotel := &models.Hotel{
+			Name:         "已下架酒店2",
+			Province:     "广东省",
+			City:         "深圳市",
+			District:     "南山区",
+			Address:      "测试路3号",
+			Phone:        "0755-12345680",
+			CheckInTime:  "14:00",
+			CheckOutTime: "12:00",
+			Status:       models.HotelStatusActive,
+		}
+		svc.db.Create(disabledHotel)
+		svc.db.Model(disabledHotel).Update("status", models.HotelStatusDisabled)
+
+		_, err := svc.GetRoomList(ctx, disabledHotel.ID)
 		assert.Error(t, err)
 	})
 }
@@ -603,4 +664,130 @@ func TestHotelService_convertRoomInfo(t *testing.T) {
 	assert.Equal(t, room.DailyPrice, info.DailyPrice)
 	assert.Equal(t, room.Status, info.Status)
 	assert.Equal(t, "可用", info.StatusName)
+}
+
+// TestHotelService_GetHotelList_DBError 测试数据库错误
+func TestHotelService_GetHotelList_DBError(t *testing.T) {
+	svc := setupTestHotelService(t)
+	ctx := context.Background()
+
+	// 关闭数据库连接模拟数据库错误
+	sqlDB, _ := svc.db.DB()
+	sqlDB.Close()
+
+	_, _, err := svc.GetHotelList(ctx, &HotelListRequest{
+		Page:     1,
+		PageSize: 10,
+	})
+	require.Error(t, err)
+}
+
+// TestHotelService_GetCities_DBError 测试数据库错误
+func TestHotelService_GetCities_DBError(t *testing.T) {
+	svc := setupTestHotelService(t)
+	ctx := context.Background()
+
+	// 关闭数据库连接模拟数据库错误
+	sqlDB, _ := svc.db.DB()
+	sqlDB.Close()
+
+	_, err := svc.GetCities(ctx)
+	require.Error(t, err)
+}
+
+// TestHotelService_GetRoomList_DBError 测试数据库错误
+func TestHotelService_GetRoomList_DBError(t *testing.T) {
+	svc := setupTestHotelService(t)
+	ctx := context.Background()
+
+	// 关闭数据库连接模拟数据库错误
+	sqlDB, _ := svc.db.DB()
+	sqlDB.Close()
+
+	_, err := svc.GetRoomList(ctx, 1)
+	require.Error(t, err)
+}
+
+// TestHotelService_GetHotelDetail_DBError 测试数据库错误
+func TestHotelService_GetHotelDetail_DBError(t *testing.T) {
+	svc := setupTestHotelService(t)
+	ctx := context.Background()
+
+	// 关闭数据库连接模拟数据库错误
+	sqlDB, _ := svc.db.DB()
+	sqlDB.Close()
+
+	_, err := svc.GetHotelDetail(ctx, 1)
+	require.Error(t, err)
+}
+
+// TestHotelService_GetRoomDetail_DBError 测试数据库错误
+func TestHotelService_GetRoomDetail_DBError(t *testing.T) {
+	svc := setupTestHotelService(t)
+	ctx := context.Background()
+
+	// 关闭数据库连接模拟数据库错误
+	sqlDB, _ := svc.db.DB()
+	sqlDB.Close()
+
+	_, err := svc.GetRoomDetail(ctx, 1)
+	require.Error(t, err)
+}
+
+// TestHotelService_CheckRoomAvailability_DBError 测试数据库错误
+func TestHotelService_CheckRoomAvailability_DBError(t *testing.T) {
+	svc := setupTestHotelService(t)
+	ctx := context.Background()
+
+	// 关闭数据库连接模拟数据库错误
+	sqlDB, _ := svc.db.DB()
+	sqlDB.Close()
+
+	_, err := svc.CheckRoomAvailability(ctx, 1, time.Now(), time.Now().Add(time.Hour))
+	require.Error(t, err)
+}
+
+// TestHotelService_convertHotelInfo_NilFields 测试空字段处理
+func TestHotelService_convertHotelInfo_NilFields(t *testing.T) {
+	svc := setupTestHotelService(t)
+
+	// 创建一个没有 Facilities 的酒店
+	hotel := &models.Hotel{
+		ID:        1,
+		Name:      "测试酒店",
+		City:      "北京",
+		Address:   "测试地址",
+		Phone:     "13800138000",
+		Status:    models.HotelStatusActive,
+		CreatedAt: time.Now(),
+		// Facilities 为空
+	}
+
+	info := svc.convertHotelInfo(hotel)
+	assert.Equal(t, hotel.ID, info.ID)
+	assert.Empty(t, info.Facilities)
+}
+
+// TestHotelService_convertRoomInfo_NilFields 测试空字段处理
+func TestHotelService_convertRoomInfo_NilFields(t *testing.T) {
+	svc := setupTestHotelService(t)
+
+	// 创建一个没有可选字段的房间
+	room := &models.Room{
+		ID:          1,
+		HotelID:     1,
+		RoomNo:      "101",
+		RoomType:    models.RoomTypeStandard,
+		MaxGuests:   2,
+		HourlyPrice: 60.0,
+		DailyPrice:  288.0,
+		Status:      models.RoomStatusActive,
+		CreatedAt:   time.Now(),
+		// Area 和 BedType 为空
+	}
+
+	info := svc.convertRoomInfo(room)
+	assert.Equal(t, room.ID, info.ID)
+	assert.Nil(t, info.Area)
+	assert.Nil(t, info.BedType)
 }

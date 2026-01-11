@@ -224,6 +224,39 @@ func TestWechatService_WechatLogin_DisabledUser(t *testing.T) {
 	assert.Equal(t, appErrors.ErrAccountDisabled.Code, appErr.Code)
 }
 
+func TestWechatService_Code2Session_HTTPError(t *testing.T) {
+	svc, _ := setupWechatService(t)
+
+	// Test HTTP request error
+	svc.httpClient = &http.Client{
+		Transport: roundTripperFunc(func(r *http.Request) (*http.Response, error) {
+			return nil, assert.AnError
+		}),
+	}
+
+	_, err := svc.WechatLogin(context.Background(), &WechatLoginRequest{Code: "http_error"})
+	require.Error(t, err)
+}
+
+func TestWechatService_Code2Session_InvalidJSON(t *testing.T) {
+	svc, _ := setupWechatService(t)
+
+	// Test invalid JSON response
+	svc.httpClient = &http.Client{
+		Transport: roundTripperFunc(func(r *http.Request) (*http.Response, error) {
+			body := `{invalid json`
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBufferString(body)),
+				Header:     make(http.Header),
+			}, nil
+		}),
+	}
+
+	_, err := svc.WechatLogin(context.Background(), &WechatLoginRequest{Code: "invalid_json"})
+	require.Error(t, err)
+}
+
 func TestWechatService_BindPhone(t *testing.T) {
 	svc, db := setupWechatService(t)
 	ctx := context.Background()
@@ -268,3 +301,61 @@ func TestWechatService_BindPhone(t *testing.T) {
 	require.ErrorAs(t, err, &appErr)
 	assert.Equal(t, appErrors.ErrPhoneExists.Code, appErr.Code)
 }
+
+func TestWechatService_BindPhone_InvalidCode(t *testing.T) {
+	svc, db := setupWechatService(t)
+	ctx := context.Background()
+
+	openid := "openid_invalid_code"
+	user := &models.User{
+		OpenID:        &openid,
+		Nickname:      "测试用户",
+		MemberLevelID: 1,
+		Status:        models.UserStatusActive,
+	}
+	require.NoError(t, db.Create(user).Error)
+
+	redisClient, _ := newTestRedisClient(t)
+	smsSender := &stubSMSSender{}
+	codeSvc := NewCodeService(redisClient, smsSender, nil)
+
+	phone := "13800138333"
+	// Send code but use wrong code
+	require.NoError(t, codeSvc.SendCode(ctx, phone, CodeTypeBind))
+
+	err := svc.BindPhone(ctx, user.ID, phone, "wrong_code", codeSvc)
+	require.Error(t, err)
+	var appErr *appErrors.AppError
+	require.ErrorAs(t, err, &appErr)
+	assert.Equal(t, appErrors.ErrSmsCodeError.Code, appErr.Code)
+}
+
+func TestWechatService_WechatLogin_NoNicknameDefaultGenerated(t *testing.T) {
+	svc, db := setupWechatService(t)
+
+	svc.httpClient = &http.Client{
+		Transport: roundTripperFunc(func(r *http.Request) (*http.Response, error) {
+			body := `{"openid":"openid_no_nick","session_key":"sk","errcode":0,"errmsg":""}`
+			return &http.Response{
+				StatusCode: 200,
+				Body:       io.NopCloser(bytes.NewBufferString(body)),
+				Header:     make(http.Header),
+			}, nil
+		}),
+	}
+
+	// Login without providing nickname
+	resp, err := svc.WechatLogin(context.Background(), &WechatLoginRequest{
+		Code: "good",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	assert.True(t, resp.IsNewUser)
+	// Should have generated nickname
+	assert.Contains(t, resp.User.Nickname, "微信用户")
+
+	var created models.User
+	require.NoError(t, db.Where("openid = ?", "openid_no_nick").First(&created).Error)
+	assert.Contains(t, created.Nickname, "微信用户")
+}
+

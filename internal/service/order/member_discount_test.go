@@ -214,3 +214,102 @@ func TestMemberDiscountService_CalculateWithMemberDiscount(t *testing.T) {
 		assert.Equal(t, "coupon", result.DiscountDetails[2].Type)
 	})
 }
+
+func TestMemberDiscountService_GetMemberDiscount(t *testing.T) {
+	db := setupMemberDiscountTestDB(t)
+	userRepo := repository.NewUserRepository(db)
+	levelRepo := repository.NewMemberLevelRepository(db)
+	svc := NewMemberDiscountService(db, userRepo, levelRepo)
+	ctx := context.Background()
+
+	t.Run("普通会员无折扣返回1.0", func(t *testing.T) {
+		user := createMemberDiscountTestUser(db, 1)
+		discount, err := svc.GetMemberDiscount(ctx, user.ID)
+		require.NoError(t, err)
+		assert.Equal(t, 1.0, discount)
+	})
+
+	t.Run("黄金会员返回0.9折扣", func(t *testing.T) {
+		user := createMemberDiscountTestUser(db, 2)
+		discount, err := svc.GetMemberDiscount(ctx, user.ID)
+		require.NoError(t, err)
+		assert.Equal(t, 0.9, discount)
+	})
+
+	t.Run("钻石会员返回0.95折扣", func(t *testing.T) {
+		user := createMemberDiscountTestUser(db, 3)
+		discount, err := svc.GetMemberDiscount(ctx, user.ID)
+		require.NoError(t, err)
+		assert.Equal(t, 0.95, discount)
+	})
+
+	t.Run("用户不存在返回1.0", func(t *testing.T) {
+		discount, err := svc.GetMemberDiscount(ctx, 999999)
+		require.NoError(t, err)
+		assert.Equal(t, 1.0, discount)
+	})
+
+	t.Run("用户存在但无会员等级返回1.0", func(t *testing.T) {
+		phone := fmt.Sprintf("137%08d", time.Now().UnixNano()%100000000)
+		user := &models.User{
+			Phone:         &phone,
+			Nickname:      "无等级用户",
+			MemberLevelID: 999, // 不存在的会员等级ID
+			Status:        models.UserStatusActive,
+		}
+		require.NoError(t, db.Create(user).Error)
+
+		discount, err := svc.GetMemberDiscount(ctx, user.ID)
+		require.NoError(t, err)
+		assert.Equal(t, 1.0, discount)
+	})
+}
+
+func TestMemberDiscountService_GetMemberInfo(t *testing.T) {
+	db := setupMemberDiscountTestDB(t)
+	userRepo := repository.NewUserRepository(db)
+	levelRepo := repository.NewMemberLevelRepository(db)
+	svc := NewMemberDiscountService(db, userRepo, levelRepo)
+	ctx := context.Background()
+
+	t.Run("获取普通会员信息", func(t *testing.T) {
+		user := createMemberDiscountTestUser(db, 1)
+		info, err := svc.GetMemberInfo(ctx, user.ID)
+		require.NoError(t, err)
+		require.NotNil(t, info)
+		assert.Equal(t, int64(1), info.ID)
+		assert.Equal(t, "普通会员", info.Name)
+		assert.Equal(t, 1.0, info.Discount)
+	})
+
+	t.Run("获取黄金会员信息", func(t *testing.T) {
+		user := createMemberDiscountTestUser(db, 2)
+		info, err := svc.GetMemberInfo(ctx, user.ID)
+		require.NoError(t, err)
+		require.NotNil(t, info)
+		assert.Equal(t, int64(2), info.ID)
+		assert.Equal(t, "黄金会员", info.Name)
+		assert.Equal(t, 0.9, info.Discount)
+	})
+
+	t.Run("用户不存在返回nil", func(t *testing.T) {
+		info, err := svc.GetMemberInfo(ctx, 999999)
+		require.NoError(t, err)
+		assert.Nil(t, info)
+	})
+
+	t.Run("用户存在但无会员等级返回nil", func(t *testing.T) {
+		phone := fmt.Sprintf("138%08d", time.Now().UnixNano()%100000000)
+		user := &models.User{
+			Phone:         &phone,
+			Nickname:      "无等级用户2",
+			MemberLevelID: 999, // 不存在的会员等级ID
+			Status:        models.UserStatusActive,
+		}
+		require.NoError(t, db.Create(user).Error)
+
+		info, err := svc.GetMemberInfo(ctx, user.ID)
+		require.NoError(t, err)
+		assert.Nil(t, info)
+	})
+}

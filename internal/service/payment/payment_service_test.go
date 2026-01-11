@@ -130,6 +130,23 @@ func TestPaymentService_CreatePayment(t *testing.T) {
 		assert.NotNil(t, resp)
 		assert.Nil(t, resp.PayParams) // 没有微信支付参数
 	})
+
+	t.Run("创建支付无描述使用默认", func(t *testing.T) {
+		req := &CreatePaymentRequest{
+			OrderID:        3,
+			OrderNo:        "R20240101003",
+			OrderType:      "rental",
+			Amount:         60.0,
+			PaymentMethod:  models.PaymentMethodWechat,
+			PaymentChannel: models.PaymentChannelMiniProgram,
+			OpenID:         "oXXXX",
+			// 不设置Description
+		}
+
+		resp, err := svc.CreatePayment(ctx, user.ID, req)
+		require.NoError(t, err)
+		assert.NotNil(t, resp)
+	})
 }
 
 func TestPaymentService_QueryPayment(t *testing.T) {
@@ -339,6 +356,249 @@ func TestPaymentService_toPaymentInfo(t *testing.T) {
 	assert.Equal(t, "支付成功", info.StatusName)
 	assert.Equal(t, &transactionID, info.TransactionID)
 	assert.NotNil(t, info.PaidAt)
+}
+
+// setupTestPaymentServiceWithWechat 创建带微信支付客户端的测试服务
+func setupTestPaymentServiceWithWechat(t *testing.T) *testPaymentService {
+	db := setupTestDB(t)
+	paymentRepo := repository.NewPaymentRepository(db)
+	refundRepo := repository.NewRefundRepository(db)
+	rentalRepo := repository.NewRentalRepository(db)
+
+	// 使用微信支付客户端
+	wp, err := wechatpay.NewClient(&wechatpay.Config{})
+	require.NoError(t, err)
+
+	service := NewPaymentService(db, paymentRepo, refundRepo, rentalRepo, wp)
+
+	return &testPaymentService{
+		PaymentService: service,
+		db:             db,
+	}
+}
+
+func TestPaymentService_CreatePayment_WithWechatClient(t *testing.T) {
+	svc := setupTestPaymentServiceWithWechat(t)
+	ctx := context.Background()
+	user := createTestUser(t, svc.db)
+
+	t.Run("创建微信小程序支付成功", func(t *testing.T) {
+		req := &CreatePaymentRequest{
+			OrderID:        100,
+			OrderNo:        "R20240101100",
+			OrderType:      "rental",
+			Amount:         60.0,
+			PaymentMethod:  models.PaymentMethodWechat,
+			PaymentChannel: models.PaymentChannelMiniProgram,
+			OpenID:         "oXXXX12345",
+			Description:    "租借订单支付",
+		}
+
+		resp, err := svc.CreatePayment(ctx, user.ID, req)
+		require.NoError(t, err)
+		assert.NotNil(t, resp)
+		assert.NotEmpty(t, resp.PaymentNo)
+		assert.NotNil(t, resp.PayParams)
+		assert.NotEmpty(t, resp.PayParams.PrepayID)
+		assert.NotEmpty(t, resp.PayParams.PaySign)
+	})
+
+	t.Run("创建微信Native扫码支付成功", func(t *testing.T) {
+		req := &CreatePaymentRequest{
+			OrderID:        101,
+			OrderNo:        "R20240101101",
+			OrderType:      "rental",
+			Amount:         80.0,
+			PaymentMethod:  models.PaymentMethodWechat,
+			PaymentChannel: models.PaymentChannelNative,
+			Description:    "Native支付",
+		}
+
+		resp, err := svc.CreatePayment(ctx, user.ID, req)
+		require.NoError(t, err)
+		assert.NotNil(t, resp)
+		assert.NotNil(t, resp.PayParams)
+		assert.NotEmpty(t, resp.PayParams.CodeURL)
+	})
+
+	t.Run("创建微信H5支付成功", func(t *testing.T) {
+		req := &CreatePaymentRequest{
+			OrderID:        102,
+			OrderNo:        "R20240101102",
+			OrderType:      "rental",
+			Amount:         90.0,
+			PaymentMethod:  models.PaymentMethodWechat,
+			PaymentChannel: models.PaymentChannelH5,
+			Description:    "H5支付",
+		}
+
+		resp, err := svc.CreatePayment(ctx, user.ID, req)
+		require.NoError(t, err)
+		assert.NotNil(t, resp)
+		assert.NotNil(t, resp.PayParams)
+		assert.NotEmpty(t, resp.PayParams.H5URL)
+	})
+
+	t.Run("创建微信支付使用默认渠道", func(t *testing.T) {
+		req := &CreatePaymentRequest{
+			OrderID:        103,
+			OrderNo:        "R20240101103",
+			OrderType:      "rental",
+			Amount:         70.0,
+			PaymentMethod:  models.PaymentMethodWechat,
+			PaymentChannel: "unknown_channel", // 未知渠道，使用默认
+			OpenID:         "oXXXX67890",
+		}
+
+		resp, err := svc.CreatePayment(ctx, user.ID, req)
+		require.NoError(t, err)
+		assert.NotNil(t, resp)
+		assert.NotNil(t, resp.PayParams)
+		assert.NotEmpty(t, resp.PayParams.PrepayID)
+	})
+
+	t.Run("创建微信支付无描述使用默认描述", func(t *testing.T) {
+		req := &CreatePaymentRequest{
+			OrderID:        104,
+			OrderNo:        "R20240101104",
+			OrderType:      "rental",
+			Amount:         50.0,
+			PaymentMethod:  models.PaymentMethodWechat,
+			PaymentChannel: models.PaymentChannelMiniProgram,
+			OpenID:         "oXXXX11111",
+			// 不设置Description，应使用默认
+		}
+
+		resp, err := svc.CreatePayment(ctx, user.ID, req)
+		require.NoError(t, err)
+		assert.NotNil(t, resp)
+		assert.NotNil(t, resp.PayParams)
+	})
+}
+
+func TestPaymentService_CreateRefund_WithWechatClient(t *testing.T) {
+	svc := setupTestPaymentServiceWithWechat(t)
+	ctx := context.Background()
+	user := createTestUser(t, svc.db)
+
+	// 创建成功支付的记录
+	now := time.Now()
+	payment := &models.Payment{
+		PaymentNo:      "P20240101WECHAT",
+		OrderID:        200,
+		OrderNo:        "R20240101200",
+		UserID:         user.ID,
+		Amount:         100.0,
+		PaymentMethod:  models.PaymentMethodWechat,
+		PaymentChannel: models.PaymentChannelMiniProgram,
+		Status:         models.PaymentStatusSuccess,
+		PaidAt:         &now,
+	}
+	svc.db.Create(payment)
+
+	t.Run("微信支付退款成功", func(t *testing.T) {
+		req := &CreateRefundRequest{
+			PaymentNo: payment.PaymentNo,
+			Amount:    50.0,
+			Reason:    "微信退款测试",
+		}
+
+		err := svc.CreateRefund(ctx, user.ID, req)
+		require.NoError(t, err)
+
+		// 验证退款记录已创建
+		var refund models.Refund
+		svc.db.Where("payment_no = ?", payment.PaymentNo).First(&refund)
+		assert.Equal(t, req.Amount, refund.Amount)
+		// 微信退款会更新为处理中状态
+		assert.EqualValues(t, models.RefundStatusProcessing, refund.Status)
+		assert.NotNil(t, refund.TransactionID)
+	})
+}
+
+func TestPaymentService_CreateRefund_PaymentNotFound(t *testing.T) {
+	svc := setupTestPaymentService(t)
+	ctx := context.Background()
+	user := createTestUser(t, svc.db)
+
+	t.Run("退款时支付记录不存在", func(t *testing.T) {
+		req := &CreateRefundRequest{
+			PaymentNo: "P_NOT_EXISTS",
+			Amount:    50.0,
+			Reason:    "测试退款",
+		}
+
+		err := svc.CreateRefund(ctx, user.ID, req)
+		require.Error(t, err)
+		var appErr *appErrors.AppError
+		require.ErrorAs(t, err, &appErr)
+		assert.Equal(t, appErrors.ErrPaymentNotFound.Code, appErr.Code)
+	})
+}
+
+func TestPaymentService_CreatePayment_DBError(t *testing.T) {
+	svc := setupTestPaymentService(t)
+	ctx := context.Background()
+	user := createTestUser(t, svc.db)
+
+	// 关闭数据库连接模拟数据库错误
+	sqlDB, _ := svc.db.DB()
+	sqlDB.Close()
+
+	req := &CreatePaymentRequest{
+		OrderID:        1,
+		OrderNo:        "R20240101001",
+		OrderType:      "rental",
+		Amount:         60.0,
+		PaymentMethod:  models.PaymentMethodBalance,
+		PaymentChannel: models.PaymentChannelMiniProgram,
+	}
+
+	_, err := svc.CreatePayment(ctx, user.ID, req)
+	require.Error(t, err)
+}
+
+func TestPaymentService_QueryPayment_DBError(t *testing.T) {
+	svc := setupTestPaymentService(t)
+	ctx := context.Background()
+
+	// 关闭数据库连接模拟数据库错误
+	sqlDB, _ := svc.db.DB()
+	sqlDB.Close()
+
+	_, err := svc.QueryPayment(ctx, "P12345")
+	require.Error(t, err)
+}
+
+func TestPaymentService_CreateRefund_DBError(t *testing.T) {
+	svc := setupTestPaymentService(t)
+	ctx := context.Background()
+	user := createTestUser(t, svc.db)
+
+	// 关闭数据库连接模拟数据库错误
+	sqlDB, _ := svc.db.DB()
+	sqlDB.Close()
+
+	req := &CreateRefundRequest{
+		PaymentNo: "P12345",
+		Amount:    50.0,
+		Reason:    "测试退款",
+	}
+
+	err := svc.CreateRefund(ctx, user.ID, req)
+	require.Error(t, err)
+}
+
+func TestPaymentService_CloseExpiredPayments_DBError(t *testing.T) {
+	svc := setupTestPaymentService(t)
+	ctx := context.Background()
+
+	// 关闭数据库连接模拟数据库错误
+	sqlDB, _ := svc.db.DB()
+	sqlDB.Close()
+
+	err := svc.CloseExpiredPayments(ctx)
+	require.Error(t, err)
 }
 
 func TestPaymentService_HandlePaymentCallback(t *testing.T) {

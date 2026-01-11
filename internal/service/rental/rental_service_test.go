@@ -292,3 +292,641 @@ func TestRentalService_PayStartReturnComplete_FullWalletFlow(t *testing.T) {
 	assert.Equal(t, 200.0-pricing.Price, wallet.Balance)
 	assert.Equal(t, float64(0), wallet.FrozenBalance)
 }
+
+func TestRentalService_PayRental_Errors(t *testing.T) {
+	svc := setupTestRentalService(t)
+	ctx := context.Background()
+
+	user, device, pricing := createTestData(t, svc.db)
+
+	t.Run("租借不存在", func(t *testing.T) {
+		err := svc.PayRental(ctx, user.ID, 999999)
+		assert.Error(t, err)
+	})
+
+	t.Run("无权限支付他人订单", func(t *testing.T) {
+		// 创建租借
+		rentalInfo, err := svc.CreateRental(ctx, user.ID, &CreateRentalRequest{
+			DeviceID:  device.ID,
+			PricingID: pricing.ID,
+		})
+		require.NoError(t, err)
+
+		// 另一个用户尝试支付
+		err = svc.PayRental(ctx, 999999, rentalInfo.ID)
+		assert.Error(t, err)
+
+		// 完成当前租借，以便后续测试
+		svc.PayRental(ctx, user.ID, rentalInfo.ID)
+		svc.StartRental(ctx, user.ID, rentalInfo.ID)
+		svc.ReturnRental(ctx, user.ID, rentalInfo.ID)
+		svc.CompleteRental(ctx, rentalInfo.ID)
+	})
+
+	t.Run("状态错误不能支付", func(t *testing.T) {
+		// 创建新设备避免槽位冲突
+		device2 := &models.Device{
+			DeviceNo:       "D20240101003",
+			Name:           "测试设备3",
+			Type:           models.DeviceTypeStandard,
+			VenueID:        device.VenueID,
+			QRCode:         "https://qr.example.com/D20240101003",
+			ProductName:    "测试产品",
+			SlotCount:      1,
+			AvailableSlots: 1,
+			OnlineStatus:   models.DeviceOnline,
+			LockStatus:     models.DeviceLocked,
+			RentalStatus:   models.DeviceRentalFree,
+			NetworkType:    "WiFi",
+			Status:         models.DeviceStatusActive,
+		}
+		svc.db.Create(device2)
+
+		rentalInfo, err := svc.CreateRental(ctx, user.ID, &CreateRentalRequest{
+			DeviceID:  device2.ID,
+			PricingID: pricing.ID,
+		})
+		require.NoError(t, err)
+
+		// 先支付
+		err = svc.PayRental(ctx, user.ID, rentalInfo.ID)
+		require.NoError(t, err)
+
+		// 再次支付应失败
+		err = svc.PayRental(ctx, user.ID, rentalInfo.ID)
+		assert.Error(t, err)
+	})
+}
+
+func TestRentalService_StartRental_Errors(t *testing.T) {
+	svc := setupTestRentalService(t)
+	ctx := context.Background()
+
+	user, device, pricing := createTestData(t, svc.db)
+
+	t.Run("租借不存在", func(t *testing.T) {
+		err := svc.StartRental(ctx, user.ID, 999999)
+		assert.Error(t, err)
+	})
+
+	t.Run("无权限开始他人租借", func(t *testing.T) {
+		device2 := &models.Device{
+			DeviceNo:       "D20240101004",
+			Name:           "测试设备4",
+			Type:           models.DeviceTypeStandard,
+			VenueID:        device.VenueID,
+			QRCode:         "https://qr.example.com/D20240101004",
+			ProductName:    "测试产品",
+			SlotCount:      1,
+			AvailableSlots: 1,
+			OnlineStatus:   models.DeviceOnline,
+			LockStatus:     models.DeviceLocked,
+			RentalStatus:   models.DeviceRentalFree,
+			NetworkType:    "WiFi",
+			Status:         models.DeviceStatusActive,
+		}
+		svc.db.Create(device2)
+
+		rentalInfo, err := svc.CreateRental(ctx, user.ID, &CreateRentalRequest{
+			DeviceID:  device2.ID,
+			PricingID: pricing.ID,
+		})
+		require.NoError(t, err)
+		svc.PayRental(ctx, user.ID, rentalInfo.ID)
+
+		err = svc.StartRental(ctx, 999999, rentalInfo.ID)
+		assert.Error(t, err)
+
+		// 完成当前租借
+		svc.StartRental(ctx, user.ID, rentalInfo.ID)
+		svc.ReturnRental(ctx, user.ID, rentalInfo.ID)
+		svc.CompleteRental(ctx, rentalInfo.ID)
+	})
+
+	t.Run("未支付状态不能开始", func(t *testing.T) {
+		device3 := &models.Device{
+			DeviceNo:       "D20240101005",
+			Name:           "测试设备5",
+			Type:           models.DeviceTypeStandard,
+			VenueID:        device.VenueID,
+			QRCode:         "https://qr.example.com/D20240101005",
+			ProductName:    "测试产品",
+			SlotCount:      1,
+			AvailableSlots: 1,
+			OnlineStatus:   models.DeviceOnline,
+			LockStatus:     models.DeviceLocked,
+			RentalStatus:   models.DeviceRentalFree,
+			NetworkType:    "WiFi",
+			Status:         models.DeviceStatusActive,
+		}
+		svc.db.Create(device3)
+
+		rentalInfo, err := svc.CreateRental(ctx, user.ID, &CreateRentalRequest{
+			DeviceID:  device3.ID,
+			PricingID: pricing.ID,
+		})
+		require.NoError(t, err)
+
+		err = svc.StartRental(ctx, user.ID, rentalInfo.ID)
+		assert.Error(t, err)
+
+		// 取消当前租借
+		svc.CancelRental(ctx, user.ID, rentalInfo.ID)
+	})
+
+	t.Run("设备已禁用不能开始", func(t *testing.T) {
+		device4 := &models.Device{
+			DeviceNo:       "D20240101006",
+			Name:           "测试设备6",
+			Type:           models.DeviceTypeStandard,
+			VenueID:        device.VenueID,
+			QRCode:         "https://qr.example.com/D20240101006",
+			ProductName:    "测试产品",
+			SlotCount:      1,
+			AvailableSlots: 1,
+			OnlineStatus:   models.DeviceOnline,
+			LockStatus:     models.DeviceLocked,
+			RentalStatus:   models.DeviceRentalFree,
+			NetworkType:    "WiFi",
+			Status:         models.DeviceStatusActive,
+		}
+		svc.db.Create(device4)
+
+		rentalInfo, err := svc.CreateRental(ctx, user.ID, &CreateRentalRequest{
+			DeviceID:  device4.ID,
+			PricingID: pricing.ID,
+		})
+		require.NoError(t, err)
+		svc.PayRental(ctx, user.ID, rentalInfo.ID)
+
+		// 禁用设备
+		svc.db.Model(&models.Device{}).Where("id = ?", device4.ID).Update("status", models.DeviceStatusDisabled)
+
+		err = svc.StartRental(ctx, user.ID, rentalInfo.ID)
+		assert.Error(t, err)
+
+		// 恢复设备状态并完成租借
+		svc.db.Model(&models.Device{}).Where("id = ?", device4.ID).Update("status", models.DeviceStatusActive)
+		svc.StartRental(ctx, user.ID, rentalInfo.ID)
+		svc.ReturnRental(ctx, user.ID, rentalInfo.ID)
+		svc.CompleteRental(ctx, rentalInfo.ID)
+	})
+
+	t.Run("设备离线不能开始", func(t *testing.T) {
+		device5 := &models.Device{
+			DeviceNo:       "D20240101007",
+			Name:           "测试设备7",
+			Type:           models.DeviceTypeStandard,
+			VenueID:        device.VenueID,
+			QRCode:         "https://qr.example.com/D20240101007",
+			ProductName:    "测试产品",
+			SlotCount:      1,
+			AvailableSlots: 1,
+			OnlineStatus:   models.DeviceOnline,
+			LockStatus:     models.DeviceLocked,
+			RentalStatus:   models.DeviceRentalFree,
+			NetworkType:    "WiFi",
+			Status:         models.DeviceStatusActive,
+		}
+		svc.db.Create(device5)
+
+		rentalInfo, err := svc.CreateRental(ctx, user.ID, &CreateRentalRequest{
+			DeviceID:  device5.ID,
+			PricingID: pricing.ID,
+		})
+		require.NoError(t, err)
+		svc.PayRental(ctx, user.ID, rentalInfo.ID)
+
+		// 设备离线
+		svc.db.Model(&models.Device{}).Where("id = ?", device5.ID).Update("online_status", models.DeviceOffline)
+
+		err = svc.StartRental(ctx, user.ID, rentalInfo.ID)
+		assert.Error(t, err)
+	})
+}
+
+func TestRentalService_ReturnRental_Errors(t *testing.T) {
+	svc := setupTestRentalService(t)
+	ctx := context.Background()
+
+	user, device, pricing := createTestData(t, svc.db)
+
+	t.Run("租借不存在", func(t *testing.T) {
+		err := svc.ReturnRental(ctx, user.ID, 999999)
+		assert.Error(t, err)
+	})
+
+	t.Run("无权限归还他人租借", func(t *testing.T) {
+		device2 := &models.Device{
+			DeviceNo:       "D20240101008",
+			Name:           "测试设备8",
+			Type:           models.DeviceTypeStandard,
+			VenueID:        device.VenueID,
+			QRCode:         "https://qr.example.com/D20240101008",
+			ProductName:    "测试产品",
+			SlotCount:      1,
+			AvailableSlots: 1,
+			OnlineStatus:   models.DeviceOnline,
+			LockStatus:     models.DeviceLocked,
+			RentalStatus:   models.DeviceRentalFree,
+			NetworkType:    "WiFi",
+			Status:         models.DeviceStatusActive,
+		}
+		svc.db.Create(device2)
+
+		rentalInfo, err := svc.CreateRental(ctx, user.ID, &CreateRentalRequest{
+			DeviceID:  device2.ID,
+			PricingID: pricing.ID,
+		})
+		require.NoError(t, err)
+		svc.PayRental(ctx, user.ID, rentalInfo.ID)
+		svc.StartRental(ctx, user.ID, rentalInfo.ID)
+
+		err = svc.ReturnRental(ctx, 999999, rentalInfo.ID)
+		assert.Error(t, err)
+
+		// 完成当前租借
+		svc.ReturnRental(ctx, user.ID, rentalInfo.ID)
+		svc.CompleteRental(ctx, rentalInfo.ID)
+	})
+
+	t.Run("非使用中状态不能归还", func(t *testing.T) {
+		device3 := &models.Device{
+			DeviceNo:       "D20240101009",
+			Name:           "测试设备9",
+			Type:           models.DeviceTypeStandard,
+			VenueID:        device.VenueID,
+			QRCode:         "https://qr.example.com/D20240101009",
+			ProductName:    "测试产品",
+			SlotCount:      1,
+			AvailableSlots: 1,
+			OnlineStatus:   models.DeviceOnline,
+			LockStatus:     models.DeviceLocked,
+			RentalStatus:   models.DeviceRentalFree,
+			NetworkType:    "WiFi",
+			Status:         models.DeviceStatusActive,
+		}
+		svc.db.Create(device3)
+
+		rentalInfo, err := svc.CreateRental(ctx, user.ID, &CreateRentalRequest{
+			DeviceID:  device3.ID,
+			PricingID: pricing.ID,
+		})
+		require.NoError(t, err)
+		svc.PayRental(ctx, user.ID, rentalInfo.ID)
+
+		// 未开始就尝试归还
+		err = svc.ReturnRental(ctx, user.ID, rentalInfo.ID)
+		assert.Error(t, err)
+	})
+}
+
+func TestRentalService_CompleteRental_Errors(t *testing.T) {
+	svc := setupTestRentalService(t)
+	ctx := context.Background()
+
+	user, device, pricing := createTestData(t, svc.db)
+
+	t.Run("租借不存在", func(t *testing.T) {
+		err := svc.CompleteRental(ctx, 999999)
+		assert.Error(t, err)
+	})
+
+	t.Run("非已归还状态不能完成", func(t *testing.T) {
+		device2 := &models.Device{
+			DeviceNo:       "D20240101010",
+			Name:           "测试设备10",
+			Type:           models.DeviceTypeStandard,
+			VenueID:        device.VenueID,
+			QRCode:         "https://qr.example.com/D20240101010",
+			ProductName:    "测试产品",
+			SlotCount:      1,
+			AvailableSlots: 1,
+			OnlineStatus:   models.DeviceOnline,
+			LockStatus:     models.DeviceLocked,
+			RentalStatus:   models.DeviceRentalFree,
+			NetworkType:    "WiFi",
+			Status:         models.DeviceStatusActive,
+		}
+		svc.db.Create(device2)
+
+		rentalInfo, err := svc.CreateRental(ctx, user.ID, &CreateRentalRequest{
+			DeviceID:  device2.ID,
+			PricingID: pricing.ID,
+		})
+		require.NoError(t, err)
+		svc.PayRental(ctx, user.ID, rentalInfo.ID)
+		svc.StartRental(ctx, user.ID, rentalInfo.ID)
+
+		// 未归还就尝试完成
+		err = svc.CompleteRental(ctx, rentalInfo.ID)
+		assert.Error(t, err)
+	})
+}
+
+func TestRentalService_CreateRental_MoreErrors(t *testing.T) {
+	svc := setupTestRentalService(t)
+	ctx := context.Background()
+
+	user, device, pricing := createTestData(t, svc.db)
+
+	t.Run("定价不存在", func(t *testing.T) {
+		_, err := svc.CreateRental(ctx, user.ID, &CreateRentalRequest{
+			DeviceID:  device.ID,
+			PricingID: 999999,
+		})
+		assert.Error(t, err)
+	})
+
+	t.Run("已有进行中租借", func(t *testing.T) {
+		// 先创建一个租借
+		_, err := svc.CreateRental(ctx, user.ID, &CreateRentalRequest{
+			DeviceID:  device.ID,
+			PricingID: pricing.ID,
+		})
+		require.NoError(t, err)
+
+		// 再创建另一个设备
+		device2 := &models.Device{
+			DeviceNo:       "D20240101030",
+			Name:           "测试设备30",
+			Type:           models.DeviceTypeStandard,
+			VenueID:        device.VenueID,
+			QRCode:         "https://qr.example.com/D20240101030",
+			ProductName:    "测试产品",
+			SlotCount:      1,
+			AvailableSlots: 1,
+			OnlineStatus:   models.DeviceOnline,
+			LockStatus:     models.DeviceLocked,
+			RentalStatus:   models.DeviceRentalFree,
+			NetworkType:    "WiFi",
+			Status:         models.DeviceStatusActive,
+		}
+		svc.db.Create(device2)
+
+		// 尝试创建第二个租借
+		_, err = svc.CreateRental(ctx, user.ID, &CreateRentalRequest{
+			DeviceID:  device2.ID,
+			PricingID: pricing.ID,
+		})
+		assert.Error(t, err)
+	})
+
+	t.Run("定价已停用", func(t *testing.T) {
+		// 创建另一个用户
+		phone2 := "13800138099"
+		user2 := &models.User{
+			Phone:         &phone2,
+			Nickname:      "测试用户2",
+			MemberLevelID: 1,
+			Status:        models.UserStatusActive,
+		}
+		svc.db.Create(user2)
+		svc.db.Create(&models.UserWallet{UserID: user2.ID, Balance: 200.0})
+
+		device3 := &models.Device{
+			DeviceNo:       "D20240101031",
+			Name:           "测试设备31",
+			Type:           models.DeviceTypeStandard,
+			VenueID:        device.VenueID,
+			QRCode:         "https://qr.example.com/D20240101031",
+			ProductName:    "测试产品",
+			SlotCount:      1,
+			AvailableSlots: 1,
+			OnlineStatus:   models.DeviceOnline,
+			LockStatus:     models.DeviceLocked,
+			RentalStatus:   models.DeviceRentalFree,
+			NetworkType:    "WiFi",
+			Status:         models.DeviceStatusActive,
+		}
+		svc.db.Create(device3)
+
+		// 创建停用的定价（先创建再更新，避免 default:true 覆盖）
+		disabledPricing := &models.RentalPricing{
+			VenueID:       &device.VenueID,
+			DurationHours: 2,
+			Price:         20.0,
+			Deposit:       100.0,
+			OvertimeRate:  2.0,
+			IsActive:      true,
+		}
+		svc.db.Create(disabledPricing)
+		svc.db.Model(disabledPricing).Update("is_active", false)
+
+		_, err := svc.CreateRental(ctx, user2.ID, &CreateRentalRequest{
+			DeviceID:  device3.ID,
+			PricingID: disabledPricing.ID,
+		})
+		assert.Error(t, err)
+	})
+}
+
+func TestRentalService_ReturnRental_OvertimeFee(t *testing.T) {
+	svc := setupTestRentalService(t)
+	ctx := context.Background()
+
+	user, device, pricing := createTestData(t, svc.db)
+
+	t.Run("无超时费用", func(t *testing.T) {
+		rentalInfo, err := svc.CreateRental(ctx, user.ID, &CreateRentalRequest{
+			DeviceID:  device.ID,
+			PricingID: pricing.ID,
+		})
+		require.NoError(t, err)
+		svc.PayRental(ctx, user.ID, rentalInfo.ID)
+		svc.StartRental(ctx, user.ID, rentalInfo.ID)
+
+		err = svc.ReturnRental(ctx, user.ID, rentalInfo.ID)
+		require.NoError(t, err)
+
+		// 验证无超时费
+		var rental models.Rental
+		svc.db.First(&rental, rentalInfo.ID)
+		assert.Equal(t, float64(0), rental.OvertimeFee)
+		assert.Equal(t, models.RentalStatusReturned, rental.Status)
+	})
+}
+
+func TestRentalService_GetRental_DBError(t *testing.T) {
+	svc := setupTestRentalService(t)
+	ctx := context.Background()
+
+	// 关闭数据库连接模拟错误
+	sqlDB, _ := svc.db.DB()
+	sqlDB.Close()
+
+	_, err := svc.GetRental(ctx, 1, 1)
+	assert.Error(t, err)
+}
+
+func TestRentalService_ListRentals_DBError(t *testing.T) {
+	svc := setupTestRentalService(t)
+	ctx := context.Background()
+
+	// 关闭数据库连接模拟错误
+	sqlDB, _ := svc.db.DB()
+	sqlDB.Close()
+
+	_, _, err := svc.ListRentals(ctx, 1, 1, 10, nil)
+	assert.Error(t, err)
+}
+
+func TestRentalService_CreateRental_DBError(t *testing.T) {
+	svc := setupTestRentalService(t)
+	ctx := context.Background()
+
+	// 关闭数据库连接模拟错误
+	sqlDB, _ := svc.db.DB()
+	sqlDB.Close()
+
+	_, err := svc.CreateRental(ctx, 1, &CreateRentalRequest{
+		DeviceID:  1,
+		PricingID: 1,
+	})
+	assert.Error(t, err)
+}
+
+func TestRentalService_PayRental_DBError(t *testing.T) {
+	svc := setupTestRentalService(t)
+	ctx := context.Background()
+
+	// 关闭数据库连接模拟错误
+	sqlDB, _ := svc.db.DB()
+	sqlDB.Close()
+
+	err := svc.PayRental(ctx, 1, 1)
+	assert.Error(t, err)
+}
+
+func TestRentalService_StartRental_DBError(t *testing.T) {
+	svc := setupTestRentalService(t)
+	ctx := context.Background()
+
+	// 关闭数据库连接模拟错误
+	sqlDB, _ := svc.db.DB()
+	sqlDB.Close()
+
+	err := svc.StartRental(ctx, 1, 1)
+	assert.Error(t, err)
+}
+
+func TestRentalService_ReturnRental_DBError(t *testing.T) {
+	svc := setupTestRentalService(t)
+	ctx := context.Background()
+
+	// 关闭数据库连接模拟错误
+	sqlDB, _ := svc.db.DB()
+	sqlDB.Close()
+
+	err := svc.ReturnRental(ctx, 1, 1)
+	assert.Error(t, err)
+}
+
+func TestRentalService_CompleteRental_DBError(t *testing.T) {
+	svc := setupTestRentalService(t)
+	ctx := context.Background()
+
+	// 关闭数据库连接模拟错误
+	sqlDB, _ := svc.db.DB()
+	sqlDB.Close()
+
+	err := svc.CompleteRental(ctx, 1)
+	assert.Error(t, err)
+}
+
+func TestRentalService_CancelRental_DBError(t *testing.T) {
+	svc := setupTestRentalService(t)
+	ctx := context.Background()
+
+	// 关闭数据库连接模拟错误
+	sqlDB, _ := svc.db.DB()
+	sqlDB.Close()
+
+	err := svc.CancelRental(ctx, 1, 1)
+	assert.Error(t, err)
+}
+
+func TestRentalService_CreateRental_DeviceCheckFail(t *testing.T) {
+	svc := setupTestRentalService(t)
+	ctx := context.Background()
+
+	user, _, pricing := createTestData(t, svc.db)
+
+	t.Run("设备不存在", func(t *testing.T) {
+		_, err := svc.CreateRental(ctx, user.ID, &CreateRentalRequest{
+			DeviceID:  999999, // 不存在的设备
+			PricingID: pricing.ID,
+		})
+		assert.Error(t, err)
+	})
+}
+
+func TestRentalService_CreateRental_NoSlot(t *testing.T) {
+	svc := setupTestRentalService(t)
+	ctx := context.Background()
+
+	user, device, pricing := createTestData(t, svc.db)
+
+	// 将设备槽位设为0
+	svc.db.Model(&models.Device{}).Where("id = ?", device.ID).Update("available_slots", 0)
+
+	_, err := svc.CreateRental(ctx, user.ID, &CreateRentalRequest{
+		DeviceID:  device.ID,
+		PricingID: pricing.ID,
+	})
+	assert.Error(t, err)
+}
+
+func TestRentalService_CancelRental_StatusError(t *testing.T) {
+	svc := setupTestRentalService(t)
+	ctx := context.Background()
+
+	user, device, pricing := createTestData(t, svc.db)
+
+	// 创建租借并支付
+	rentalInfo, err := svc.CreateRental(ctx, user.ID, &CreateRentalRequest{
+		DeviceID:  device.ID,
+		PricingID: pricing.ID,
+	})
+	require.NoError(t, err)
+
+	// 支付后尝试取消
+	svc.PayRental(ctx, user.ID, rentalInfo.ID)
+	err = svc.CancelRental(ctx, user.ID, rentalInfo.ID)
+	assert.Error(t, err)
+}
+
+func TestRentalService_CancelRental_NotFound(t *testing.T) {
+	svc := setupTestRentalService(t)
+	ctx := context.Background()
+
+	user, _, _ := createTestData(t, svc.db)
+
+	err := svc.CancelRental(ctx, user.ID, 999999)
+	assert.Error(t, err)
+}
+
+func TestRentalService_CompleteRental_OrderNotFound(t *testing.T) {
+	svc := setupTestRentalService(t)
+	ctx := context.Background()
+
+	user, device, pricing := createTestData(t, svc.db)
+
+	// 创建完整流程的租借
+	rentalInfo, err := svc.CreateRental(ctx, user.ID, &CreateRentalRequest{
+		DeviceID:  device.ID,
+		PricingID: pricing.ID,
+	})
+	require.NoError(t, err)
+
+	svc.PayRental(ctx, user.ID, rentalInfo.ID)
+	svc.StartRental(ctx, user.ID, rentalInfo.ID)
+	svc.ReturnRental(ctx, user.ID, rentalInfo.ID)
+
+	// 删除订单
+	svc.db.Delete(&models.Order{}, "id = ?", rentalInfo.OrderID)
+
+	// 尝试完成
+	err = svc.CompleteRental(ctx, rentalInfo.ID)
+	assert.Error(t, err)
+}

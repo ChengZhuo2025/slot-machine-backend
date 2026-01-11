@@ -204,4 +204,17 @@ func TestCompositeOrderEventHandler(t *testing.T) {
 		h.AddHandler(nil)
 		require.NoError(t, h.OnOrderCompleted(ctx, order))
 	})
+
+	t.Run("AddHandler 添加真实 handler", func(t *testing.T) {
+		h := NewCompositeOrderEventHandler()
+		called := false
+		h.AddHandler(&stubOrderEventHandler{
+			onCompleted: func(ctx context.Context, order *models.Order) error {
+				called = true
+				return nil
+			},
+		})
+		require.NoError(t, h.OnOrderCompleted(ctx, order))
+		assert.True(t, called)
+	})
 }

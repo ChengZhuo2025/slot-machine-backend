@@ -443,8 +443,28 @@ func TestAuthService_RefreshToken_InvalidToken(t *testing.T) {
 	service, _ := setupTestAuthService(t)
 	ctx := context.Background()
 
-	_, err := service.RefreshToken(ctx, "invalid-token")
-	assert.Error(t, err)
+	t.Run("无效token", func(t *testing.T) {
+		_, err := service.RefreshToken(ctx, "invalid-token")
+		assert.Error(t, err)
+	})
+
+	t.Run("过期token", func(t *testing.T) {
+		// 创建一个过期的 JWT manager
+		expiredJWTManager := jwt.NewManager(&jwt.Config{
+			Secret:            "test-secret-key",
+			AccessExpireTime:  -time.Hour,  // 负数表示已过期
+			RefreshExpireTime: -time.Hour,  // 负数表示已过期
+			Issuer:            "test",
+		})
+
+		// 生成一个已过期的 token
+		tokenPair, err := expiredJWTManager.GenerateTokenPair(1, jwt.UserTypeUser, "")
+		require.NoError(t, err)
+
+		// 尝试用已过期的 token 刷新
+		_, err = service.RefreshToken(ctx, tokenPair.RefreshToken)
+		assert.Error(t, err)
+	})
 }
 
 func TestAuthService_GetUserByID(t *testing.T) {
@@ -480,24 +500,17 @@ func TestAuthService_GetUserByID_NotFound(t *testing.T) {
 func TestAuthService_generateNickname(t *testing.T) {
 	service, _ := setupTestAuthService(t)
 
-	tests := []struct {
-		name     string
-		phone    string
-		expected string
-	}{
-		{
-			name:     "正常手机号",
-			phone:    "13800138000",
-			expected: "用户8000",
-		},
-	}
+	t.Run("正常手机号", func(t *testing.T) {
+		nickname := service.generateNickname("13800138000")
+		assert.Equal(t, "用户8000", nickname)
+	})
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			nickname := service.generateNickname(tt.phone)
-			assert.Equal(t, tt.expected, nickname)
-		})
-	}
+	t.Run("手机号长度不足4位使用时间戳", func(t *testing.T) {
+		nickname := service.generateNickname("123")
+		assert.Contains(t, nickname, "用户")
+		// 验证格式为 "用户" + 数字，数字范围 0-9999
+		assert.Regexp(t, `^用户\d{1,4}$`, nickname)
+	})
 }
 
 func TestAuthService_toUserInfo(t *testing.T) {
@@ -526,4 +539,383 @@ func TestAuthService_toUserInfo(t *testing.T) {
 	assert.Equal(t, user.MemberLevelID, info.MemberLevelID)
 	assert.Equal(t, user.Points, info.Points)
 	assert.Equal(t, user.IsVerified, info.IsVerified)
+}
+
+func TestAuthService_SendSmsCode_Real(t *testing.T) {
+	service, _ := setupTestAuthService(t)
+	ctx := context.Background()
+
+	// Set up code service for the real auth service
+	redisClient, _ := newTestRedisClient(t)
+	smsSender := &stubSMSSender{}
+	service.codeService = NewCodeService(redisClient, smsSender, nil)
+
+	// Test successful code send
+	err := service.SendSmsCode(ctx, &SendSmsCodeRequest{
+		Phone:    "13800138000",
+		CodeType: CodeTypeLogin,
+	})
+	assert.NoError(t, err)
+
+	// Test invalid phone
+	err = service.SendSmsCode(ctx, &SendSmsCodeRequest{
+		Phone:    "123",
+		CodeType: CodeTypeLogin,
+	})
+	assert.Error(t, err)
+}
+
+func TestAuthService_SmsLogin_Real(t *testing.T) {
+	service, _ := setupTestAuthService(t)
+	ctx := context.Background()
+
+	// Set up code service
+	redisClient, _ := newTestRedisClient(t)
+	smsSender := &stubSMSSender{}
+	service.codeService = NewCodeService(redisClient, smsSender, nil)
+
+	phone := "13800138999"
+
+	// Send code first
+	err := service.SendSmsCode(ctx, &SendSmsCodeRequest{
+		Phone:    phone,
+		CodeType: CodeTypeLogin,
+	})
+	require.NoError(t, err)
+
+	// Get the code from Redis
+	code, err := redisClient.Get(ctx, service.codeService.codeKey(phone, CodeTypeLogin)).Result()
+	require.NoError(t, err)
+
+	// Test successful login
+	resp, err := service.SmsLogin(ctx, &SmsLoginRequest{
+		Phone: phone,
+		Code:  code,
+	})
+	require.NoError(t, err)
+	assert.NotNil(t, resp)
+	assert.True(t, resp.IsNewUser)
+	assert.Equal(t, phone, *resp.User.Phone)
+
+	// Test login with wrong code
+	_, err = service.SmsLogin(ctx, &SmsLoginRequest{
+		Phone: phone,
+		Code:  "wrong_code",
+	})
+	assert.Error(t, err)
+}
+
+func TestAuthService_FindOrCreateUser_WithReferrer(t *testing.T) {
+	service, db := setupTestAuthService(t)
+	ctx := context.Background()
+
+	// Create referrer
+	refPhone := "13800138001"
+	referrer := &models.User{
+		Phone:         &refPhone,
+		Nickname:      "推荐人",
+		MemberLevelID: 1,
+		Status:        models.UserStatusActive,
+	}
+	require.NoError(t, db.Create(referrer).Error)
+
+	// Create distributor
+	require.NoError(t, db.Create(&models.Distributor{
+		UserID:     referrer.ID,
+		InviteCode: "TEST123",
+		Status:     models.DistributorStatusApproved,
+	}).Error)
+
+	// Create new user with invite code
+	newPhone := "13800138002"
+	inviteCode := "TEST123"
+	user, isNew, err := service.findOrCreateUser(ctx, newPhone, &inviteCode)
+	require.NoError(t, err)
+	assert.True(t, isNew)
+	assert.NotNil(t, user.ReferrerID)
+	assert.Equal(t, referrer.ID, *user.ReferrerID)
+
+	// Try to create same user again (should return existing)
+	user2, isNew2, err := service.findOrCreateUser(ctx, newPhone, nil)
+	require.NoError(t, err)
+	assert.False(t, isNew2)
+	assert.Equal(t, user.ID, user2.ID)
+}
+
+func TestAuthService_GetCodeExpireIn(t *testing.T) {
+	service, _ := setupTestAuthService(t)
+
+	// Set up code service
+	redisClient, _ := newTestRedisClient(t)
+	smsSender := &stubSMSSender{}
+	service.codeService = NewCodeService(redisClient, smsSender, nil)
+
+	expireTime := service.codeService.GetCodeExpireIn()
+	assert.Greater(t, expireTime, time.Duration(0))
+}
+
+func TestAuthService_SmsLogin_VerifyCodeError(t *testing.T) {
+	service, _ := setupTestAuthService(t)
+	ctx := context.Background()
+
+	// Set up code service with a faulty Redis (will cause VerifyCode to fail)
+	redisClient, _ := newTestRedisClient(t)
+	smsSender := &stubSMSSender{}
+	service.codeService = NewCodeService(redisClient, smsSender, nil)
+
+	// Try to login without sending code (Redis will be empty)
+	_, err := service.SmsLogin(ctx, &SmsLoginRequest{
+		Phone: "13800139999",
+		Code:  "123456",
+	})
+	assert.Error(t, err)
+}
+
+func TestCodeService_AllCodeTypes(t *testing.T) {
+	redisClient, _ := newTestRedisClient(t)
+	smsSender := &stubSMSSender{}
+	codeSvc := NewCodeService(redisClient, smsSender, nil)
+	ctx := context.Background()
+
+	// Test all code types to cover getTemplateCode switch cases
+	codeTypes := []struct {
+		codeType CodeType
+		phone    string
+	}{
+		{CodeTypeLogin, "13800138881"},
+		{CodeTypeRegister, "13800138882"},
+		{CodeTypeBind, "13800138883"},
+		{CodeTypeReset, "13800138884"},
+	}
+
+	for _, tc := range codeTypes {
+		t.Run(string(tc.codeType), func(t *testing.T) {
+			err := codeSvc.SendCode(ctx, tc.phone, tc.codeType)
+			assert.NoError(t, err)
+
+			// Get and verify the code
+			code, err := redisClient.Get(ctx, codeSvc.codeKey(tc.phone, tc.codeType)).Result()
+			require.NoError(t, err)
+
+			valid, err := codeSvc.VerifyCode(ctx, tc.phone, code, tc.codeType)
+			require.NoError(t, err)
+			assert.True(t, valid)
+		})
+	}
+}
+
+func TestAuthService_SendSmsCode_RateLimitError(t *testing.T) {
+	service, _ := setupTestAuthService(t)
+	ctx := context.Background()
+
+	redisClient, _ := newTestRedisClient(t)
+	smsSender := &stubSMSSender{}
+	service.codeService = NewCodeService(redisClient, smsSender, nil)
+
+	phone := "13800137777"
+
+	// Send first code successfully
+	err := service.SendSmsCode(ctx, &SendSmsCodeRequest{
+		Phone:    phone,
+		CodeType: CodeTypeLogin,
+	})
+	require.NoError(t, err)
+
+	// Try to send again immediately (should hit rate limit)
+	err = service.SendSmsCode(ctx, &SendSmsCodeRequest{
+		Phone:    phone,
+		CodeType: CodeTypeLogin,
+	})
+	assert.Error(t, err)
+}
+
+func TestAuthService_SmsLogin_DisabledUserScenario(t *testing.T) {
+	service, db := setupTestAuthService(t)
+	ctx := context.Background()
+
+	redisClient, _ := newTestRedisClient(t)
+	smsSender := &stubSMSSender{}
+	service.codeService = NewCodeService(redisClient, smsSender, nil)
+
+	phone := "13900136666" // Use unique phone to avoid rate limit conflicts
+
+	// Send a valid code first
+	err := service.SendSmsCode(ctx, &SendSmsCodeRequest{
+		Phone:    phone,
+		CodeType: CodeTypeLogin,
+	})
+	require.NoError(t, err)
+
+	// Get the valid code
+	validCode, err := redisClient.Get(ctx, service.codeService.codeKey(phone, CodeTypeLogin)).Result()
+	require.NoError(t, err)
+
+	// First login to create the user
+	resp, err := service.SmsLogin(ctx, &SmsLoginRequest{
+		Phone: phone,
+		Code:  validCode,
+	})
+	require.NoError(t, err)
+	userID := resp.User.ID
+
+	// Disable the user
+	err = db.Model(&models.User{}).Where("id = ?", userID).Update("status", models.UserStatusDisabled).Error
+	require.NoError(t, err)
+
+	// Use a different code service instance with different phone to avoid rate limit
+	phone2 := "13900136667"
+	err = service.SendSmsCode(ctx, &SendSmsCodeRequest{
+		Phone:    phone2,
+		CodeType: CodeTypeLogin,
+	})
+	require.NoError(t, err)
+
+	validCode2, err := redisClient.Get(ctx, service.codeService.codeKey(phone2, CodeTypeLogin)).Result()
+	require.NoError(t, err)
+
+	// Update the disabled user's phone to phone2
+	err = db.Model(&models.User{}).Where("id = ?", userID).Update("phone", phone2).Error
+	require.NoError(t, err)
+
+	// Try to login with disabled user (using phone2)
+	_, err = service.SmsLogin(ctx, &SmsLoginRequest{
+		Phone: phone2,
+		Code:  validCode2,
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "禁用")
+}
+
+func TestCodeService_GetTemplateCode_DefaultCase(t *testing.T) {
+	redisClient, _ := newTestRedisClient(t)
+	smsSender := &stubSMSSender{}
+	codeSvc := NewCodeService(redisClient, smsSender, nil)
+	ctx := context.Background()
+
+	// Test with an invalid code type (will hit default case in getTemplateCode)
+	phone := "13800135555"
+	invalidCodeType := CodeType("unknown_type")
+
+	// This should use the default template (login)
+	err := codeSvc.SendCode(ctx, phone, invalidCodeType)
+	assert.NoError(t, err)
+
+	// Verify the code was sent
+	code, err := redisClient.Get(ctx, codeSvc.codeKey(phone, invalidCodeType)).Result()
+	assert.NoError(t, err)
+	assert.NotEmpty(t, code)
+}
+
+
+// TestAuthService_findOrCreateUser_DatabaseError 测试数据库错误路径
+func TestAuthService_FindOrCreateUser_GetByPhoneError(t *testing.T) {
+	service, db := setupTestAuthService(t)
+	ctx := context.Background()
+
+	// 关闭数据库连接以模拟数据库错误
+	sqlDB, _ := db.DB()
+	sqlDB.Close()
+
+	_, _, err := service.findOrCreateUser(ctx, "13800138888", nil)
+	assert.Error(t, err)
+}
+
+// TestAuthService_GetUserByID_DatabaseError 测试 GetUserByID 数据库错误
+func TestAuthService_GetUserByID_DatabaseError(t *testing.T) {
+	service, db := setupTestAuthService(t)
+	ctx := context.Background()
+
+	// 创建一个用户
+	phone := "13800138777"
+	user := &models.User{
+		Phone:         &phone,
+		Nickname:      "测试",
+		MemberLevelID: 1,
+		Status:        models.UserStatusActive,
+	}
+	db.Create(user)
+
+	// 关闭数据库连接以模拟数据库错误
+	sqlDB, _ := db.DB()
+	sqlDB.Close()
+
+	_, err := service.GetUserByID(ctx, user.ID)
+	assert.Error(t, err)
+}
+
+// TestNewAuthService 测试 AuthService 构造函数
+func TestNewAuthService(t *testing.T) {
+	db := setupTestDB(t)
+	userRepo := repository.NewUserRepository(db)
+	jwtManager := jwt.NewManager(&jwt.Config{
+		Secret:            "test-secret-key",
+		AccessExpireTime:  time.Hour,
+		RefreshExpireTime: 2 * time.Hour,
+		Issuer:            "test",
+	})
+	redisClient, _ := newTestRedisClient(t)
+	smsSender := &stubSMSSender{}
+	codeService := NewCodeService(redisClient, smsSender, nil)
+
+	service := NewAuthService(db, userRepo, jwtManager, codeService)
+
+	assert.NotNil(t, service)
+	assert.NotNil(t, service.db)
+	assert.NotNil(t, service.userRepo)
+	assert.NotNil(t, service.jwtManager)
+	assert.NotNil(t, service.codeService)
+}
+
+// TestAuthService_FindOrCreateUser_WalletCreateError 测试钱包创建失败
+func TestAuthService_FindOrCreateUser_WalletCreateError(t *testing.T) {
+	db := setupTestDB(t)
+	userRepo := repository.NewUserRepository(db)
+	jwtManager := jwt.NewManager(&jwt.Config{
+		Secret:            "test-secret-key",
+		AccessExpireTime:  time.Hour,
+		RefreshExpireTime: 2 * time.Hour,
+		Issuer:            "test",
+	})
+
+	service := &AuthService{
+		db:         db,
+		userRepo:   userRepo,
+		jwtManager: jwtManager,
+	}
+
+	ctx := context.Background()
+	phone := "13800139777"
+
+	// 删除 UserWallet 表来模拟钱包创建失败
+	db.Migrator().DropTable(&models.UserWallet{})
+
+	_, _, err := service.findOrCreateUser(ctx, phone, nil)
+	assert.Error(t, err)
+}
+
+// TestAuthService_FindOrCreateUser_CreateError 测试用户创建失败
+func TestAuthService_FindOrCreateUser_CreateError(t *testing.T) {
+	db := setupTestDB(t)
+	userRepo := repository.NewUserRepository(db)
+	jwtManager := jwt.NewManager(&jwt.Config{
+		Secret:            "test-secret-key",
+		AccessExpireTime:  time.Hour,
+		RefreshExpireTime: 2 * time.Hour,
+		Issuer:            "test",
+	})
+
+	service := &AuthService{
+		db:         db,
+		userRepo:   userRepo,
+		jwtManager: jwtManager,
+	}
+
+	ctx := context.Background()
+	phone := "13800139666"
+
+	// 删除 User 表来模拟创建失败
+	db.Migrator().DropTable(&models.User{})
+
+	_, _, err := service.findOrCreateUser(ctx, phone, nil)
+	assert.Error(t, err)
 }

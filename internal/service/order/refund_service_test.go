@@ -201,6 +201,34 @@ func TestRefundService_CreateRefund(t *testing.T) {
 		})
 		assert.Error(t, err)
 	})
+
+	t.Run("待发货订单可以退款", func(t *testing.T) {
+		order := createPaidOrder(t, db, user.ID, models.OrderStatusPendingShip, 100.0)
+		createPayment(t, db, user.ID, order.ID, order.OrderNo, 100.0, models.PaymentStatusSuccess)
+
+		refund, err := svc.CreateRefund(ctx, user.ID, &CreateRefundRequest{
+			OrderID: order.ID,
+			Amount:  80.0,
+			Reason:  "不想要了",
+		})
+		require.NoError(t, err)
+		require.NotNil(t, refund)
+		assert.Equal(t, order.ID, refund.OrderID)
+	})
+
+	t.Run("已发货订单可以退款", func(t *testing.T) {
+		order := createPaidOrder(t, db, user.ID, models.OrderStatusShipped, 100.0)
+		createPayment(t, db, user.ID, order.ID, order.OrderNo, 100.0, models.PaymentStatusSuccess)
+
+		refund, err := svc.CreateRefund(ctx, user.ID, &CreateRefundRequest{
+			OrderID: order.ID,
+			Amount:  80.0,
+			Reason:  "不想要了",
+		})
+		require.NoError(t, err)
+		require.NotNil(t, refund)
+		assert.Equal(t, order.ID, refund.OrderID)
+	})
 }
 
 func TestRefundService_CancelRefund(t *testing.T) {
@@ -411,6 +439,14 @@ func TestRefundService_ApproveRefund(t *testing.T) {
 		assert.Equal(t, models.RefundOperatorAdmin, *updated.OperatorType)
 	})
 
+	t.Run("退款不存在", func(t *testing.T) {
+		err := svc.ApproveRefund(ctx, adminID, 99999)
+		require.Error(t, err)
+		appErr, ok := err.(*appErrors.AppError)
+		require.True(t, ok)
+		assert.Equal(t, appErrors.ErrRefundNotFound.Code, appErr.Code)
+	})
+
 	t.Run("非待处理状态不允许审批", func(t *testing.T) {
 		require.NoError(t, db.Model(&models.Refund{}).Where("id = ?", refund.ID).
 			UpdateColumn("status", models.RefundStatusRejected).Error)
@@ -512,4 +548,75 @@ func TestRefundService_RejectRefund(t *testing.T) {
 		assert.Equal(t, appErrors.ErrOperationFailed.Code, appErr.Code)
 		assert.Contains(t, appErr.Message, "不允许拒绝")
 	})
+}
+
+func TestRefundService_getStatusName(t *testing.T) {
+	db := setupTestDB(t)
+	svc := setupRefundService(db)
+
+	tests := []struct {
+		name     string
+		status   int8
+		expected string
+	}{
+		{"待处理", models.RefundStatusPending, "待处理"},
+		{"已批准", models.RefundStatusApproved, "已批准"},
+		{"已拒绝", models.RefundStatusRejected, "已拒绝"},
+		{"处理中", models.RefundStatusProcessing, "处理中"},
+		{"退款成功", models.RefundStatusSuccess, "退款成功"},
+		{"退款失败", models.RefundStatusFailed, "退款失败"},
+		{"未知状态", 99, "未知状态(99)"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := svc.getStatusName(tt.status)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+// TestRefundService_RejectRefund_NotFound 测试退款不存在
+func TestRefundService_RejectRefund_NotFound(t *testing.T) {
+	db := setupTestDB(t)
+	svc := setupRefundService(db)
+	ctx := context.Background()
+
+	adminID := int64(99)
+	err := svc.RejectRefund(ctx, adminID, 99999, "不同意")
+	require.Error(t, err)
+	appErr, ok := err.(*appErrors.AppError)
+	require.True(t, ok)
+	assert.Equal(t, appErrors.ErrRefundNotFound.Code, appErr.Code)
+}
+
+// TestRefundService_RejectRefund_DBError 测试数据库错误
+func TestRefundService_RejectRefund_DBError(t *testing.T) {
+	db := setupTestDB(t)
+	svc := setupRefundService(db)
+	ctx := context.Background()
+
+	user := createTestUser(t, db, "13800138111")
+	order := createPaidOrder(t, db, user.ID, models.OrderStatusRefunding, 100.0)
+	payment := createPayment(t, db, user.ID, order.ID, order.OrderNo, 100.0, models.PaymentStatusSuccess)
+	refund := &models.Refund{
+		RefundNo:  fmt.Sprintf("R%d", time.Now().UnixNano()),
+		OrderID:   order.ID,
+		OrderNo:   order.OrderNo,
+		PaymentID: payment.ID,
+		PaymentNo: payment.PaymentNo,
+		UserID:    user.ID,
+		Amount:    10.0,
+		Reason:    "测试",
+		Status:    models.RefundStatusPending,
+	}
+	require.NoError(t, db.Create(refund).Error)
+
+	// 关闭数据库连接模拟错误
+	sqlDB, _ := db.DB()
+	sqlDB.Close()
+
+	adminID := int64(99)
+	err := svc.RejectRefund(ctx, adminID, refund.ID, "不同意")
+	require.Error(t, err)
 }

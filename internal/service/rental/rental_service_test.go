@@ -4,6 +4,7 @@ package rental
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -235,6 +236,8 @@ func TestRentalService_getStatusName(t *testing.T) {
 		{models.RentalStatusReturned, "已归还"},
 		{models.RentalStatusCompleted, "已完成"},
 		{models.RentalStatusCancelled, "已取消"},
+		{models.RentalStatusRefunding, "退款中"},
+		{models.RentalStatusRefunded, "已退款"},
 		{"unknown", "未知"},
 	}
 
@@ -929,4 +932,506 @@ func TestRentalService_CompleteRental_OrderNotFound(t *testing.T) {
 	// 尝试完成
 	err = svc.CompleteRental(ctx, rentalInfo.ID)
 	assert.Error(t, err)
+}
+
+func TestRentalService_ReturnRental_WithOvertimeFee(t *testing.T) {
+	svc := setupTestRentalService(t)
+	ctx := context.Background()
+
+	user, device, pricing := createTestData(t, svc.db)
+
+	t.Run("超时费不超过押金", func(t *testing.T) {
+		rentalInfo, err := svc.CreateRental(ctx, user.ID, &CreateRentalRequest{
+			DeviceID:  device.ID,
+			PricingID: pricing.ID,
+		})
+		require.NoError(t, err)
+		svc.PayRental(ctx, user.ID, rentalInfo.ID)
+		svc.StartRental(ctx, user.ID, rentalInfo.ID)
+
+		// 手动设置过期时间为过去（模拟超时2小时）
+		pastTime := time.Now().Add(-2 * time.Hour)
+		svc.db.Model(&models.Rental{}).Where("id = ?", rentalInfo.ID).Update("expected_return_at", pastTime)
+
+		err = svc.ReturnRental(ctx, user.ID, rentalInfo.ID)
+		require.NoError(t, err)
+
+		// 验证超时费计算 (超时3小时 * 1.5 = 4.5)
+		var rental models.Rental
+		svc.db.First(&rental, rentalInfo.ID)
+		assert.Greater(t, rental.OvertimeFee, float64(0))
+		assert.LessOrEqual(t, rental.OvertimeFee, rental.Deposit)
+	})
+
+	t.Run("超时费超过押金时限制为押金", func(t *testing.T) {
+		device2 := &models.Device{
+			DeviceNo:       "D20240101040",
+			Name:           "测试设备40",
+			Type:           models.DeviceTypeStandard,
+			VenueID:        device.VenueID,
+			QRCode:         "https://qr.example.com/D20240101040",
+			ProductName:    "测试产品",
+			SlotCount:      1,
+			AvailableSlots: 1,
+			OnlineStatus:   models.DeviceOnline,
+			LockStatus:     models.DeviceLocked,
+			RentalStatus:   models.DeviceRentalFree,
+			NetworkType:    "WiFi",
+			Status:         models.DeviceStatusActive,
+		}
+		svc.db.Create(device2)
+
+		// 创建高超时费定价
+		highOvertimePricing := &models.RentalPricing{
+			VenueID:       &device.VenueID,
+			DurationHours: 1,
+			Price:         10.0,
+			Deposit:       20.0,    // 低押金
+			OvertimeRate:  100.0,   // 高超时费率
+			IsActive:      true,
+		}
+		svc.db.Create(highOvertimePricing)
+
+		rentalInfo, err := svc.CreateRental(ctx, user.ID, &CreateRentalRequest{
+			DeviceID:  device2.ID,
+			PricingID: highOvertimePricing.ID,
+		})
+		require.NoError(t, err)
+		svc.PayRental(ctx, user.ID, rentalInfo.ID)
+		svc.StartRental(ctx, user.ID, rentalInfo.ID)
+
+		// 手动设置过期时间为过去（模拟超时10小时）
+		pastTime := time.Now().Add(-10 * time.Hour)
+		svc.db.Model(&models.Rental{}).Where("id = ?", rentalInfo.ID).Update("expected_return_at", pastTime)
+
+		err = svc.ReturnRental(ctx, user.ID, rentalInfo.ID)
+		require.NoError(t, err)
+
+		// 验证超时费不超过押金
+		var rental models.Rental
+		svc.db.First(&rental, rentalInfo.ID)
+		assert.Equal(t, rental.Deposit, rental.OvertimeFee) // 超时费被限制为押金
+	})
+}
+
+func TestRentalService_CompleteRental_WithOvertimeFee(t *testing.T) {
+	svc := setupTestRentalService(t)
+	ctx := context.Background()
+
+	user, device, pricing := createTestData(t, svc.db)
+
+	t.Run("有超时费时押金扣除", func(t *testing.T) {
+		rentalInfo, err := svc.CreateRental(ctx, user.ID, &CreateRentalRequest{
+			DeviceID:  device.ID,
+			PricingID: pricing.ID,
+		})
+		require.NoError(t, err)
+		svc.PayRental(ctx, user.ID, rentalInfo.ID)
+		svc.StartRental(ctx, user.ID, rentalInfo.ID)
+
+		// 手动设置超时费
+		svc.db.Model(&models.Rental{}).Where("id = ?", rentalInfo.ID).Updates(map[string]interface{}{
+			"status":       models.RentalStatusReturned,
+			"overtime_fee": 10.0,
+			"returned_at":  time.Now(),
+		})
+
+		// 记录当前钱包状态
+		var walletBefore models.UserWallet
+		svc.db.Where("user_id = ?", user.ID).First(&walletBefore)
+
+		err = svc.CompleteRental(ctx, rentalInfo.ID)
+		require.NoError(t, err)
+
+		// 验证钱包变化
+		var walletAfter models.UserWallet
+		svc.db.Where("user_id = ?", user.ID).First(&walletAfter)
+
+		// 冻结余额应该减少（押金部分退还）
+		assert.Less(t, walletAfter.FrozenBalance, walletBefore.FrozenBalance)
+	})
+
+	t.Run("无超时费时全额退还押金", func(t *testing.T) {
+		device2 := &models.Device{
+			DeviceNo:       "D20240101041",
+			Name:           "测试设备41",
+			Type:           models.DeviceTypeStandard,
+			VenueID:        device.VenueID,
+			QRCode:         "https://qr.example.com/D20240101041",
+			ProductName:    "测试产品",
+			SlotCount:      1,
+			AvailableSlots: 1,
+			OnlineStatus:   models.DeviceOnline,
+			LockStatus:     models.DeviceLocked,
+			RentalStatus:   models.DeviceRentalFree,
+			NetworkType:    "WiFi",
+			Status:         models.DeviceStatusActive,
+		}
+		svc.db.Create(device2)
+
+		rentalInfo, err := svc.CreateRental(ctx, user.ID, &CreateRentalRequest{
+			DeviceID:  device2.ID,
+			PricingID: pricing.ID,
+		})
+		require.NoError(t, err)
+		svc.PayRental(ctx, user.ID, rentalInfo.ID)
+		svc.StartRental(ctx, user.ID, rentalInfo.ID)
+		svc.ReturnRental(ctx, user.ID, rentalInfo.ID)
+
+		err = svc.CompleteRental(ctx, rentalInfo.ID)
+		require.NoError(t, err)
+
+		// 验证租借状态
+		var rental models.Rental
+		svc.db.First(&rental, rentalInfo.ID)
+		assert.Equal(t, models.RentalStatusCompleted, rental.Status)
+	})
+}
+
+func TestRentalService_CompleteRental_NegativeOvertimeFee(t *testing.T) {
+	svc := setupTestRentalService(t)
+	ctx := context.Background()
+
+	user, device, pricing := createTestData(t, svc.db)
+
+	// 创建租借并手动设置负超时费（测试边界条件）
+	rentalInfo, err := svc.CreateRental(ctx, user.ID, &CreateRentalRequest{
+		DeviceID:  device.ID,
+		PricingID: pricing.ID,
+	})
+	require.NoError(t, err)
+	svc.PayRental(ctx, user.ID, rentalInfo.ID)
+	svc.StartRental(ctx, user.ID, rentalInfo.ID)
+
+	// 手动设置负超时费（异常数据）
+	svc.db.Model(&models.Rental{}).Where("id = ?", rentalInfo.ID).Updates(map[string]interface{}{
+		"status":       models.RentalStatusReturned,
+		"overtime_fee": -10.0,
+		"returned_at":  time.Now(),
+	})
+
+	err = svc.CompleteRental(ctx, rentalInfo.ID)
+	require.NoError(t, err)
+
+	// 验证完成成功
+	var rental models.Rental
+	svc.db.First(&rental, rentalInfo.ID)
+	assert.Equal(t, models.RentalStatusCompleted, rental.Status)
+}
+
+func TestRentalService_CompleteRental_OvertimeExceedsDeposit(t *testing.T) {
+	svc := setupTestRentalService(t)
+	ctx := context.Background()
+
+	user, device, pricing := createTestData(t, svc.db)
+
+	rentalInfo, err := svc.CreateRental(ctx, user.ID, &CreateRentalRequest{
+		DeviceID:  device.ID,
+		PricingID: pricing.ID,
+	})
+	require.NoError(t, err)
+	svc.PayRental(ctx, user.ID, rentalInfo.ID)
+	svc.StartRental(ctx, user.ID, rentalInfo.ID)
+
+	// 手动设置超时费大于押金（异常数据，应该被处理）
+	svc.db.Model(&models.Rental{}).Where("id = ?", rentalInfo.ID).Updates(map[string]interface{}{
+		"status":       models.RentalStatusReturned,
+		"overtime_fee": pricing.Deposit + 100, // 超过押金
+		"returned_at":  time.Now(),
+	})
+
+	err = svc.CompleteRental(ctx, rentalInfo.ID)
+	require.NoError(t, err)
+
+	var rental models.Rental
+	svc.db.First(&rental, rentalInfo.ID)
+	assert.Equal(t, models.RentalStatusCompleted, rental.Status)
+}
+
+func TestRentalService_toRentalInfo_NoOrder(t *testing.T) {
+	svc := setupTestRentalService(t)
+
+	// 测试没有OrderID的情况
+	rental := &models.Rental{
+		ID:            1,
+		OrderID:       0, // 没有关联订单
+		UserID:        1,
+		DeviceID:      1,
+		DurationHours: 1,
+		RentalFee:     10.0,
+		Deposit:       50.0,
+		OvertimeRate:  1.5,
+		Status:        models.RentalStatusPending,
+		CreatedAt:     time.Now(),
+	}
+
+	info := svc.toRentalInfo(rental, nil, nil)
+	assert.NotNil(t, info)
+	assert.Equal(t, int64(1), info.ID)
+	assert.Empty(t, info.OrderNo)
+	assert.Nil(t, info.Device)
+}
+
+func TestRentalService_toRentalInfo_WithDevice(t *testing.T) {
+	svc := setupTestRentalService(t)
+
+	rental := &models.Rental{
+		ID:            1,
+		OrderID:       0,
+		UserID:        1,
+		DeviceID:      1,
+		DurationHours: 1,
+		RentalFee:     10.0,
+		Deposit:       50.0,
+		OvertimeRate:  1.5,
+		Status:        models.RentalStatusInUse,
+		CreatedAt:     time.Now(),
+	}
+
+	productImage := "/images/test.png"
+	device := &models.Device{
+		ID:           1,
+		DeviceNo:     "D123",
+		Name:         "测试设备",
+		Type:         models.DeviceTypeStandard,
+		ProductName:  "测试产品",
+		ProductImage: &productImage,
+	}
+
+	info := svc.toRentalInfo(rental, device, nil)
+	assert.NotNil(t, info)
+	require.NotNil(t, info.Device)
+	assert.Equal(t, device.ID, info.Device.ID)
+	assert.Equal(t, device.DeviceNo, info.Device.DeviceNo)
+	assert.Equal(t, device.Name, info.Device.Name)
+	assert.Equal(t, device.ProductName, info.Device.ProductName)
+	assert.Equal(t, *device.ProductImage, *info.Device.ProductImage)
+}
+
+func TestRentalService_PayRental_OrderNotFound(t *testing.T) {
+	svc := setupTestRentalService(t)
+	ctx := context.Background()
+
+	user, device, pricing := createTestData(t, svc.db)
+
+	// 创建租借
+	rentalInfo, err := svc.CreateRental(ctx, user.ID, &CreateRentalRequest{
+		DeviceID:  device.ID,
+		PricingID: pricing.ID,
+	})
+	require.NoError(t, err)
+
+	// 删除订单
+	svc.db.Delete(&models.Order{}, "id = ?", rentalInfo.OrderID)
+
+	// 尝试支付
+	err = svc.PayRental(ctx, user.ID, rentalInfo.ID)
+	assert.Error(t, err)
+}
+
+func TestRentalService_StartRental_DeviceNotFound(t *testing.T) {
+	svc := setupTestRentalService(t)
+	ctx := context.Background()
+
+	user, device, pricing := createTestData(t, svc.db)
+
+	// 创建租借
+	rentalInfo, err := svc.CreateRental(ctx, user.ID, &CreateRentalRequest{
+		DeviceID:  device.ID,
+		PricingID: pricing.ID,
+	})
+	require.NoError(t, err)
+	svc.PayRental(ctx, user.ID, rentalInfo.ID)
+
+	// 删除设备
+	svc.db.Delete(&models.Device{}, "id = ?", device.ID)
+
+	// 尝试开始
+	err = svc.StartRental(ctx, user.ID, rentalInfo.ID)
+	assert.Error(t, err)
+}
+
+func TestRentalService_CreateRental_ZeroTotalAmount(t *testing.T) {
+	svc := setupTestRentalService(t)
+	ctx := context.Background()
+
+	user, device, _ := createTestData(t, svc.db)
+
+	// 创建免费定价（价格和押金都是0）
+	freePricing := &models.RentalPricing{
+		VenueID:       &device.VenueID,
+		DurationHours: 1,
+		Price:         0,
+		Deposit:       0,
+		OvertimeRate:  0,
+		IsActive:      true,
+	}
+	svc.db.Create(freePricing)
+
+	// 创建新设备
+	device2 := &models.Device{
+		DeviceNo:       "D20240101050",
+		Name:           "免费测试设备",
+		Type:           models.DeviceTypeStandard,
+		VenueID:        device.VenueID,
+		QRCode:         "https://qr.example.com/D20240101050",
+		ProductName:    "免费产品",
+		SlotCount:      1,
+		AvailableSlots: 1,
+		OnlineStatus:   models.DeviceOnline,
+		LockStatus:     models.DeviceLocked,
+		RentalStatus:   models.DeviceRentalFree,
+		NetworkType:    "WiFi",
+		Status:         models.DeviceStatusActive,
+	}
+	svc.db.Create(device2)
+
+	// 免费租借应该成功（不检查余额）
+	rentalInfo, err := svc.CreateRental(ctx, user.ID, &CreateRentalRequest{
+		DeviceID:  device2.ID,
+		PricingID: freePricing.ID,
+	})
+	require.NoError(t, err)
+	assert.NotNil(t, rentalInfo)
+	assert.Equal(t, float64(0), rentalInfo.RentalFee)
+	assert.Equal(t, float64(0), rentalInfo.Deposit)
+}
+
+func TestRentalService_PayRental_ZeroAmounts(t *testing.T) {
+	svc := setupTestRentalService(t)
+	ctx := context.Background()
+
+	user, device, _ := createTestData(t, svc.db)
+
+	// 创建免费定价
+	freePricing := &models.RentalPricing{
+		VenueID:       &device.VenueID,
+		DurationHours: 1,
+		Price:         0,
+		Deposit:       0,
+		OvertimeRate:  0,
+		IsActive:      true,
+	}
+	svc.db.Create(freePricing)
+
+	// 创建新设备
+	device2 := &models.Device{
+		DeviceNo:       "D20240101051",
+		Name:           "免费测试设备2",
+		Type:           models.DeviceTypeStandard,
+		VenueID:        device.VenueID,
+		QRCode:         "https://qr.example.com/D20240101051",
+		ProductName:    "免费产品",
+		SlotCount:      1,
+		AvailableSlots: 1,
+		OnlineStatus:   models.DeviceOnline,
+		LockStatus:     models.DeviceLocked,
+		RentalStatus:   models.DeviceRentalFree,
+		NetworkType:    "WiFi",
+		Status:         models.DeviceStatusActive,
+	}
+	svc.db.Create(device2)
+
+	// 创建免费租借
+	rentalInfo, err := svc.CreateRental(ctx, user.ID, &CreateRentalRequest{
+		DeviceID:  device2.ID,
+		PricingID: freePricing.ID,
+	})
+	require.NoError(t, err)
+
+	// 支付免费租借
+	err = svc.PayRental(ctx, user.ID, rentalInfo.ID)
+	require.NoError(t, err)
+
+	// 验证订单状态
+	var order models.Order
+	svc.db.First(&order, rentalInfo.OrderID)
+	assert.Equal(t, models.OrderStatusPaid, order.Status)
+}
+
+func TestRentalService_CompleteRental_ZeroDeposit(t *testing.T) {
+	svc := setupTestRentalService(t)
+	ctx := context.Background()
+
+	user, device, _ := createTestData(t, svc.db)
+
+	// 创建无押金定价
+	noDepositPricing := &models.RentalPricing{
+		VenueID:       &device.VenueID,
+		DurationHours: 1,
+		Price:         10.0,
+		Deposit:       0, // 无押金
+		OvertimeRate:  0,
+		IsActive:      true,
+	}
+	svc.db.Create(noDepositPricing)
+
+	// 创建新设备
+	device2 := &models.Device{
+		DeviceNo:       "D20240101052",
+		Name:           "无押金测试设备",
+		Type:           models.DeviceTypeStandard,
+		VenueID:        device.VenueID,
+		QRCode:         "https://qr.example.com/D20240101052",
+		ProductName:    "无押金产品",
+		SlotCount:      1,
+		AvailableSlots: 1,
+		OnlineStatus:   models.DeviceOnline,
+		LockStatus:     models.DeviceLocked,
+		RentalStatus:   models.DeviceRentalFree,
+		NetworkType:    "WiFi",
+		Status:         models.DeviceStatusActive,
+	}
+	svc.db.Create(device2)
+
+	// 创建无押金租借
+	rentalInfo, err := svc.CreateRental(ctx, user.ID, &CreateRentalRequest{
+		DeviceID:  device2.ID,
+		PricingID: noDepositPricing.ID,
+	})
+	require.NoError(t, err)
+
+	// 完整流程
+	svc.PayRental(ctx, user.ID, rentalInfo.ID)
+	svc.StartRental(ctx, user.ID, rentalInfo.ID)
+	svc.ReturnRental(ctx, user.ID, rentalInfo.ID)
+
+	// 完成无押金租借
+	err = svc.CompleteRental(ctx, rentalInfo.ID)
+	require.NoError(t, err)
+
+	// 验证租借状态
+	var rental models.Rental
+	svc.db.First(&rental, rentalInfo.ID)
+	assert.Equal(t, models.RentalStatusCompleted, rental.Status)
+}
+
+func TestRentalService_GetRental_NotFound(t *testing.T) {
+	svc := setupTestRentalService(t)
+	ctx := context.Background()
+
+	user, _, _ := createTestData(t, svc.db)
+
+	_, err := svc.GetRental(ctx, user.ID, 999999)
+	assert.Error(t, err)
+}
+
+func TestRentalService_toRentalInfo_WithOrderID(t *testing.T) {
+	svc := setupTestRentalService(t)
+
+	user, device, pricing := createTestData(t, svc.db)
+
+	// 创建租借，获取关联的Order
+	ctx := context.Background()
+	rentalInfo, err := svc.CreateRental(ctx, user.ID, &CreateRentalRequest{
+		DeviceID:  device.ID,
+		PricingID: pricing.ID,
+	})
+	require.NoError(t, err)
+
+	// 获取租借详情验证OrderNo
+	info, err := svc.GetRental(ctx, user.ID, rentalInfo.ID)
+	require.NoError(t, err)
+	assert.NotEmpty(t, info.OrderNo)
+	assert.Equal(t, rentalInfo.OrderID, info.OrderID)
 }

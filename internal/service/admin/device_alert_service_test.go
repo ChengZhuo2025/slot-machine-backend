@@ -121,3 +121,190 @@ func TestDeviceAlertService_CreateAndResolveAlert_PersistsAndLogs(t *testing.T) 
 	require.NotNil(t, dbAlert.ResolvedAt)
 }
 
+func TestDeviceAlertService_CheckAllDevices(t *testing.T) {
+	db := setupAdminServiceTestDB(t)
+	ctx := context.Background()
+
+	merchant := &models.Merchant{Name: "商户A", ContactName: "联系人", ContactPhone: "13900139000", CommissionRate: 0.2, SettlementType: "monthly", Status: models.MerchantStatusActive}
+	require.NoError(t, db.Create(merchant).Error)
+	venue := &models.Venue{MerchantID: merchant.ID, Name: "场地A", Type: "mall", Province: "广东省", City: "深圳市", District: "南山区", Address: "科技园路1号", Status: models.VenueStatusActive}
+	require.NoError(t, db.Create(venue).Error)
+
+	// 创建多个设备
+	for i := 0; i < 3; i++ {
+		battery := 5
+		device := &models.Device{
+			DeviceNo:       "DEV_CHECK_" + string(rune('A'+i)),
+			Name:           "检测设备",
+			Type:           models.DeviceTypeStandard,
+			VenueID:        venue.ID,
+			ProductName:    "测试产品",
+			SlotCount:      1,
+			AvailableSlots: 1,
+			OnlineStatus:   models.DeviceOnline,
+			LockStatus:     models.DeviceLocked,
+			RentalStatus:   models.DeviceRentalFree,
+			NetworkType:    "WiFi",
+			Status:         models.DeviceStatusActive,
+			BatteryLevel:   &battery,
+		}
+		require.NoError(t, db.Create(device).Error)
+	}
+
+	deviceRepo := repository.NewDeviceRepository(db)
+	deviceLogRepo := repository.NewDeviceLogRepository(db)
+	alertRepo := repository.NewDeviceAlertRepository(db)
+	svc := NewDeviceAlertService(deviceRepo, deviceLogRepo, alertRepo)
+
+	alerts, err := svc.CheckAllDevices(ctx)
+	require.NoError(t, err)
+	assert.NotNil(t, alerts)
+}
+
+func TestDeviceAlertService_ListAlerts(t *testing.T) {
+	db := setupAdminServiceTestDB(t)
+	ctx := context.Background()
+
+	merchant := &models.Merchant{Name: "商户A", ContactName: "联系人", ContactPhone: "13900139000", CommissionRate: 0.2, SettlementType: "monthly", Status: models.MerchantStatusActive}
+	require.NoError(t, db.Create(merchant).Error)
+	venue := &models.Venue{MerchantID: merchant.ID, Name: "场地A", Type: "mall", Province: "广东省", City: "深圳市", District: "南山区", Address: "科技园路1号", Status: models.VenueStatusActive}
+	require.NoError(t, db.Create(venue).Error)
+	device := &models.Device{
+		DeviceNo:       "DEV_LIST_ALERT",
+		Name:           "告警列表设备",
+		Type:           models.DeviceTypeStandard,
+		VenueID:        venue.ID,
+		ProductName:    "测试产品",
+		SlotCount:      1,
+		AvailableSlots: 1,
+		OnlineStatus:   models.DeviceOnline,
+		LockStatus:     models.DeviceLocked,
+		RentalStatus:   models.DeviceRentalFree,
+		NetworkType:    "WiFi",
+		Status:         models.DeviceStatusActive,
+	}
+	require.NoError(t, db.Create(device).Error)
+
+	// 创建一些告警记录
+	for i := 0; i < 3; i++ {
+		alert := &models.DeviceAlert{
+			DeviceID: device.ID,
+			Type:     string(AlertTypeFault),
+			Level:    string(AlertLevelWarning),
+			Title:    "告警" + string(rune('0'+i)),
+			Content:  "告警消息",
+		}
+		require.NoError(t, db.Create(alert).Error)
+	}
+
+	deviceRepo := repository.NewDeviceRepository(db)
+	deviceLogRepo := repository.NewDeviceLogRepository(db)
+	alertRepo := repository.NewDeviceAlertRepository(db)
+	svc := NewDeviceAlertService(deviceRepo, deviceLogRepo, alertRepo)
+
+	alerts, total, err := svc.ListAlerts(ctx, 0, 10, nil)
+	require.NoError(t, err)
+	assert.Equal(t, int64(3), total)
+	assert.Len(t, alerts, 3)
+}
+
+func TestDeviceAlertService_GetUnresolvedCount(t *testing.T) {
+	db := setupAdminServiceTestDB(t)
+	ctx := context.Background()
+
+	merchant := &models.Merchant{Name: "商户A", ContactName: "联系人", ContactPhone: "13900139000", CommissionRate: 0.2, SettlementType: "monthly", Status: models.MerchantStatusActive}
+	require.NoError(t, db.Create(merchant).Error)
+	venue := &models.Venue{MerchantID: merchant.ID, Name: "场地A", Type: "mall", Province: "广东省", City: "深圳市", District: "南山区", Address: "科技园路1号", Status: models.VenueStatusActive}
+	require.NoError(t, db.Create(venue).Error)
+	device := &models.Device{
+		DeviceNo:       "DEV_UNRESOLVED",
+		Name:           "未解决告警设备",
+		Type:           models.DeviceTypeStandard,
+		VenueID:        venue.ID,
+		ProductName:    "测试产品",
+		SlotCount:      1,
+		AvailableSlots: 1,
+		OnlineStatus:   models.DeviceOnline,
+		LockStatus:     models.DeviceLocked,
+		RentalStatus:   models.DeviceRentalFree,
+		NetworkType:    "WiFi",
+		Status:         models.DeviceStatusActive,
+	}
+	require.NoError(t, db.Create(device).Error)
+
+	// 创建未解决的告警
+	unresolvedAlert := &models.DeviceAlert{
+		DeviceID:   device.ID,
+		Type:       string(AlertTypeFault),
+		Level:      string(AlertLevelCritical),
+		Title:      "未解决告警",
+		Content:    "告警消息",
+		IsResolved: false,
+	}
+	require.NoError(t, db.Create(unresolvedAlert).Error)
+
+	// 创建已解决的告警
+	resolvedAlert := &models.DeviceAlert{
+		DeviceID:   device.ID,
+		Type:       string(AlertTypeFault),
+		Level:      string(AlertLevelWarning),
+		Title:      "已解决告警",
+		Content:    "告警消息",
+		IsResolved: true,
+	}
+	require.NoError(t, db.Create(resolvedAlert).Error)
+
+	deviceRepo := repository.NewDeviceRepository(db)
+	deviceLogRepo := repository.NewDeviceLogRepository(db)
+	alertRepo := repository.NewDeviceAlertRepository(db)
+	svc := NewDeviceAlertService(deviceRepo, deviceLogRepo, alertRepo)
+
+	count, err := svc.GetUnresolvedCount(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), count)
+}
+
+func TestDeviceAlertService_GetAlertStatistics(t *testing.T) {
+	db := setupAdminServiceTestDB(t)
+	ctx := context.Background()
+
+	merchant := &models.Merchant{Name: "商户A", ContactName: "联系人", ContactPhone: "13900139000", CommissionRate: 0.2, SettlementType: "monthly", Status: models.MerchantStatusActive}
+	require.NoError(t, db.Create(merchant).Error)
+	venue := &models.Venue{MerchantID: merchant.ID, Name: "场地A", Type: "mall", Province: "广东省", City: "深圳市", District: "南山区", Address: "科技园路1号", Status: models.VenueStatusActive}
+	require.NoError(t, db.Create(venue).Error)
+	device := &models.Device{
+		DeviceNo:       "DEV_STATS",
+		Name:           "统计设备",
+		Type:           models.DeviceTypeStandard,
+		VenueID:        venue.ID,
+		ProductName:    "测试产品",
+		SlotCount:      1,
+		AvailableSlots: 1,
+		OnlineStatus:   models.DeviceOnline,
+		LockStatus:     models.DeviceLocked,
+		RentalStatus:   models.DeviceRentalFree,
+		NetworkType:    "WiFi",
+		Status:         models.DeviceStatusActive,
+	}
+	require.NoError(t, db.Create(device).Error)
+
+	// 创建不同类型的告警
+	alerts := []models.DeviceAlert{
+		{DeviceID: device.ID, Type: string(AlertTypeFault), Level: string(AlertLevelCritical), Title: "故障", Content: "消息"},
+		{DeviceID: device.ID, Type: string(AlertTypeLowBattery), Level: string(AlertLevelWarning), Title: "低电量", Content: "消息"},
+		{DeviceID: device.ID, Type: string(AlertTypeOffline), Level: string(AlertLevelCritical), Title: "离线", Content: "消息"},
+	}
+	for i := range alerts {
+		require.NoError(t, db.Create(&alerts[i]).Error)
+	}
+
+	deviceRepo := repository.NewDeviceRepository(db)
+	deviceLogRepo := repository.NewDeviceLogRepository(db)
+	alertRepo := repository.NewDeviceAlertRepository(db)
+	svc := NewDeviceAlertService(deviceRepo, deviceLogRepo, alertRepo)
+
+	stats, err := svc.GetAlertStatistics(ctx)
+	require.NoError(t, err)
+	assert.NotNil(t, stats)
+}
+

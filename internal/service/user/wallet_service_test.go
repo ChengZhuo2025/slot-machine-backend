@@ -394,3 +394,26 @@ func TestWalletService_GetTransactions(t *testing.T) {
 		assert.Len(t, records, 2)
 	})
 }
+
+func TestWalletService_getTypeName(t *testing.T) {
+	db := setupWalletTestDB(t)
+	svc := setupWalletService(db)
+
+	tests := []struct {
+		txType   string
+		expected string
+	}{
+		{models.WalletTxTypeRecharge, "充值"},
+		{models.WalletTxTypeConsume, "消费"},
+		{models.WalletTxTypeRefund, "退款"},
+		{models.WalletTxTypeWithdraw, "提现"},
+		{models.WalletTxTypeDeposit, "押金冻结"},
+		{models.WalletTxTypeReturnDeposit, "押金退还"},
+		{"unknown", "其他"},
+	}
+
+	for _, tt := range tests {
+		name := svc.getTypeName(tt.txType)
+		assert.Equal(t, tt.expected, name)
+	}
+}

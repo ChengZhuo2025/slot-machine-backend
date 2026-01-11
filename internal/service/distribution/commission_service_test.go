@@ -567,3 +567,133 @@ func TestCommissionService_GetByDistributorID(t *testing.T) {
 		assert.Equal(t, int64(5), total)
 	})
 }
+
+func TestCommissionService_GetStats(t *testing.T) {
+	db := setupCommissionTestDB(t)
+	commissionRepo := repository.NewCommissionRepository(db)
+	distributorRepo := repository.NewDistributorRepository(db)
+	userRepo := repository.NewUserRepository(db)
+	svc := NewCommissionService(commissionRepo, distributorRepo, userRepo, db)
+	ctx := context.Background()
+
+	referrer := createTestUser(db, nil)
+	distributor := createTestDistributor(db, referrer.ID, nil, models.DistributorStatusApproved)
+
+	// 创建佣金记录
+	commission := &models.Commission{
+		DistributorID: distributor.ID,
+		OrderID:       1,
+		FromUserID:    2,
+		Type:          models.CommissionTypeDirect,
+		OrderAmount:   100.0,
+		Rate:          DefaultDirectRate,
+		Amount:        10.0,
+		Status:        models.CommissionStatusSettled,
+	}
+	db.Create(commission)
+
+	stats, err := svc.GetStats(ctx, distributor.ID)
+	require.NoError(t, err)
+	assert.NotNil(t, stats)
+}
+
+func TestCommissionService_List(t *testing.T) {
+	db := setupCommissionTestDB(t)
+	commissionRepo := repository.NewCommissionRepository(db)
+	distributorRepo := repository.NewDistributorRepository(db)
+	userRepo := repository.NewUserRepository(db)
+	svc := NewCommissionService(commissionRepo, distributorRepo, userRepo, db)
+	ctx := context.Background()
+
+	referrer := createTestUser(db, nil)
+	distributor := createTestDistributor(db, referrer.ID, nil, models.DistributorStatusApproved)
+
+	// 创建佣金记录
+	for i := 0; i < 3; i++ {
+		commission := &models.Commission{
+			DistributorID: distributor.ID,
+			OrderID:       int64(i + 1),
+			FromUserID:    int64(i + 100),
+			Type:          models.CommissionTypeDirect,
+			OrderAmount:   100.0,
+			Rate:          DefaultDirectRate,
+			Amount:        10.0,
+			Status:        models.CommissionStatusPending,
+		}
+		db.Create(commission)
+	}
+
+	commissions, total, err := svc.List(ctx, 0, 10, nil)
+	require.NoError(t, err)
+	assert.Len(t, commissions, 3)
+	assert.Equal(t, int64(3), total)
+}
+
+func TestCommissionService_GetByOrderID(t *testing.T) {
+	db := setupCommissionTestDB(t)
+	commissionRepo := repository.NewCommissionRepository(db)
+	distributorRepo := repository.NewDistributorRepository(db)
+	userRepo := repository.NewUserRepository(db)
+	svc := NewCommissionService(commissionRepo, distributorRepo, userRepo, db)
+	ctx := context.Background()
+
+	referrer := createTestUser(db, nil)
+	distributor := createTestDistributor(db, referrer.ID, nil, models.DistributorStatusApproved)
+
+	// 创建佣金记录
+	commission := &models.Commission{
+		DistributorID: distributor.ID,
+		OrderID:       123,
+		FromUserID:    456,
+		Type:          models.CommissionTypeDirect,
+		OrderAmount:   100.0,
+		Rate:          DefaultDirectRate,
+		Amount:        10.0,
+		Status:        models.CommissionStatusPending,
+	}
+	db.Create(commission)
+
+	commissions, err := svc.GetByOrderID(ctx, 123)
+	require.NoError(t, err)
+	assert.Len(t, commissions, 1)
+	assert.Equal(t, int64(123), commissions[0].OrderID)
+}
+
+func TestCommissionService_SettlePendingCommissions(t *testing.T) {
+	db := setupCommissionTestDB(t)
+	commissionRepo := repository.NewCommissionRepository(db)
+	distributorRepo := repository.NewDistributorRepository(db)
+	userRepo := repository.NewUserRepository(db)
+	svc := NewCommissionService(commissionRepo, distributorRepo, userRepo, db)
+	ctx := context.Background()
+
+	// 设置结算延迟为0天（便于测试）
+	svc.SetRates(DefaultDirectRate, DefaultIndirectRate, 0)
+
+	referrer := createTestUser(db, nil)
+	distributor := createTestDistributor(db, referrer.ID, nil, models.DistributorStatusApproved)
+
+	// 创建待结算的佣金记录（创建时间在过去）
+	commission := &models.Commission{
+		DistributorID: distributor.ID,
+		OrderID:       1,
+		FromUserID:    2,
+		Type:          models.CommissionTypeDirect,
+		OrderAmount:   100.0,
+		Rate:          DefaultDirectRate,
+		Amount:        10.0,
+		Status:        models.CommissionStatusPending,
+	}
+	db.Create(commission)
+	// 手动设置创建时间为过去
+	db.Model(commission).Update("created_at", time.Now().AddDate(0, 0, -1))
+
+	count, err := svc.SettlePendingCommissions(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), count)
+
+	// 验证佣金状态
+	var updated models.Commission
+	db.First(&updated, commission.ID)
+	assert.Equal(t, models.CommissionStatusSettled, updated.Status)
+}

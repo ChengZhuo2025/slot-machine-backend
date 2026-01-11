@@ -400,3 +400,14 @@ func TestFeedbackAdminService_GetStatistics(t *testing.T) {
 		assert.Equal(t, int64(1), stats.TypeCounts["other"])
 	})
 }
+
+func TestFeedbackError_Error(t *testing.T) {
+	t.Run("返回错误消息", func(t *testing.T) {
+		err := &FeedbackError{Code: "TEST_CODE", Message: "测试错误消息"}
+		assert.Equal(t, "测试错误消息", err.Error())
+	})
+
+	t.Run("ErrNotOwner错误", func(t *testing.T) {
+		assert.Equal(t, "无权操作此反馈", ErrNotOwner.Error())
+	})
+}

@@ -168,3 +168,89 @@ func TestMemberPackageService_PurchasePackage_Disabled(t *testing.T) {
 	_, err := svc.PurchasePackage(ctx, user.ID, pkg.ID)
 	require.Error(t, err)
 }
+
+func TestMemberPackageService_GetPackagesByLevel(t *testing.T) {
+	db := setupMemberPackageServiceTestDB(t)
+	svc, _ := newMemberPackageServiceForTest(db)
+	ctx := context.Background()
+
+	// 为等级2创建几个套餐
+	createTestMemberPackage(db, func(p *models.MemberPackage) { p.Name = "套餐1"; p.MemberLevelID = 2 })
+	createTestMemberPackage(db, func(p *models.MemberPackage) { p.Name = "套餐2"; p.MemberLevelID = 2 })
+	createTestMemberPackage(db, func(p *models.MemberPackage) { p.Name = "等级3套餐"; p.MemberLevelID = 3 })
+
+	t.Run("获取指定等级的套餐列表", func(t *testing.T) {
+		packages, err := svc.GetPackagesByLevel(ctx, 2)
+		require.NoError(t, err)
+		assert.Len(t, packages, 2)
+	})
+
+	t.Run("获取无套餐的等级", func(t *testing.T) {
+		packages, err := svc.GetPackagesByLevel(ctx, 1)
+		require.NoError(t, err)
+		assert.Len(t, packages, 0)
+	})
+}
+
+func TestMemberPackageService_getDurationText(t *testing.T) {
+	db := setupMemberPackageServiceTestDB(t)
+	svc, _ := newMemberPackageServiceForTest(db)
+
+	tests := []struct {
+		duration int
+		unit     string
+		expected string
+	}{
+		{1, models.PackageDurationUnitDay, "1天"},
+		{7, models.PackageDurationUnitDay, "7天"},
+		{1, models.PackageDurationUnitMonth, "1个月"},
+		{3, models.PackageDurationUnitMonth, "3个月"},
+		{1, models.PackageDurationUnitYear, "1年"},
+		{2, models.PackageDurationUnitYear, "2年"},
+		{6, "unknown", "6个月"}, // 默认情况
+	}
+
+	for _, tt := range tests {
+		result := svc.getDurationText(tt.duration, tt.unit)
+		assert.Equal(t, tt.expected, result)
+	}
+}
+
+func TestMemberPackageService_toPackageInfo(t *testing.T) {
+	db := setupMemberPackageServiceTestDB(t)
+	svc, _ := newMemberPackageServiceForTest(db)
+
+	t.Run("nil输入返回nil", func(t *testing.T) {
+		result := svc.toPackageInfo(nil)
+		assert.Nil(t, result)
+	})
+
+	t.Run("完整套餐信息转换", func(t *testing.T) {
+		benefits := models.JSON{"free_shipping": true}
+		level := &models.MemberLevel{ID: 2, Name: "黄金会员", Level: 2, Discount: 0.9}
+		originalPrice := 50.0
+		pkg := &models.MemberPackage{
+			ID:            1,
+			Name:          "黄金会员月卡",
+			MemberLevelID: 2,
+			MemberLevel:   level,
+			Duration:      1,
+			DurationUnit:  models.PackageDurationUnitMonth,
+			Price:         30.0,
+			OriginalPrice: &originalPrice,
+			GiftPoints:    20,
+			Benefits:      benefits,
+			Sort:          10,
+			IsRecommend:   true,
+			Status:        models.MemberPackageStatusActive,
+		}
+
+		result := svc.toPackageInfo(pkg)
+		require.NotNil(t, result)
+		assert.Equal(t, "黄金会员月卡", result.Name)
+		assert.Equal(t, "1个月", result.DurationText)
+		assert.NotNil(t, result.Benefits)
+		require.NotNil(t, result.MemberLevel)
+		assert.Equal(t, "黄金会员", result.MemberLevel.Name)
+	})
+}

@@ -661,3 +661,203 @@ func TestDistributorService_GetApprovedDistributorByUserID(t *testing.T) {
 		assert.Contains(t, err.Error(), "分销商尚未审核通过")
 	})
 }
+
+func TestDistributorService_GetByID(t *testing.T) {
+	db := setupDistributorTestDB(t)
+	distributorRepo := repository.NewDistributorRepository(db)
+	userRepo := repository.NewUserRepository(db)
+	svc := NewDistributorService(distributorRepo, userRepo, db)
+	ctx := context.Background()
+
+	user := createDistributorTestUser(db, nil)
+	distributor := &models.Distributor{
+		UserID:     user.ID,
+		Level:      models.DistributorLevelDirect,
+		InviteCode: "GETBYID1",
+		Status:     models.DistributorStatusApproved,
+	}
+	db.Create(distributor)
+
+	result, err := svc.GetByID(ctx, distributor.ID)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, distributor.ID, result.ID)
+}
+
+func TestDistributorService_GetByInviteCode(t *testing.T) {
+	db := setupDistributorTestDB(t)
+	distributorRepo := repository.NewDistributorRepository(db)
+	userRepo := repository.NewUserRepository(db)
+	svc := NewDistributorService(distributorRepo, userRepo, db)
+	ctx := context.Background()
+
+	user := createDistributorTestUser(db, nil)
+	distributor := &models.Distributor{
+		UserID:     user.ID,
+		Level:      models.DistributorLevelDirect,
+		InviteCode: "FINDCODE",
+		Status:     models.DistributorStatusApproved,
+	}
+	db.Create(distributor)
+
+	result, err := svc.GetByInviteCode(ctx, "FINDCODE")
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, "FINDCODE", result.InviteCode)
+}
+
+func TestDistributorService_GetTeamMembers(t *testing.T) {
+	db := setupDistributorTestDB(t)
+	distributorRepo := repository.NewDistributorRepository(db)
+	userRepo := repository.NewUserRepository(db)
+	svc := NewDistributorService(distributorRepo, userRepo, db)
+	ctx := context.Background()
+
+	// 创建父级分销商
+	parentUser := createDistributorTestUser(db, nil)
+	parentDistributor := &models.Distributor{
+		UserID:     parentUser.ID,
+		Level:      models.DistributorLevelDirect,
+		InviteCode: "PARENT01",
+		Status:     models.DistributorStatusApproved,
+	}
+	db.Create(parentDistributor)
+
+	// 创建下级分销商
+	for i := 0; i < 3; i++ {
+		childUser := createDistributorTestUser(db, &parentUser.ID)
+		childDistributor := &models.Distributor{
+			UserID:     childUser.ID,
+			ParentID:   &parentDistributor.ID,
+			Level:      models.DistributorLevelIndirect,
+			InviteCode: fmt.Sprintf("CHILD%03d", i),
+			Status:     models.DistributorStatusApproved,
+		}
+		db.Create(childDistributor)
+	}
+
+	members, total, err := svc.GetTeamMembers(ctx, parentDistributor.ID, 0, 10, "")
+	require.NoError(t, err)
+	assert.Equal(t, int64(3), total)
+	assert.Len(t, members, 3)
+}
+
+func TestDistributorService_GetDirectMembers(t *testing.T) {
+	db := setupDistributorTestDB(t)
+	distributorRepo := repository.NewDistributorRepository(db)
+	userRepo := repository.NewUserRepository(db)
+	svc := NewDistributorService(distributorRepo, userRepo, db)
+	ctx := context.Background()
+
+	// 创建父级分销商
+	parentUser := createDistributorTestUser(db, nil)
+	parentDistributor := &models.Distributor{
+		UserID:      parentUser.ID,
+		Level:       models.DistributorLevelDirect,
+		InviteCode:  "DIRECT01",
+		DirectCount: 2,
+		Status:      models.DistributorStatusApproved,
+	}
+	db.Create(parentDistributor)
+
+	// 创建直接下级分销商
+	for i := 0; i < 2; i++ {
+		childUser := createDistributorTestUser(db, &parentUser.ID)
+		childDistributor := &models.Distributor{
+			UserID:     childUser.ID,
+			ParentID:   &parentDistributor.ID,
+			Level:      models.DistributorLevelIndirect,
+			InviteCode: fmt.Sprintf("DCHLD%03d", i),
+			Status:     models.DistributorStatusApproved,
+		}
+		db.Create(childDistributor)
+	}
+
+	members, total, err := svc.GetDirectMembers(ctx, parentDistributor.ID, 0, 10)
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), total)
+	assert.Len(t, members, 2)
+}
+
+func TestDistributorService_GetPendingList(t *testing.T) {
+	db := setupDistributorTestDB(t)
+	distributorRepo := repository.NewDistributorRepository(db)
+	userRepo := repository.NewUserRepository(db)
+	svc := NewDistributorService(distributorRepo, userRepo, db)
+	ctx := context.Background()
+
+	// 创建待审核分销商
+	for i := 0; i < 3; i++ {
+		user := createDistributorTestUser(db, nil)
+		distributor := &models.Distributor{
+			UserID:     user.ID,
+			Level:      models.DistributorLevelDirect,
+			InviteCode: fmt.Sprintf("PEND%04d", i),
+			Status:     models.DistributorStatusPending,
+		}
+		db.Create(distributor)
+	}
+
+	list, total, err := svc.GetPendingList(ctx, 0, 10)
+	require.NoError(t, err)
+	assert.Equal(t, int64(3), total)
+	assert.Len(t, list, 3)
+}
+
+func TestDistributorService_List(t *testing.T) {
+	db := setupDistributorTestDB(t)
+	distributorRepo := repository.NewDistributorRepository(db)
+	userRepo := repository.NewUserRepository(db)
+	svc := NewDistributorService(distributorRepo, userRepo, db)
+	ctx := context.Background()
+
+	// 创建分销商
+	for i := 0; i < 5; i++ {
+		user := createDistributorTestUser(db, nil)
+		status := models.DistributorStatusApproved
+		if i%2 == 0 {
+			status = models.DistributorStatusPending
+		}
+		distributor := &models.Distributor{
+			UserID:     user.ID,
+			Level:      models.DistributorLevelDirect,
+			InviteCode: fmt.Sprintf("LIST%04d", i),
+			Status:     status,
+		}
+		db.Create(distributor)
+	}
+
+	list, total, err := svc.List(ctx, 0, 10, nil)
+	require.NoError(t, err)
+	assert.Equal(t, int64(5), total)
+	assert.Len(t, list, 5)
+}
+
+func TestDistributorService_GetTopDistributors(t *testing.T) {
+	db := setupDistributorTestDB(t)
+	distributorRepo := repository.NewDistributorRepository(db)
+	userRepo := repository.NewUserRepository(db)
+	svc := NewDistributorService(distributorRepo, userRepo, db)
+	ctx := context.Background()
+
+	// 创建有佣金的分销商
+	for i := 0; i < 3; i++ {
+		user := createDistributorTestUser(db, nil)
+		distributor := &models.Distributor{
+			UserID:          user.ID,
+			Level:           models.DistributorLevelDirect,
+			InviteCode:      fmt.Sprintf("TOP%05d", i),
+			TotalCommission: float64((3 - i) * 100), // 降序佣金
+			Status:          models.DistributorStatusApproved,
+		}
+		db.Create(distributor)
+	}
+
+	topList, err := svc.GetTopDistributors(ctx, 10)
+	require.NoError(t, err)
+	assert.Len(t, topList, 3)
+	// 验证按佣金降序
+	if len(topList) >= 2 {
+		assert.GreaterOrEqual(t, topList[0].TotalCommission, topList[1].TotalCommission)
+	}
+}

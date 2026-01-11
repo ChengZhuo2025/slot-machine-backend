@@ -740,3 +740,200 @@ func TestWithdrawService_GetConfig(t *testing.T) {
 		assert.NotNil(t, config["support_methods"])
 	})
 }
+
+func TestWithdrawService_GetByUserID(t *testing.T) {
+	db := setupWithdrawTestDB(t)
+	withdrawalRepo := repository.NewWithdrawalRepository(db)
+	distributorRepo := repository.NewDistributorRepository(db)
+	userRepo := repository.NewUserRepository(db)
+	svc := NewWithdrawService(withdrawalRepo, distributorRepo, userRepo, db)
+	ctx := context.Background()
+
+	user := createWithdrawTestUser(db)
+
+	// 创建多条提现记录
+	for i := 0; i < 3; i++ {
+		withdrawal := &models.Withdrawal{
+			WithdrawalNo: fmt.Sprintf("W%d%d", time.Now().UnixNano(), i),
+			UserID:       user.ID,
+			Type:         models.WithdrawalTypeCommission,
+			Amount:       float64(20 + i*10),
+			Fee:          0.3,
+			ActualAmount: float64(20+i*10) - 0.3,
+			WithdrawTo:   models.WithdrawToWechat,
+			Status:       models.WithdrawalStatusPending,
+		}
+		db.Create(withdrawal)
+	}
+
+	withdrawals, total, err := svc.GetByUserID(ctx, user.ID, 0, 10)
+	require.NoError(t, err)
+	assert.Equal(t, int64(3), total)
+	assert.Len(t, withdrawals, 3)
+}
+
+func TestWithdrawService_GetByID(t *testing.T) {
+	db := setupWithdrawTestDB(t)
+	withdrawalRepo := repository.NewWithdrawalRepository(db)
+	distributorRepo := repository.NewDistributorRepository(db)
+	userRepo := repository.NewUserRepository(db)
+	svc := NewWithdrawService(withdrawalRepo, distributorRepo, userRepo, db)
+	ctx := context.Background()
+
+	user := createWithdrawTestUser(db)
+	withdrawal := &models.Withdrawal{
+		WithdrawalNo: fmt.Sprintf("W%d", time.Now().UnixNano()),
+		UserID:       user.ID,
+		Type:         models.WithdrawalTypeCommission,
+		Amount:       50.0,
+		Fee:          0.3,
+		ActualAmount: 49.7,
+		WithdrawTo:   models.WithdrawToWechat,
+		Status:       models.WithdrawalStatusPending,
+	}
+	db.Create(withdrawal)
+
+	result, err := svc.GetByID(ctx, withdrawal.ID)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Equal(t, withdrawal.ID, result.ID)
+	assert.Equal(t, withdrawal.WithdrawalNo, result.WithdrawalNo)
+}
+
+func TestWithdrawService_List(t *testing.T) {
+	db := setupWithdrawTestDB(t)
+	withdrawalRepo := repository.NewWithdrawalRepository(db)
+	distributorRepo := repository.NewDistributorRepository(db)
+	userRepo := repository.NewUserRepository(db)
+	svc := NewWithdrawService(withdrawalRepo, distributorRepo, userRepo, db)
+	ctx := context.Background()
+
+	// 创建多个用户的提现记录
+	for i := 0; i < 5; i++ {
+		user := createWithdrawTestUser(db)
+		withdrawal := &models.Withdrawal{
+			WithdrawalNo: fmt.Sprintf("W%d%d", time.Now().UnixNano(), i),
+			UserID:       user.ID,
+			Type:         models.WithdrawalTypeCommission,
+			Amount:       float64(20 + i*10),
+			Fee:          0.3,
+			ActualAmount: float64(20+i*10) - 0.3,
+			WithdrawTo:   models.WithdrawToWechat,
+			Status:       models.WithdrawalStatusPending,
+		}
+		db.Create(withdrawal)
+	}
+
+	withdrawals, total, err := svc.List(ctx, 0, 10, nil)
+	require.NoError(t, err)
+	assert.Equal(t, int64(5), total)
+	assert.Len(t, withdrawals, 5)
+}
+
+func TestWithdrawService_GetPendingList(t *testing.T) {
+	db := setupWithdrawTestDB(t)
+	withdrawalRepo := repository.NewWithdrawalRepository(db)
+	distributorRepo := repository.NewDistributorRepository(db)
+	userRepo := repository.NewUserRepository(db)
+	svc := NewWithdrawService(withdrawalRepo, distributorRepo, userRepo, db)
+	ctx := context.Background()
+
+	user := createWithdrawTestUser(db)
+
+	// 创建不同状态的提现记录
+	statuses := []string{
+		models.WithdrawalStatusPending,
+		models.WithdrawalStatusPending,
+		models.WithdrawalStatusApproved,
+		models.WithdrawalStatusSuccess,
+	}
+	for i, status := range statuses {
+		withdrawal := &models.Withdrawal{
+			WithdrawalNo: fmt.Sprintf("WP%d%d", time.Now().UnixNano(), i),
+			UserID:       user.ID,
+			Type:         models.WithdrawalTypeCommission,
+			Amount:       50.0,
+			Fee:          0.3,
+			ActualAmount: 49.7,
+			WithdrawTo:   models.WithdrawToWechat,
+			Status:       status,
+		}
+		db.Create(withdrawal)
+	}
+
+	pending, total, err := svc.GetPendingList(ctx, 0, 10)
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), total)
+	assert.Len(t, pending, 2)
+	for _, w := range pending {
+		assert.Equal(t, models.WithdrawalStatusPending, w.Status)
+	}
+}
+
+func TestWithdrawService_GetApprovedList(t *testing.T) {
+	db := setupWithdrawTestDB(t)
+	withdrawalRepo := repository.NewWithdrawalRepository(db)
+	distributorRepo := repository.NewDistributorRepository(db)
+	userRepo := repository.NewUserRepository(db)
+	svc := NewWithdrawService(withdrawalRepo, distributorRepo, userRepo, db)
+	ctx := context.Background()
+
+	user := createWithdrawTestUser(db)
+
+	// 创建不同状态的提现记录
+	statuses := []string{
+		models.WithdrawalStatusPending,
+		models.WithdrawalStatusApproved,
+		models.WithdrawalStatusApproved,
+		models.WithdrawalStatusSuccess,
+	}
+	for i, status := range statuses {
+		withdrawal := &models.Withdrawal{
+			WithdrawalNo: fmt.Sprintf("WA%d%d", time.Now().UnixNano(), i),
+			UserID:       user.ID,
+			Type:         models.WithdrawalTypeCommission,
+			Amount:       50.0,
+			Fee:          0.3,
+			ActualAmount: 49.7,
+			WithdrawTo:   models.WithdrawToWechat,
+			Status:       status,
+		}
+		db.Create(withdrawal)
+	}
+
+	approved, total, err := svc.GetApprovedList(ctx, 0, 10)
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), total)
+	assert.Len(t, approved, 2)
+	for _, w := range approved {
+		assert.Equal(t, models.WithdrawalStatusApproved, w.Status)
+	}
+}
+
+func TestWithdrawService_GetStats(t *testing.T) {
+	db := setupWithdrawTestDB(t)
+	withdrawalRepo := repository.NewWithdrawalRepository(db)
+	distributorRepo := repository.NewDistributorRepository(db)
+	userRepo := repository.NewUserRepository(db)
+	svc := NewWithdrawService(withdrawalRepo, distributorRepo, userRepo, db)
+	ctx := context.Background()
+
+	user := createWithdrawTestUser(db)
+
+	// 创建一些提现记录
+	withdrawal := &models.Withdrawal{
+		WithdrawalNo: fmt.Sprintf("WS%d", time.Now().UnixNano()),
+		UserID:       user.ID,
+		Type:         models.WithdrawalTypeCommission,
+		Amount:       50.0,
+		Fee:          0.3,
+		ActualAmount: 49.7,
+		WithdrawTo:   models.WithdrawToWechat,
+		Status:       models.WithdrawalStatusSuccess,
+	}
+	db.Create(withdrawal)
+
+	stats, err := svc.GetStats(ctx, user.ID)
+	require.NoError(t, err)
+	assert.NotNil(t, stats)
+}

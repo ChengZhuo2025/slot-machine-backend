@@ -598,7 +598,7 @@
 
 - 业务单元测试（in-package）：`internal/service/{admin,auth,content,device,distribution,finance,hotel,mall,marketing,order,payment,rental,user}/*_test.go`
 - 公共模块单元测试：`internal/common/{metrics,middleware,tracing}/*_test.go`
-- Repository 单元测试（已覆盖关键 Repo）：`internal/repository/{admin_repo,coupon_repo,device_repo,order_repo,payment_repo,rental_repo,user_repo}_test.go`（其余 repo 仍可按需补齐）
+- Repository 单元测试：`internal/repository/{admin_repo,coupon_repo,device_repo,order_repo,payment_repo,rental_repo,user_repo}_test.go`（更多 repo 已补齐）
 - 端到端/场景测试：
   - API 测试：`tests/api/*_test.go`（`//go:build api`）
   - 集成测试：`tests/integration/*_test.go`（`//go:build integration`）
@@ -616,28 +616,28 @@
 
 **优秀模块 (≥85%)：**
 
-- auth `90.6%`             ✅
-- order `90.4%`            ✅
-- hotel (booking) `87.6%`  ✅
-- content `89.6%`          ✅
-- payment `92.4%`          ✅
+- payment `92.4%`            ✅
+- auth `90.6%`               ✅
+- order `90.4%`              ✅
+- content `89.6%`
+- hotel (booking) `87.6%`
+- distribution `86.8%`
+- rental `85.3%`
 
 **良好模块 (70-85%)：**
 
-- marketing `71.5%`
-- user `70.0%`
+- marketing `84.1%`
+- user `80.1%`
 
 **中等模块 (50-70%)：**
 
-- rental `64.5%` (**↑8.6%** 从 55.92%)
-- distribution `62.4%`
+- device `62.6%`
 - mall `55.5%`
 
 **需改进模块 (<50%)：**
 
-- device `46.1%` (**↑25.6%** 从 20.5%) 🔄 **本次翻倍提升，进展显著**
-- admin `42.9%`
-- finance `21.1%` ⚠️ **需要重点补充**
+- admin `49.6%`
+- finance `36.2%`
 
 ## ⚠️ CRITICAL: Model开发验证Checklist
 

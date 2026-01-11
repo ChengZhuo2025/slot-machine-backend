@@ -149,3 +149,141 @@ func TestPointsService_GetPointsHistory_FilterAndOrder(t *testing.T) {
 	assert.Equal(t, 10, filtered[0].Points)
 }
 
+func TestPointsService_RefundPoints(t *testing.T) {
+	db := setupPointsServiceTestDB(t)
+	svc, _, _ := newPointsServiceForTest(db)
+	ctx := context.Background()
+
+	t.Run("退款扣减积分成功", func(t *testing.T) {
+		user := createTestUserForPoints(db, 100, 1)
+
+		err := svc.RefundPoints(ctx, user.ID, 50.5, "O202401010002")
+		require.NoError(t, err)
+
+		var refreshed models.User
+		require.NoError(t, db.First(&refreshed, user.ID).Error)
+		assert.Equal(t, 50, refreshed.Points) // 100 - 50 = 50
+
+		// 验证积分记录
+		var txCount int64
+		require.NoError(t, db.Model(&models.WalletTransaction{}).Where("user_id = ? AND type = ?", user.ID, "points_refund").Count(&txCount).Error)
+		assert.Equal(t, int64(1), txCount)
+	})
+
+	t.Run("退款金额为0时跳过", func(t *testing.T) {
+		user := createTestUserForPoints(db, 100, 1)
+
+		err := svc.RefundPoints(ctx, user.ID, 0, "O202401010003")
+		require.NoError(t, err)
+
+		var refreshed models.User
+		require.NoError(t, db.First(&refreshed, user.ID).Error)
+		assert.Equal(t, 100, refreshed.Points) // 积分不变
+	})
+}
+
+func TestPointsService_RefundPointsTx(t *testing.T) {
+	db := setupPointsServiceTestDB(t)
+	svc, _, _ := newPointsServiceForTest(db)
+	ctx := context.Background()
+
+	t.Run("事务中退款扣减积分成功", func(t *testing.T) {
+		user := createTestUserForPoints(db, 100, 1)
+
+		err := db.Transaction(func(tx *gorm.DB) error {
+			return svc.RefundPointsTx(ctx, tx, user.ID, 30.5, "O202401010004")
+		})
+		require.NoError(t, err)
+
+		var refreshed models.User
+		require.NoError(t, db.First(&refreshed, user.ID).Error)
+		assert.Equal(t, 70, refreshed.Points) // 100 - 30 = 70
+	})
+
+	t.Run("事务中金额为0时跳过", func(t *testing.T) {
+		user := createTestUserForPoints(db, 100, 1)
+
+		err := db.Transaction(func(tx *gorm.DB) error {
+			return svc.RefundPointsTx(ctx, tx, user.ID, 0, "O202401010005")
+		})
+		require.NoError(t, err)
+
+		var refreshed models.User
+		require.NoError(t, db.First(&refreshed, user.ID).Error)
+		assert.Equal(t, 100, refreshed.Points) // 积分不变
+	})
+}
+
+func TestPointsService_AddConsumePointsTx(t *testing.T) {
+	db := setupPointsServiceTestDB(t)
+	svc, _, _ := newPointsServiceForTest(db)
+	ctx := context.Background()
+
+	t.Run("事务中消费获得积分成功", func(t *testing.T) {
+		user := createTestUserForPoints(db, 0, 1)
+
+		err := db.Transaction(func(tx *gorm.DB) error {
+			return svc.AddConsumePointsTx(ctx, tx, user.ID, 120.5, "O202401010006")
+		})
+		require.NoError(t, err)
+
+		var refreshed models.User
+		require.NoError(t, db.First(&refreshed, user.ID).Error)
+		assert.Equal(t, 120, refreshed.Points) // int(120.5) => 120
+	})
+
+	t.Run("事务中金额为0时跳过", func(t *testing.T) {
+		user := createTestUserForPoints(db, 50, 1)
+
+		err := db.Transaction(func(tx *gorm.DB) error {
+			return svc.AddConsumePointsTx(ctx, tx, user.ID, 0, "O202401010007")
+		})
+		require.NoError(t, err)
+
+		var refreshed models.User
+		require.NoError(t, db.First(&refreshed, user.ID).Error)
+		assert.Equal(t, 50, refreshed.Points) // 积分不变
+	})
+}
+
+func TestPointsService_getPointsTypeName(t *testing.T) {
+	db := setupPointsServiceTestDB(t)
+	svc, _, _ := newPointsServiceForTest(db)
+
+	tests := []struct {
+		txType   string
+		expected string
+	}{
+		{"points_consume", "消费获取"},
+		{"points_package_purchase", "套餐购买"},
+		{"points_sign_in", "签到"},
+		{"points_activity", "活动赠送"},
+		{"points_refund", "退款扣减"},
+		{"points_expired", "积分过期"},
+		{"points_exchange", "积分兑换"},
+		{"points_admin", "管理员调整"},
+		{"unknown", "其他"},
+	}
+
+	for _, tt := range tests {
+		name := svc.getPointsTypeName(tt.txType)
+		assert.Equal(t, tt.expected, name)
+	}
+}
+
+func TestPointsService_getDescription(t *testing.T) {
+	db := setupPointsServiceTestDB(t)
+	svc, _, _ := newPointsServiceForTest(db)
+
+	t.Run("有备注时返回备注", func(t *testing.T) {
+		remark := "这是备注"
+		result := svc.getDescription(&remark)
+		assert.Equal(t, "这是备注", result)
+	})
+
+	t.Run("无备注时返回空字符串", func(t *testing.T) {
+		result := svc.getDescription(nil)
+		assert.Equal(t, "", result)
+	})
+}
+

@@ -128,3 +128,147 @@ func TestMemberLevelService_GetDiscount_UserNotFound(t *testing.T) {
 	assert.Equal(t, 1.0, discount)
 }
 
+func TestMemberLevelService_GetLevelByID(t *testing.T) {
+	db := setupMemberLevelServiceTestDB(t)
+	svc, _, _ := newMemberLevelServiceForTest(db)
+	ctx := context.Background()
+
+	t.Run("获取存在的会员等级", func(t *testing.T) {
+		level, err := svc.GetLevelByID(ctx, 1)
+		require.NoError(t, err)
+		require.NotNil(t, level)
+		assert.Equal(t, "普通会员", level.Name)
+		assert.Equal(t, 1, level.Level)
+	})
+
+	t.Run("获取不存在的会员等级", func(t *testing.T) {
+		level, err := svc.GetLevelByID(ctx, 999)
+		assert.Error(t, err)
+		assert.Nil(t, level)
+	})
+}
+
+func TestMemberLevelService_CheckAndUpgradeLevel_NoUpgrade(t *testing.T) {
+	db := setupMemberLevelServiceTestDB(t)
+	svc, _, _ := newMemberLevelServiceForTest(db)
+	ctx := context.Background()
+
+	// 积分不够升级
+	user := createTestUserForMember(db, 50, 1)
+
+	upgraded, newLevel, err := svc.CheckAndUpgradeLevel(ctx, user.ID)
+	require.NoError(t, err)
+	assert.False(t, upgraded)
+	assert.Nil(t, newLevel)
+
+	var refreshed models.User
+	require.NoError(t, db.First(&refreshed, user.ID).Error)
+	assert.Equal(t, int64(1), refreshed.MemberLevelID)
+}
+
+func TestMemberLevelService_CheckAndUpgradeLevel_AlreadyHighest(t *testing.T) {
+	db := setupMemberLevelServiceTestDB(t)
+	svc, _, _ := newMemberLevelServiceForTest(db)
+	ctx := context.Background()
+
+	// 已经是最高等级
+	user := createTestUserForMember(db, 1000, 2)
+
+	upgraded, newLevel, err := svc.CheckAndUpgradeLevel(ctx, user.ID)
+	require.NoError(t, err)
+	assert.False(t, upgraded)
+	assert.Nil(t, newLevel)
+}
+
+func TestMemberLevelService_CheckAndUpgradeLevel_UserNotFound(t *testing.T) {
+	db := setupMemberLevelServiceTestDB(t)
+	svc, _, _ := newMemberLevelServiceForTest(db)
+	ctx := context.Background()
+
+	upgraded, newLevel, err := svc.CheckAndUpgradeLevel(ctx, 999999)
+	assert.Error(t, err)
+	assert.False(t, upgraded)
+	assert.Nil(t, newLevel)
+}
+
+func TestMemberLevelService_CheckAndUpgradeLevelTx(t *testing.T) {
+	db := setupMemberLevelServiceTestDB(t)
+	svc, _, _ := newMemberLevelServiceForTest(db)
+	ctx := context.Background()
+
+	t.Run("事务中升级成功", func(t *testing.T) {
+		user := createTestUserForMember(db, 150, 1)
+
+		err := db.Transaction(func(tx *gorm.DB) error {
+			upgraded, err := svc.CheckAndUpgradeLevelTx(ctx, tx, user.ID)
+			if err != nil {
+				return err
+			}
+			assert.True(t, upgraded)
+			return nil
+		})
+		require.NoError(t, err)
+
+		var refreshed models.User
+		require.NoError(t, db.First(&refreshed, user.ID).Error)
+		assert.Equal(t, int64(2), refreshed.MemberLevelID)
+	})
+
+	t.Run("事务中不需要升级", func(t *testing.T) {
+		user := createTestUserForMember(db, 50, 1)
+
+		err := db.Transaction(func(tx *gorm.DB) error {
+			upgraded, err := svc.CheckAndUpgradeLevelTx(ctx, tx, user.ID)
+			if err != nil {
+				return err
+			}
+			assert.False(t, upgraded)
+			return nil
+		})
+		require.NoError(t, err)
+
+		var refreshed models.User
+		require.NoError(t, db.First(&refreshed, user.ID).Error)
+		assert.Equal(t, int64(1), refreshed.MemberLevelID)
+	})
+
+	t.Run("事务中用户不存在", func(t *testing.T) {
+		err := db.Transaction(func(tx *gorm.DB) error {
+			_, err := svc.CheckAndUpgradeLevelTx(ctx, tx, 999999)
+			return err
+		})
+		assert.Error(t, err)
+	})
+}
+
+func TestMemberLevelService_GetDiscount_Success(t *testing.T) {
+	db := setupMemberLevelServiceTestDB(t)
+	svc, _, _ := newMemberLevelServiceForTest(db)
+	ctx := context.Background()
+
+	// 创建黄金会员用户
+	user := createTestUserForMember(db, 200, 2)
+
+	discount, err := svc.GetDiscount(ctx, user.ID)
+	require.NoError(t, err)
+	assert.Equal(t, 0.9, discount)
+}
+
+func TestMemberLevelService_GetUserMemberInfo_HighestLevel(t *testing.T) {
+	db := setupMemberLevelServiceTestDB(t)
+	svc, _, _ := newMemberLevelServiceForTest(db)
+	ctx := context.Background()
+
+	// 创建已是最高等级的用户
+	user := createTestUserForMember(db, 500, 2)
+
+	info, err := svc.GetUserMemberInfo(ctx, user.ID)
+	require.NoError(t, err)
+	require.NotNil(t, info.CurrentLevel)
+	assert.Equal(t, "黄金会员", info.CurrentLevel.Name)
+	// 已是最高等级，无下一级
+	assert.Nil(t, info.NextLevel)
+	assert.Nil(t, info.PointsToNextLevel)
+	assert.Nil(t, info.ProgressPercent)
+}
+

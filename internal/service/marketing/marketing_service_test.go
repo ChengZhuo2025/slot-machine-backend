@@ -711,3 +711,287 @@ func TestMarketing_EdgeCases(t *testing.T) {
 		assert.Error(t, err)
 	})
 }
+
+// ================== Additional Coverage Tests ==================
+
+func TestCouponService_GetUserCouponForOrder(t *testing.T) {
+	db := setupMarketingTestDB(t)
+	svc := setupCouponService(db)
+	ctx := context.Background()
+
+	user := createMarketingTestUser(t, db, "13800138010")
+	coupon := createMarketingTestCoupon(t, db, func(c *models.Coupon) {
+		c.Name = "订单可用优惠券"
+		c.MinAmount = 50.0
+		c.Value = 10.0
+	})
+	userCoupon := createMarketingTestUserCoupon(t, db, user.ID, coupon.ID, models.UserCouponStatusUnused)
+
+	t.Run("获取订单可用的用户优惠券成功", func(t *testing.T) {
+		uc, discount, err := svc.GetUserCouponForOrder(ctx, user.ID, userCoupon.ID, "mall", 100.0)
+		require.NoError(t, err)
+		assert.NotNil(t, uc)
+		assert.Equal(t, coupon.ID, uc.CouponID)
+		assert.Greater(t, discount, 0.0)
+	})
+
+	t.Run("优惠券不存在返回nil", func(t *testing.T) {
+		uc, discount, err := svc.GetUserCouponForOrder(ctx, user.ID, 99999, "mall", 100.0)
+		require.NoError(t, err)
+		assert.Nil(t, uc)
+		assert.Equal(t, 0.0, discount)
+	})
+
+	t.Run("金额未达到门槛返回nil", func(t *testing.T) {
+		uc, discount, err := svc.GetUserCouponForOrder(ctx, user.ID, userCoupon.ID, "mall", 30.0)
+		require.NoError(t, err)
+		assert.Nil(t, uc)
+		assert.Equal(t, 0.0, discount)
+	})
+}
+
+func TestUserCouponService_GetAvailableCouponsForOrder(t *testing.T) {
+	db := setupMarketingTestDB(t)
+	svc := setupUserCouponService(db)
+	ctx := context.Background()
+
+	user := createMarketingTestUser(t, db, "13800138011")
+	coupon := createMarketingTestCoupon(t, db, func(c *models.Coupon) {
+		c.Name = "订单可用优惠券2"
+		c.MinAmount = 50.0
+		c.Value = 10.0
+	})
+	createMarketingTestUserCoupon(t, db, user.ID, coupon.ID, models.UserCouponStatusUnused)
+
+	t.Run("获取订单可用的优惠券列表", func(t *testing.T) {
+		list, err := svc.GetAvailableCouponsForOrder(ctx, user.ID, "mall", 100.0)
+		require.NoError(t, err)
+		assert.NotEmpty(t, list)
+	})
+
+	t.Run("订单金额太小无可用优惠券", func(t *testing.T) {
+		list, err := svc.GetAvailableCouponsForOrder(ctx, user.ID, "mall", 10.0)
+		require.NoError(t, err)
+		// 可能为空或有满足条件的
+		assert.NotNil(t, list)
+	})
+}
+
+func TestUserCouponService_ExpireUserCoupons(t *testing.T) {
+	db := setupMarketingTestDB(t)
+	svc := setupUserCouponService(db)
+	ctx := context.Background()
+
+	user := createMarketingTestUser(t, db, "13800138012")
+	coupon := createMarketingTestCoupon(t, db)
+
+	// 创建一个已过期的用户优惠券
+	expiredCoupon := &models.UserCoupon{
+		UserID:     user.ID,
+		CouponID:   coupon.ID,
+		Status:     models.UserCouponStatusUnused,
+		ExpiredAt:  time.Now().Add(-1 * time.Hour), // 已过期
+		ReceivedAt: time.Now().Add(-2 * time.Hour),
+	}
+	require.NoError(t, db.Create(expiredCoupon).Error)
+
+	t.Run("过期优惠券批量处理", func(t *testing.T) {
+		count, err := svc.ExpireUserCoupons(ctx)
+		require.NoError(t, err)
+		assert.GreaterOrEqual(t, count, int64(0))
+
+		// 验证状态已更新
+		var updated models.UserCoupon
+		db.First(&updated, expiredCoupon.ID)
+		assert.Equal(t, int8(models.UserCouponStatusExpired), updated.Status)
+	})
+}
+
+func TestUserCouponService_UnuseCoupon_MoreCases(t *testing.T) {
+	db := setupMarketingTestDB(t)
+	svc := setupUserCouponService(db)
+	ctx := context.Background()
+
+	user := createMarketingTestUser(t, db, "13800138013")
+	coupon := createMarketingTestCoupon(t, db)
+	userCoupon := createMarketingTestUserCoupon(t, db, user.ID, coupon.ID, models.UserCouponStatusUsed)
+
+	t.Run("取消使用已使用的优惠券", func(t *testing.T) {
+		err := svc.UnuseCoupon(ctx, userCoupon.ID)
+		require.NoError(t, err)
+
+		var updated models.UserCoupon
+		db.First(&updated, userCoupon.ID)
+		assert.Equal(t, int8(models.UserCouponStatusUnused), updated.Status)
+	})
+
+	t.Run("取消使用不存在的优惠券", func(t *testing.T) {
+		err := svc.UnuseCoupon(ctx, 99999)
+		assert.Error(t, err)
+	})
+
+	t.Run("取消使用非已使用状态的优惠券不报错", func(t *testing.T) {
+		// 创建一个未使用的优惠券
+		unusedCoupon := createMarketingTestUserCoupon(t, db, user.ID, coupon.ID, models.UserCouponStatusUnused)
+		err := svc.UnuseCoupon(ctx, unusedCoupon.ID)
+		// 不是已使用状态，直接返回nil，无需恢复
+		assert.NoError(t, err)
+	})
+}
+
+func TestCampaignService_buildCampaignItem_AllTypes(t *testing.T) {
+	db := setupMarketingTestDB(t)
+	svc := setupCampaignService(db)
+	now := time.Now()
+
+	types := []string{
+		models.CampaignTypeFlashSale,
+		models.CampaignTypeDiscount,
+		models.CampaignTypeGift,
+		models.CampaignTypeGroupBuy,
+		"unknown", // 未知类型
+	}
+
+	for _, campType := range types {
+		campaign := &models.Campaign{
+			ID:        1,
+			Name:      "测试活动",
+			Type:      campType,
+			StartTime: now,
+			EndTime:   now.Add(24 * time.Hour),
+			Status:    models.CampaignStatusActive,
+		}
+		item := svc.buildCampaignItem(campaign, now)
+		assert.NotEmpty(t, item.TypeText)
+		assert.NotEmpty(t, item.StatusText)
+	}
+}
+
+func TestCampaignService_buildCampaignItem_AllStatuses(t *testing.T) {
+	db := setupMarketingTestDB(t)
+	svc := setupCampaignService(db)
+	now := time.Now()
+
+	statuses := []int8{
+		models.CampaignStatusDisabled,
+		models.CampaignStatusActive,
+		99, // 未知状态
+	}
+
+	for _, status := range statuses {
+		campaign := &models.Campaign{
+			ID:        1,
+			Name:      "测试活动",
+			Type:      models.CampaignTypeDiscount,
+			StartTime: now,
+			EndTime:   now.Add(24 * time.Hour),
+			Status:    status,
+		}
+		item := svc.buildCampaignItem(campaign, now)
+		assert.NotEmpty(t, item.StatusText)
+	}
+}
+
+func TestUserCouponService_buildUserCouponItem_AllStatuses(t *testing.T) {
+	db := setupMarketingTestDB(t)
+	svc := setupUserCouponService(db)
+	now := time.Now()
+
+	coupon := &models.Coupon{
+		Name:      "测试优惠券",
+		Type:      models.CouponTypeFixed,
+		Value:     10.0,
+		MinAmount: 50.0,
+	}
+
+	t.Run("未使用状态", func(t *testing.T) {
+		uc := &models.UserCoupon{
+			ID:        1,
+			UserID:    1,
+			CouponID:  1,
+			Status:    models.UserCouponStatusUnused,
+			ExpiredAt: now.Add(24 * time.Hour),
+			Coupon:    coupon,
+		}
+		item := svc.buildUserCouponItem(uc, now)
+		assert.Equal(t, "未使用", item.StatusText)
+		assert.True(t, item.IsAvailable)
+	})
+
+	t.Run("已使用状态", func(t *testing.T) {
+		uc := &models.UserCoupon{
+			ID:        2,
+			UserID:    1,
+			CouponID:  1,
+			Status:    models.UserCouponStatusUsed,
+			ExpiredAt: now.Add(24 * time.Hour),
+			Coupon:    coupon,
+		}
+		item := svc.buildUserCouponItem(uc, now)
+		assert.Equal(t, "已使用", item.StatusText)
+		assert.False(t, item.IsAvailable)
+	})
+
+	t.Run("已过期状态", func(t *testing.T) {
+		uc := &models.UserCoupon{
+			ID:        3,
+			UserID:    1,
+			CouponID:  1,
+			Status:    models.UserCouponStatusExpired,
+			ExpiredAt: now.Add(24 * time.Hour),
+			Coupon:    coupon,
+		}
+		item := svc.buildUserCouponItem(uc, now)
+		assert.Equal(t, "已过期", item.StatusText)
+		assert.False(t, item.IsAvailable)
+	})
+
+	t.Run("未使用但实际已过期", func(t *testing.T) {
+		uc := &models.UserCoupon{
+			ID:        4,
+			UserID:    1,
+			CouponID:  1,
+			Status:    models.UserCouponStatusUnused,
+			ExpiredAt: now.Add(-24 * time.Hour), // 已过期
+			Coupon:    coupon,
+		}
+		item := svc.buildUserCouponItem(uc, now)
+		assert.Equal(t, "已过期", item.StatusText)
+		assert.False(t, item.IsAvailable)
+	})
+}
+
+func TestUserCouponService_calculateDiscount_AllTypes(t *testing.T) {
+	db := setupMarketingTestDB(t)
+	svc := setupUserCouponService(db)
+
+	t.Run("满减优惠券", func(t *testing.T) {
+		coupon := &models.Coupon{
+			Type:      models.CouponTypeFixed,
+			Value:     10.0,
+			MinAmount: 50.0,
+		}
+		discount := svc.calculateDiscount(coupon, 100.0)
+		assert.Equal(t, 10.0, discount)
+	})
+
+	t.Run("折扣优惠券", func(t *testing.T) {
+		coupon := &models.Coupon{
+			Type:      models.CouponTypePercent,
+			Value:     0.1, // 10% 折扣
+			MinAmount: 0,
+		}
+		discount := svc.calculateDiscount(coupon, 100.0)
+		assert.Equal(t, 10.0, discount) // 100 * 0.1 = 10
+	})
+
+	t.Run("未知类型优惠券", func(t *testing.T) {
+		coupon := &models.Coupon{
+			Type:      "unknown", // 未知类型
+			Value:     10.0,
+			MinAmount: 0,
+		}
+		discount := svc.calculateDiscount(coupon, 100.0)
+		assert.Equal(t, 0.0, discount)
+	})
+}

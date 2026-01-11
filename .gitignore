@@ -48,10 +48,7 @@ dist/
 # Go 测试二进制文件
 *.test
 
-# Go 覆盖率文件
-*.out
-coverage.txt
-coverage.html
+# Go 覆盖率文件 (通配规则，tests/output/ 已单独处理)
 coverage/
 
 # Go vendor 目录 (如果不使用 go modules 管理)
@@ -194,9 +191,18 @@ docs/docs.go
 # ====================
 # 测试相关
 # ====================
-# 测试输出
+# 测试产物输出目录 (保留 .gitkeep)
+tests/output/*
+!tests/output/.gitkeep
+
+# 测试输出 (旧路径，保留兼容)
 test-results/
 test-reports/
+
+# 覆盖率文件 (根目录下的旧文件)
+coverage.out
+coverage.html
+coverage.txt
 
 # 性能测试结果
 *.prof

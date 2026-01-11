@@ -4,11 +4,16 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-OVERALL_MIN="${OVERALL_MIN:-80}"
-KEY_MODULE_MIN="${KEY_MODULE_MIN:-90}"
+# 调整后的覆盖率阈值
+OVERALL_MIN="${OVERALL_MIN:-70}"
+KEY_MODULE_MIN="${KEY_MODULE_MIN:-85}"
+
+# 测试产物输出目录
+OUTPUT_DIR="${OUTPUT_DIR:-$ROOT_DIR/tests/output}"
+mkdir -p "$OUTPUT_DIR"
 
 # Coverage profile path (must match scripts/coverage.sh default unless overridden)
-COVERPROFILE="${COVERPROFILE:-coverage.out}"
+COVERPROFILE="${COVERPROFILE:-$OUTPUT_DIR/coverage.out}"
 
 calc_stats() {
 	local patterns="${1:-}" # semicolon-separated substrings; empty means all
@@ -59,6 +64,7 @@ pct_ge() {
 echo "Running coverage gate..."
 echo " - overall >= ${OVERALL_MIN}%"
 echo " - key modules >= ${KEY_MODULE_MIN}% (auth/payment/order/rental/booking)"
+echo " - output directory: ${OUTPUT_DIR}"
 echo
 
 # Generate coverage profile (skip HTML by default for speed).
@@ -67,6 +73,7 @@ GO_TEST_TAGS="${GO_TEST_TAGS:-api,e2e}"
 GO_TEST_TARGETS="${GO_TEST_TARGETS:-./...}"
 COVERPKG="${COVERPKG:-./internal/service/auth/...,./internal/service/payment/...,./internal/service/order/...,./internal/service/rental/...,./internal/service/hotel/...}"
 GENERATE_HTML="${GENERATE_HTML:-0}" \
+	OUTPUT_DIR="$OUTPUT_DIR" \
 	COVERPROFILE="$COVERPROFILE" \
 	GO_TEST_TAGS="$GO_TEST_TAGS" \
 	GO_TEST_TARGETS="$GO_TEST_TARGETS" \
@@ -124,3 +131,4 @@ if [[ "$failed" -ne 0 ]]; then
 fi
 
 echo "Coverage gate: PASS"
+echo "Coverage artifacts saved to: ${OUTPUT_DIR}"

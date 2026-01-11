@@ -4,8 +4,12 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-COVERPROFILE="${COVERPROFILE:-coverage.out}"
-COVERHTML="${COVERHTML:-coverage.html}"
+# 测试产物输出目录
+OUTPUT_DIR="${OUTPUT_DIR:-$ROOT_DIR/tests/output}"
+mkdir -p "$OUTPUT_DIR"
+
+COVERPROFILE="${COVERPROFILE:-$OUTPUT_DIR/coverage.out}"
+COVERHTML="${COVERHTML:-$OUTPUT_DIR/coverage.html}"
 COVERMODE="${COVERMODE:-atomic}"
 GENERATE_HTML="${GENERATE_HTML:-1}"
 GO_TEST_TAGS="${GO_TEST_TAGS:-}"
@@ -43,6 +47,7 @@ if [[ -z "$GO_TEST_TARGETS" ]]; then
 	fi
 fi
 
+echo "Output directory: ${OUTPUT_DIR}"
 echo "Collecting coverage into: ${COVERPROFILE}"
 cmd=(go test)
 if [[ -n "$GO_TEST_TAGS" ]]; then
@@ -68,3 +73,6 @@ if [[ "$GENERATE_HTML" == "1" ]]; then
 	echo "Generating HTML report: ${COVERHTML}"
 	go tool cover -html="$COVERPROFILE" -o "$COVERHTML"
 fi
+
+echo
+echo "Coverage artifacts saved to: ${OUTPUT_DIR}"

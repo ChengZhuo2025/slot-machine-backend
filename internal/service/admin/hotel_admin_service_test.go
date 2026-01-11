@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -204,9 +205,11 @@ func TestHotelAdminService_UpdateHotel(t *testing.T) {
 		Phone:    "0755-123456",
 	})
 
+	newName := "酒店更新后"
+	newAddress := "新地址"
 	updated, err := svc.UpdateHotel(ctx, hotel.ID, &UpdateHotelRequest{
-		Name:    "酒店更新后",
-		Address: "新地址",
+		Name:    &newName,
+		Address: &newAddress,
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "酒店更新后", updated.Name)
@@ -232,7 +235,7 @@ func TestHotelAdminService_UpdateHotelStatus(t *testing.T) {
 		Phone:    "0755-123456",
 	})
 
-	err := svc.UpdateHotelStatus(ctx, hotel.ID, models.HotelStatusClosed)
+	err := svc.UpdateHotelStatus(ctx, hotel.ID, models.HotelStatusDisabled)
 	require.NoError(t, err)
 }
 
@@ -264,9 +267,11 @@ func TestHotelAdminService_UpdateRoom(t *testing.T) {
 		DailyPrice:  288,
 	})
 
+	newRoomNo := "202"
+	newHourlyPrice := 80.0
 	updated, err := svc.UpdateRoom(ctx, room.ID, &UpdateRoomRequest{
-		RoomNo:      "202",
-		HourlyPrice: 80,
+		RoomNo:      &newRoomNo,
+		HourlyPrice: &newHourlyPrice,
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "202", updated.RoomNo)
@@ -333,7 +338,8 @@ func TestHotelAdminService_GetRoomList(t *testing.T) {
 		DailyPrice:  288,
 	})
 
-	rooms, total, err := svc.GetRoomList(ctx, hotel.ID, 0, 10)
+	filters := map[string]interface{}{"hotel_id": hotel.ID}
+	rooms, total, err := svc.GetRoomList(ctx, 1, 10, filters)
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), total)
 	assert.Len(t, rooms, 1)
@@ -386,5 +392,158 @@ func TestHotelAdminService_GetBookingList(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, int64(0), total)
 	assert.Empty(t, bookings)
+}
+
+func TestHotelAdminService_TimeSlotOperations(t *testing.T) {
+	db := setupHotelAdminTestDB(t)
+	svc := NewHotelAdminService(
+		db,
+		repository.NewHotelRepository(db),
+		repository.NewRoomRepository(db),
+		repository.NewBookingRepository(db),
+		repository.NewRoomTimeSlotRepository(db),
+	)
+	ctx := context.Background()
+
+	hotel, _ := svc.CreateHotel(ctx, &CreateHotelRequest{
+		Name:     "时段测试酒店",
+		Province: "广东省",
+		City:     "深圳市",
+		District: "南山区",
+		Address:  "科技园",
+		Phone:    "0755-123456",
+	})
+
+	room, _ := svc.CreateRoom(ctx, &CreateRoomRequest{
+		HotelID:     hotel.ID,
+		RoomNo:      "TS01",
+		RoomType:    models.RoomTypeStandard,
+		HourlyPrice: 60,
+		DailyPrice:  288,
+	})
+
+	t.Run("CreateTimeSlot 创建时段", func(t *testing.T) {
+		startTime := "08:00"
+		endTime := "12:00"
+		slot, err := svc.CreateTimeSlot(ctx, &CreateTimeSlotRequest{
+			RoomID:        room.ID,
+			DurationHours: 4,
+			Price:         200,
+			StartTime:     &startTime,
+			EndTime:       &endTime,
+			Sort:          1,
+		})
+		require.NoError(t, err)
+		assert.NotNil(t, slot)
+		assert.Equal(t, room.ID, slot.RoomID)
+	})
+
+	t.Run("CreateTimeSlot 房间不存在", func(t *testing.T) {
+		_, err := svc.CreateTimeSlot(ctx, &CreateTimeSlotRequest{
+			RoomID:        99999,
+			DurationHours: 4,
+			Price:         200,
+		})
+		require.Error(t, err)
+		appErr, ok := err.(*appErrors.AppError)
+		require.True(t, ok)
+		assert.Equal(t, appErrors.ErrRoomNotFound.Code, appErr.Code)
+	})
+
+	t.Run("UpdateTimeSlot 更新时段", func(t *testing.T) {
+		slot := &models.RoomTimeSlot{
+			RoomID:        room.ID,
+			DurationHours: 2,
+			Price:         100,
+			IsActive:      true,
+		}
+		db.Create(slot)
+
+		err := svc.UpdateTimeSlot(ctx, slot.ID, map[string]interface{}{
+			"price": 150.0,
+		})
+		require.NoError(t, err)
+
+		var updated models.RoomTimeSlot
+		db.First(&updated, slot.ID)
+		assert.Equal(t, 150.0, updated.Price)
+	})
+
+	t.Run("DeleteTimeSlot 删除时段", func(t *testing.T) {
+		slot := &models.RoomTimeSlot{
+			RoomID:        room.ID,
+			DurationHours: 3,
+			Price:         150,
+			IsActive:      true,
+		}
+		db.Create(slot)
+
+		err := svc.DeleteTimeSlot(ctx, slot.ID)
+		require.NoError(t, err)
+
+		var count int64
+		db.Model(&models.RoomTimeSlot{}).Where("id = ?", slot.ID).Count(&count)
+		assert.Equal(t, int64(0), count)
+	})
+}
+
+func TestHotelAdminService_GetBookingByID(t *testing.T) {
+	db := setupHotelAdminTestDB(t)
+	svc := NewHotelAdminService(
+		db,
+		repository.NewHotelRepository(db),
+		repository.NewRoomRepository(db),
+		repository.NewBookingRepository(db),
+		repository.NewRoomTimeSlotRepository(db),
+	)
+	ctx := context.Background()
+
+	hotel, _ := svc.CreateHotel(ctx, &CreateHotelRequest{
+		Name:     "预订测试酒店",
+		Province: "广东省",
+		City:     "深圳市",
+		District: "南山区",
+		Address:  "科技园",
+		Phone:    "0755-123456",
+	})
+
+	room, _ := svc.CreateRoom(ctx, &CreateRoomRequest{
+		HotelID:     hotel.ID,
+		RoomNo:      "BK01",
+		RoomType:    models.RoomTypeStandard,
+		HourlyPrice: 60,
+		DailyPrice:  288,
+	})
+
+	booking := &models.Booking{
+		BookingNo:        fmt.Sprintf("B%d", 123456),
+		OrderID:          1,
+		UserID:           1,
+		HotelID:          hotel.ID,
+		RoomID:           room.ID,
+		CheckInTime:      time.Now(),
+		CheckOutTime:     time.Now().Add(4 * time.Hour),
+		DurationHours:    4,
+		Amount:           200,
+		VerificationCode: "123456",
+		UnlockCode:       "888888",
+		QRCode:           "qr_code",
+		Status:           models.BookingStatusPending,
+	}
+	db.Create(booking)
+
+	t.Run("GetBookingByID 获取预订详情", func(t *testing.T) {
+		result, err := svc.GetBookingByID(ctx, booking.ID)
+		require.NoError(t, err)
+		assert.Equal(t, booking.ID, result.ID)
+	})
+
+	t.Run("GetBookingByID 预订不存在", func(t *testing.T) {
+		_, err := svc.GetBookingByID(ctx, 99999)
+		require.Error(t, err)
+		appErr, ok := err.(*appErrors.AppError)
+		require.True(t, ok)
+		assert.Equal(t, appErrors.ErrBookingNotFound.Code, appErr.Code)
+	})
 }
 

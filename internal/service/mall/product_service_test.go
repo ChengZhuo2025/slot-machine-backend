@@ -537,3 +537,454 @@ func TestProductService_IncreaseSales(t *testing.T) {
 	require.NoError(t, db.First(&updated, product.ID).Error)
 	assert.Equal(t, 15, updated.Sales)
 }
+
+// ==================== GetProductsByCategory 测试 ====================
+
+func TestProductService_GetProductsByCategory(t *testing.T) {
+	db := setupProductServiceTestDB(t)
+	svc := newProductService(db)
+	ctx := context.Background()
+
+	category := seedCategory(t, db)
+	images, _ := json.Marshal([]string{"https://example.com/img.jpg"})
+
+	// 创建该分类下的商品
+	for i := 0; i < 3; i++ {
+		product := &models.Product{
+			CategoryID: category.ID,
+			Name:       fmt.Sprintf("分类商品%d", i+1),
+			Images:     images,
+			Price:      float64(50 + i*10),
+			Stock:      100,
+			Unit:       "件",
+			IsOnSale:   true,
+		}
+		require.NoError(t, db.Create(product).Error)
+	}
+
+	// 测试按分类获取商品
+	resp, err := svc.GetProductsByCategory(ctx, category.ID, 1, 10)
+	require.NoError(t, err)
+	assert.Equal(t, int64(3), resp.Total)
+	assert.Len(t, resp.List, 3)
+	assert.Equal(t, 1, resp.Page)
+	assert.Equal(t, 10, resp.PageSize)
+}
+
+func TestProductService_GetProductsByCategory_Pagination(t *testing.T) {
+	db := setupProductServiceTestDB(t)
+	svc := newProductService(db)
+	ctx := context.Background()
+
+	category := seedCategory(t, db)
+	images, _ := json.Marshal([]string{"https://example.com/img.jpg"})
+
+	// 创建多个商品用于分页测试
+	for i := 0; i < 5; i++ {
+		product := &models.Product{
+			CategoryID: category.ID,
+			Name:       fmt.Sprintf("分类商品%d", i+1),
+			Images:     images,
+			Price:      float64(50 + i*10),
+			Stock:      100,
+			Unit:       "件",
+			IsOnSale:   true,
+		}
+		require.NoError(t, db.Create(product).Error)
+	}
+
+	// 获取第一页
+	resp, err := svc.GetProductsByCategory(ctx, category.ID, 1, 2)
+	require.NoError(t, err)
+	assert.Equal(t, int64(5), resp.Total)
+	assert.Len(t, resp.List, 2)
+	assert.Equal(t, 3, resp.TotalPages)
+
+	// 获取第二页
+	resp, err = svc.GetProductsByCategory(ctx, category.ID, 2, 2)
+	require.NoError(t, err)
+	assert.Len(t, resp.List, 2)
+}
+
+func TestProductService_GetProductsByCategory_EmptyCategory(t *testing.T) {
+	db := setupProductServiceTestDB(t)
+	svc := newProductService(db)
+	ctx := context.Background()
+
+	category := seedCategory(t, db)
+
+	// 空分类
+	resp, err := svc.GetProductsByCategory(ctx, category.ID, 1, 10)
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), resp.Total)
+	assert.Empty(t, resp.List)
+}
+
+// ==================== 默认参数测试 ====================
+
+func TestProductService_GetHotProducts_DefaultLimit(t *testing.T) {
+	db := setupProductServiceTestDB(t)
+	svc := newProductService(db)
+	ctx := context.Background()
+
+	category := seedCategory(t, db)
+	images, _ := json.Marshal([]string{"https://example.com/img.jpg"})
+
+	// 创建超过默认限制数量的热门商品
+	for i := 0; i < 15; i++ {
+		product := &models.Product{
+			CategoryID: category.ID,
+			Name:       fmt.Sprintf("热门商品%d", i+1),
+			Images:     images,
+			Price:      float64(50 + i*10),
+			Stock:      100,
+			Unit:       "件",
+			IsOnSale:   true,
+			IsHot:      true,
+		}
+		require.NoError(t, db.Create(product).Error)
+	}
+
+	// 使用 0 或负数限制，应该默认返回 10 个
+	list, err := svc.GetHotProducts(ctx, 0)
+	require.NoError(t, err)
+	assert.Len(t, list, 10)
+
+	list, err = svc.GetHotProducts(ctx, -5)
+	require.NoError(t, err)
+	assert.Len(t, list, 10)
+}
+
+func TestProductService_GetNewProducts_DefaultLimit(t *testing.T) {
+	db := setupProductServiceTestDB(t)
+	svc := newProductService(db)
+	ctx := context.Background()
+
+	category := seedCategory(t, db)
+	images, _ := json.Marshal([]string{"https://example.com/img.jpg"})
+
+	// 创建超过默认限制数量的新品
+	for i := 0; i < 15; i++ {
+		product := &models.Product{
+			CategoryID: category.ID,
+			Name:       fmt.Sprintf("新品%d", i+1),
+			Images:     images,
+			Price:      float64(50 + i*10),
+			Stock:      100,
+			Unit:       "件",
+			IsOnSale:   true,
+			IsNew:      true,
+		}
+		require.NoError(t, db.Create(product).Error)
+	}
+
+	// 使用 0 或负数限制，应该默认返回 10 个
+	list, err := svc.GetNewProducts(ctx, 0)
+	require.NoError(t, err)
+	assert.Len(t, list, 10)
+
+	list, err = svc.GetNewProducts(ctx, -5)
+	require.NoError(t, err)
+	assert.Len(t, list, 10)
+}
+
+// ==================== GetProductList 默认参数测试 ====================
+
+func TestProductService_GetProductList_DefaultParams(t *testing.T) {
+	db := setupProductServiceTestDB(t)
+	svc := newProductService(db)
+	ctx := context.Background()
+
+	category := seedCategory(t, db)
+	images, _ := json.Marshal([]string{"https://example.com/img.jpg"})
+
+	// 创建一些商品
+	for i := 0; i < 25; i++ {
+		product := &models.Product{
+			CategoryID: category.ID,
+			Name:       fmt.Sprintf("商品%d", i+1),
+			Images:     images,
+			Price:      float64(50 + i*10),
+			Stock:      100,
+			Unit:       "件",
+			IsOnSale:   true,
+		}
+		require.NoError(t, db.Create(product).Error)
+	}
+
+	// 测试 Page 和 PageSize 默认值
+	resp, err := svc.GetProductList(ctx, &ProductListRequest{
+		Page:     0, // 应该默认为 1
+		PageSize: 0, // 应该默认为 20
+	})
+	require.NoError(t, err)
+	assert.Equal(t, 1, resp.Page)
+	assert.Equal(t, 20, resp.PageSize)
+	assert.Len(t, resp.List, 20)
+}
+
+func TestProductService_GetProductList_PriceFilter(t *testing.T) {
+	db := setupProductServiceTestDB(t)
+	svc := newProductService(db)
+	ctx := context.Background()
+
+	category := seedCategory(t, db)
+	images, _ := json.Marshal([]string{"https://example.com/img.jpg"})
+
+	// 创建不同价格的商品
+	prices := []float64{30, 50, 80, 100, 150}
+	for i, price := range prices {
+		product := &models.Product{
+			CategoryID: category.ID,
+			Name:       fmt.Sprintf("价格商品%d", i+1),
+			Images:     images,
+			Price:      price,
+			Stock:      100,
+			Unit:       "件",
+			IsOnSale:   true,
+		}
+		require.NoError(t, db.Create(product).Error)
+	}
+
+	// 测试最低价格过滤
+	resp, err := svc.GetProductList(ctx, &ProductListRequest{
+		Page:     1,
+		PageSize: 10,
+		MinPrice: 80,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, int64(3), resp.Total) // 80, 100, 150
+
+	// 测试最高价格过滤
+	resp, err = svc.GetProductList(ctx, &ProductListRequest{
+		Page:     1,
+		PageSize: 10,
+		MaxPrice: 80,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, int64(3), resp.Total) // 30, 50, 80
+
+	// 测试价格范围过滤
+	resp, err = svc.GetProductList(ctx, &ProductListRequest{
+		Page:     1,
+		PageSize: 10,
+		MinPrice: 50,
+		MaxPrice: 100,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, int64(3), resp.Total) // 50, 80, 100
+}
+
+// ==================== 分类列表测试补充 ====================
+
+func TestProductService_GetCategoryList_WithParentID(t *testing.T) {
+	db := setupProductServiceTestDB(t)
+	svc := newProductService(db)
+	ctx := context.Background()
+
+	// 创建父分类
+	parent := &models.Category{Name: "父分类", Level: 1, Sort: 1, IsActive: true}
+	require.NoError(t, db.Create(parent).Error)
+
+	// 创建子分类
+	child1 := &models.Category{ParentID: &parent.ID, Name: "子分类1", Level: 2, Sort: 1, IsActive: true}
+	child2 := &models.Category{ParentID: &parent.ID, Name: "子分类2", Level: 2, Sort: 2, IsActive: true}
+	require.NoError(t, db.Create(child1).Error)
+	require.NoError(t, db.Create(child2).Error)
+
+	// 获取指定父分类下的子分类
+	list, err := svc.GetCategoryList(ctx, &parent.ID)
+	require.NoError(t, err)
+	assert.Len(t, list, 2)
+}
+
+func TestProductService_GetCategoryList_WithIcon(t *testing.T) {
+	db := setupProductServiceTestDB(t)
+	svc := newProductService(db)
+	ctx := context.Background()
+
+	// 创建带 Icon 的分类
+	icon := "https://example.com/icon.png"
+	category := &models.Category{
+		Name:     "带图标分类",
+		Icon:     &icon,
+		Level:    1,
+		Sort:     1,
+		IsActive: true,
+	}
+	require.NoError(t, db.Create(category).Error)
+
+	list, err := svc.GetCategoryList(ctx, nil)
+	require.NoError(t, err)
+	require.Len(t, list, 1)
+	assert.Equal(t, icon, list[0].Icon)
+}
+
+// ==================== SKU 边界测试 ====================
+
+func TestProductService_GetSkuByID_Inactive(t *testing.T) {
+	db := setupProductServiceTestDB(t)
+	svc := newProductService(db)
+	ctx := context.Background()
+
+	category := seedCategory(t, db)
+	product := seedProduct(t, db, category.ID)
+
+	// 创建一个激活的 SKU，然后更新为非激活
+	attrs, _ := json.Marshal(map[string]string{"颜色": "红色", "尺码": "M"})
+	sku := &models.ProductSku{
+		ProductID:  product.ID,
+		SkuCode:    "RED-M",
+		Attributes: attrs,
+		Price:      85.0,
+		Stock:      20,
+		IsActive:   true,
+	}
+	require.NoError(t, db.Create(sku).Error)
+
+	// 更新为非激活
+	require.NoError(t, db.Model(sku).Update("is_active", false).Error)
+
+	// 获取非激活的 SKU 应该返回错误
+	_, err := svc.GetSkuByID(ctx, sku.ID)
+	assert.Error(t, err)
+}
+
+// ==================== CheckStock 边界测试 ====================
+
+func TestProductService_CheckStock_ProductNotFound(t *testing.T) {
+	db := setupProductServiceTestDB(t)
+	svc := newProductService(db)
+	ctx := context.Background()
+
+	err := svc.CheckStock(ctx, 99999, nil, 10)
+	assert.Error(t, err)
+}
+
+func TestProductService_CheckStock_SkuNotFound(t *testing.T) {
+	db := setupProductServiceTestDB(t)
+	svc := newProductService(db)
+	ctx := context.Background()
+
+	category := seedCategory(t, db)
+	product := seedProduct(t, db, category.ID)
+
+	skuID := int64(99999)
+	err := svc.CheckStock(ctx, product.ID, &skuID, 10)
+	assert.Error(t, err)
+}
+
+// ==================== toProductInfo 边界测试 ====================
+
+func TestProductService_toProductInfo_AllFields(t *testing.T) {
+	db := setupProductServiceTestDB(t)
+	svc := newProductService(db)
+
+	desc := "商品描述"
+	subtitle := "商品副标题"
+	originalPrice := 120.0
+	images, _ := json.Marshal([]string{"img1.jpg", "img2.jpg"})
+
+	product := &models.Product{
+		ID:            1,
+		CategoryID:    1,
+		Name:          "测试商品",
+		Subtitle:      &subtitle,
+		Images:        images,
+		Description:   &desc,
+		Price:         100.0,
+		OriginalPrice: &originalPrice,
+		Stock:         50,
+		Sales:         10,
+		Unit:          "件",
+		IsOnSale:      true,
+		IsHot:         true,
+		IsNew:         false,
+	}
+
+	info := svc.toProductInfo(product)
+
+	assert.Equal(t, int64(1), info.ID)
+	assert.Equal(t, "测试商品", info.Name)
+	assert.Equal(t, "商品副标题", info.Subtitle)
+	assert.Equal(t, "商品描述", info.Description)
+	assert.Equal(t, 100.0, info.Price)
+	assert.Equal(t, 120.0, info.OriginalPrice)
+	assert.Len(t, info.Images, 2)
+	assert.True(t, info.IsHot)
+	assert.False(t, info.IsNew)
+}
+
+func TestProductService_toProductInfo_NilFields(t *testing.T) {
+	db := setupProductServiceTestDB(t)
+	svc := newProductService(db)
+
+	product := &models.Product{
+		ID:         1,
+		CategoryID: 1,
+		Name:       "测试商品",
+		Price:      100.0,
+		Stock:      50,
+		Unit:       "件",
+		IsOnSale:   true,
+		// Subtitle, Description, OriginalPrice, Images 都为 nil
+	}
+
+	info := svc.toProductInfo(product)
+
+	assert.Equal(t, int64(1), info.ID)
+	assert.Equal(t, "测试商品", info.Name)
+	assert.Empty(t, info.Subtitle)
+	assert.Empty(t, info.Description)
+	assert.Equal(t, 0.0, info.OriginalPrice)
+	assert.Nil(t, info.Images)
+}
+
+// ==================== toSkuInfo 边界测试 ====================
+
+func TestProductService_toSkuInfo_AllFields(t *testing.T) {
+	db := setupProductServiceTestDB(t)
+	svc := newProductService(db)
+
+	image := "https://example.com/sku.jpg"
+	attrs, _ := json.Marshal(map[string]string{"颜色": "红色", "尺码": "M"})
+
+	sku := &models.ProductSku{
+		ID:         1,
+		SkuCode:    "RED-M",
+		Attributes: attrs,
+		Price:      85.0,
+		Stock:      20,
+		Image:      &image,
+	}
+
+	info := svc.toSkuInfo(sku)
+
+	assert.Equal(t, int64(1), info.ID)
+	assert.Equal(t, "RED-M", info.SkuCode)
+	assert.Equal(t, 85.0, info.Price)
+	assert.Equal(t, 20, info.Stock)
+	assert.Equal(t, "https://example.com/sku.jpg", info.Image)
+	assert.Equal(t, "红色", info.Attributes["颜色"])
+	assert.Equal(t, "M", info.Attributes["尺码"])
+}
+
+func TestProductService_toSkuInfo_NilFields(t *testing.T) {
+	db := setupProductServiceTestDB(t)
+	svc := newProductService(db)
+
+	sku := &models.ProductSku{
+		ID:      1,
+		SkuCode: "RED-M",
+		Price:   85.0,
+		Stock:   20,
+		// Image, Attributes 都为 nil
+	}
+
+	info := svc.toSkuInfo(sku)
+
+	assert.Equal(t, int64(1), info.ID)
+	assert.Equal(t, "RED-M", info.SkuCode)
+	assert.Empty(t, info.Image)
+	assert.Nil(t, info.Attributes)
+}

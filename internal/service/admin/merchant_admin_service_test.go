@@ -129,3 +129,41 @@ func TestMerchantAdminService_CRUD(t *testing.T) {
 	})
 }
 
+func TestMerchantAdminService_AdditionalOperations(t *testing.T) {
+	db := setupMerchantAdminTestDB(t)
+	merchantRepo := repository.NewMerchantRepository(db)
+	aes, err := crypto.NewAES("1234567890abcdef")
+	require.NoError(t, err)
+	svc := NewMerchantAdminService(merchantRepo, aes)
+	ctx := context.Background()
+
+	// 创建商户
+	merchant, _ := svc.CreateMerchant(ctx, &CreateMerchantRequest{
+		Name:         "状态测试商户",
+		ContactName:  "联系人",
+		ContactPhone: "13800138002",
+	})
+
+	t.Run("UpdateMerchantStatus 更新商户状态", func(t *testing.T) {
+		err := svc.UpdateMerchantStatus(ctx, merchant.ID, models.MerchantStatusDisabled)
+		require.NoError(t, err)
+
+		var updated models.Merchant
+		db.First(&updated, merchant.ID)
+		assert.Equal(t, int8(models.MerchantStatusDisabled), updated.Status)
+	})
+
+	t.Run("ListMerchants 获取商户列表", func(t *testing.T) {
+		list, total, err := svc.ListMerchants(ctx, 0, 10, nil)
+		require.NoError(t, err)
+		assert.True(t, total >= 1)
+		assert.NotEmpty(t, list)
+	})
+
+	t.Run("ListAllMerchants 获取所有商户", func(t *testing.T) {
+		list, err := svc.ListAllMerchants(ctx)
+		require.NoError(t, err)
+		assert.NotNil(t, list)
+	})
+}
+

@@ -141,3 +141,126 @@ func TestProductAdminService_CreateProduct(t *testing.T) {
 	assert.Equal(t, "商品1", product.Name)
 }
 
+func TestProductAdminService_UpdateAndListCategory(t *testing.T) {
+	db := setupProductAdminTestDB(t)
+	svc := NewProductAdminService(
+		db,
+		repository.NewCategoryRepository(db),
+		repository.NewProductRepository(db),
+		repository.NewProductSkuRepository(db),
+	)
+	ctx := context.Background()
+
+	cat, _ := svc.CreateCategory(ctx, &CreateCategoryRequest{Name: "原分类"})
+
+	t.Run("UpdateCategory 更新分类", func(t *testing.T) {
+		_, err := svc.UpdateCategory(ctx, cat.ID, &UpdateCategoryRequest{Name: "更新分类"})
+		require.NoError(t, err)
+
+		var updated models.Category
+		db.First(&updated, cat.ID)
+		assert.Equal(t, "更新分类", updated.Name)
+	})
+
+	t.Run("GetAllCategories 获取所有分类", func(t *testing.T) {
+		list, err := svc.GetAllCategories(ctx)
+		require.NoError(t, err)
+		assert.NotNil(t, list)
+	})
+}
+
+func TestProductAdminService_GetProductsAndDetail(t *testing.T) {
+	db := setupProductAdminTestDB(t)
+	svc := NewProductAdminService(
+		db,
+		repository.NewCategoryRepository(db),
+		repository.NewProductRepository(db),
+		repository.NewProductSkuRepository(db),
+	)
+	ctx := context.Background()
+
+	cat, _ := svc.CreateCategory(ctx, &CreateCategoryRequest{Name: "商品分类"})
+	product, _ := svc.CreateProduct(ctx, &CreateProductRequest{
+		CategoryID: cat.ID,
+		Name:       "商品列表测试",
+		Images:     []string{"img1"},
+		Price:      10,
+		Stock:      5,
+		Unit:       "件",
+		IsOnSale:   true,
+	})
+
+	t.Run("GetProducts 获取商品列表", func(t *testing.T) {
+		list, total, err := svc.GetProducts(ctx, &ProductListParams{Page: 1, PageSize: 10})
+		require.NoError(t, err)
+		assert.True(t, total >= 1)
+		assert.NotEmpty(t, list)
+	})
+
+	t.Run("GetProductDetail 获取商品详情", func(t *testing.T) {
+		detail, err := svc.GetProductDetail(ctx, product.ID)
+		require.NoError(t, err)
+		assert.Equal(t, product.ID, detail.ID)
+		assert.Equal(t, "商品列表测试", detail.Name)
+	})
+
+	t.Run("GetProductDetail 商品不存在", func(t *testing.T) {
+		_, err := svc.GetProductDetail(ctx, 99999)
+		assert.Error(t, err)
+	})
+}
+
+func TestProductAdminService_UpdateAndDeleteProduct(t *testing.T) {
+	db := setupProductAdminTestDB(t)
+	svc := NewProductAdminService(
+		db,
+		repository.NewCategoryRepository(db),
+		repository.NewProductRepository(db),
+		repository.NewProductSkuRepository(db),
+	)
+	ctx := context.Background()
+
+	cat, _ := svc.CreateCategory(ctx, &CreateCategoryRequest{Name: "操作分类"})
+	product, _ := svc.CreateProduct(ctx, &CreateProductRequest{
+		CategoryID: cat.ID,
+		Name:       "操作测试商品",
+		Images:     []string{"img1"},
+		Price:      10,
+		Stock:      5,
+		Unit:       "件",
+		IsOnSale:   true,
+	})
+
+	t.Run("UpdateProduct 更新商品", func(t *testing.T) {
+		newPrice := 20.0
+		_, err := svc.UpdateProduct(ctx, product.ID, &UpdateProductRequest{
+			Name:  "更新后商品",
+			Price: &newPrice,
+		})
+		require.NoError(t, err)
+
+		var updated models.Product
+		db.First(&updated, product.ID)
+		assert.Equal(t, "更新后商品", updated.Name)
+		assert.Equal(t, 20.0, updated.Price)
+	})
+
+	t.Run("UpdateProductStatus 更新商品状态", func(t *testing.T) {
+		err := svc.UpdateProductStatus(ctx, product.ID, false)
+		require.NoError(t, err)
+
+		var updated models.Product
+		db.First(&updated, product.ID)
+		assert.False(t, updated.IsOnSale)
+	})
+
+	t.Run("DeleteProduct 删除商品", func(t *testing.T) {
+		err := svc.DeleteProduct(ctx, product.ID)
+		require.NoError(t, err)
+
+		var count int64
+		db.Model(&models.Product{}).Where("id = ?", product.ID).Count(&count)
+		assert.Equal(t, int64(0), count)
+	})
+}
+

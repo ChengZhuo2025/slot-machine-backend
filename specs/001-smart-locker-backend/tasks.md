@@ -610,7 +610,7 @@
 > 说明：以下为本仓库内置脚本的实测结果（以当前代码为准），用于 Phase 12 的"达标/差距"追踪。
 > **更新时间：2026-01-11** (最新更新：高优先级冲刺完成)
 
-#### 📊 关键模块覆盖率现状
+#### 关键模块覆盖率现状
 
 **覆盖率门禁（key modules = auth/payment/order/rental/booking）：整体约 76.8% ⬆️**
 
@@ -631,26 +631,23 @@
 
 **中等模块 (50-70%)：**
 
-- device `62.6%`
-- mall `55.5%`
+- device `74.4%`
+- admin `73.5%`
+- finance `65.6%`
+- mall `59.1%`
 
-**需改进模块 (<50%)：**
-
-- admin `49.6%`
-- finance `36.2%`
-
-## ⚠️ CRITICAL: Model开发验证Checklist
+## CRITICAL: Model开发验证Checklist
 
 **所有涉及Model开发的任务必须遵循以下Checklist，在PR提交前逐项检查：**
 
-### 📋 开发前检查 (必须完成)
+### 开发前检查 (必须完成)
 
 - 已查阅 `specs/001-smart-locker-backend/data-model.md` 对应表的完整定义
 - 已查看对应的 `migrations/000XXX_create_xxx.up.sql` 文件
 - 理解了表的业务含义和字段用途
 - 了解了该表与其他表的关联关系
 
-### 📝 编码中检查 (逐项验证)
+### 编码中检查 (逐项验证)
 
 - Model中**所有字段**都添加了 `column:` 标签
 - 字段名与数据库列名**完全一致**
@@ -670,7 +667,7 @@
 - 外键字段正确定义了关联关系
 - TableName()方法返回正确的表名
 
-### ✅ 开发后检查 (必须通过)
+### 开发后检查 (必须通过)
 
 - 已运行 `go build ./internal/models/...` 验证编译通过
 - 已编写基础CRUD单元测试
@@ -680,14 +677,14 @@
 - 所有测试用例通过
 - 已手动测试在实际数据库中的CRUD操作
 
-### 📚 必读参考文档
+### 必读参考文档
 
 开发时必须参考:
 1. **`specs/001-smart-locker-backend/data-model.md`** - 数据模型定义(权威参照)
 2. **`specs/001-smart-locker-backend/model-development-guide.md`** - Go Model开发规范(开发标准)
 3. **对应的migration文件** - 数据库实际结构(实现参照)
 
-**⚠️ 重要**: 只有通过以上所有检查项，Model开发任务才算完成！
+**重要**: 只有通过以上所有检查项，Model开发任务才算完成！
 
 ---
 

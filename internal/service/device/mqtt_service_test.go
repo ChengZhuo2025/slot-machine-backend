@@ -142,3 +142,199 @@ func TestMQTTService_OnAck_NoSender_DoesNotFail(t *testing.T) {
 	err := mqttSvc.OnAck(context.Background(), "DEV_ACK", &mqtt.AckPayload{CommandID: "cmd1", Success: true})
 	require.NoError(t, err)
 }
+
+func TestMQTTService_OnHeartbeat_UpdatesDeviceInfo(t *testing.T) {
+	db := setupMQTTServiceTestDB(t)
+	deviceRepo := repository.NewDeviceRepository(db)
+	venueRepo := repository.NewVenueRepository(db)
+	deviceSvc := NewDeviceService(db, deviceRepo, venueRepo)
+
+	mqttSvc := NewMQTTService(deviceRepo, deviceSvc, nil)
+	device := seedDeviceForMQTT(t, db, "DEV_HEARTBEAT")
+
+	payload := &mqtt.HeartbeatPayload{
+		SignalStrength:  -65,
+		BatteryLevel:    85,
+		Temperature:     25.5,
+		Humidity:        60.0,
+		FirmwareVersion: "v1.2.3",
+		LockStatus:      int8(models.DeviceLocked),
+	}
+
+	err := mqttSvc.OnHeartbeat(context.Background(), device.DeviceNo, payload)
+	require.NoError(t, err)
+
+	var updated models.Device
+	require.NoError(t, db.First(&updated, device.ID).Error)
+	require.NotNil(t, updated.SignalStrength)
+	assert.Equal(t, -65, *updated.SignalStrength)
+	require.NotNil(t, updated.BatteryLevel)
+	assert.Equal(t, 85, *updated.BatteryLevel)
+	require.NotNil(t, updated.FirmwareVersion)
+	assert.Equal(t, "v1.2.3", *updated.FirmwareVersion)
+}
+
+func TestMQTTService_OnHeartbeat_DeviceNotFound(t *testing.T) {
+	db := setupMQTTServiceTestDB(t)
+	deviceRepo := repository.NewDeviceRepository(db)
+	venueRepo := repository.NewVenueRepository(db)
+	deviceSvc := NewDeviceService(db, deviceRepo, venueRepo)
+
+	mqttSvc := NewMQTTService(deviceRepo, deviceSvc, nil)
+
+	payload := &mqtt.HeartbeatPayload{
+		SignalStrength: -65,
+		BatteryLevel:   85,
+	}
+
+	err := mqttSvc.OnHeartbeat(context.Background(), "NON_EXISTENT", payload)
+	assert.Error(t, err)
+}
+
+func TestMQTTService_SendUnlockCommand_NoSender(t *testing.T) {
+	db := setupMQTTServiceTestDB(t)
+	deviceRepo := repository.NewDeviceRepository(db)
+	venueRepo := repository.NewVenueRepository(db)
+	deviceSvc := NewDeviceService(db, deviceRepo, venueRepo)
+
+	// No commandSender
+	mqttSvc := NewMQTTService(deviceRepo, deviceSvc, nil)
+
+	result, err := mqttSvc.SendUnlockCommand(context.Background(), "DEV001", nil)
+	require.NoError(t, err)
+	assert.Nil(t, result)
+}
+
+func TestMQTTService_SendLockCommand_NoSender(t *testing.T) {
+	db := setupMQTTServiceTestDB(t)
+	deviceRepo := repository.NewDeviceRepository(db)
+	venueRepo := repository.NewVenueRepository(db)
+	deviceSvc := NewDeviceService(db, deviceRepo, venueRepo)
+
+	// No commandSender
+	mqttSvc := NewMQTTService(deviceRepo, deviceSvc, nil)
+
+	result, err := mqttSvc.SendLockCommand(context.Background(), "DEV001", nil)
+	require.NoError(t, err)
+	assert.Nil(t, result)
+}
+
+func TestMQTTService_Unlock_DeviceNotFound(t *testing.T) {
+	db := setupMQTTServiceTestDB(t)
+	deviceRepo := repository.NewDeviceRepository(db)
+	venueRepo := repository.NewVenueRepository(db)
+	deviceSvc := NewDeviceService(db, deviceRepo, venueRepo)
+
+	mqttSvc := NewMQTTService(deviceRepo, deviceSvc, nil)
+
+	err := mqttSvc.Unlock(context.Background(), 99999)
+	assert.Error(t, err)
+}
+
+func TestMQTTService_Unlock_Success_NoSender(t *testing.T) {
+	db := setupMQTTServiceTestDB(t)
+	deviceRepo := repository.NewDeviceRepository(db)
+	venueRepo := repository.NewVenueRepository(db)
+	deviceSvc := NewDeviceService(db, deviceRepo, venueRepo)
+
+	mqttSvc := NewMQTTService(deviceRepo, deviceSvc, nil)
+	device := seedDeviceForMQTT(t, db, "DEV_UNLOCK_1")
+
+	err := mqttSvc.Unlock(context.Background(), device.ID)
+	require.NoError(t, err)
+}
+
+func TestMQTTService_SendUnlockCommandAsync_NoSender(t *testing.T) {
+	db := setupMQTTServiceTestDB(t)
+	deviceRepo := repository.NewDeviceRepository(db)
+	venueRepo := repository.NewVenueRepository(db)
+	deviceSvc := NewDeviceService(db, deviceRepo, venueRepo)
+
+	mqttSvc := NewMQTTService(deviceRepo, deviceSvc, nil)
+
+	commandID, err := mqttSvc.SendUnlockCommandAsync(context.Background(), "DEV001", nil)
+	require.NoError(t, err)
+	assert.Empty(t, commandID)
+}
+
+func TestMQTTService_OnEvent_Locked(t *testing.T) {
+	db := setupMQTTServiceTestDB(t)
+	deviceRepo := repository.NewDeviceRepository(db)
+	venueRepo := repository.NewVenueRepository(db)
+	deviceSvc := NewDeviceService(db, deviceRepo, venueRepo)
+
+	mqttSvc := NewMQTTService(deviceRepo, deviceSvc, nil)
+	device := seedDeviceForMQTT(t, db, "DEV_MQTT_LOCKED")
+
+	// Set device to unlocked first
+	db.Model(&models.Device{}).Where("id = ?", device.ID).Update("lock_status", models.DeviceUnlocked)
+
+	payload := &mqtt.EventPayload{EventType: mqtt.EventLocked, Data: nil}
+	err := mqttSvc.OnEvent(context.Background(), device.DeviceNo, payload)
+	require.NoError(t, err)
+
+	var updated models.Device
+	require.NoError(t, db.First(&updated, device.ID).Error)
+	assert.Equal(t, int8(models.DeviceLocked), updated.LockStatus)
+}
+
+func TestMQTTService_OnEvent_Alarm(t *testing.T) {
+	db := setupMQTTServiceTestDB(t)
+	deviceRepo := repository.NewDeviceRepository(db)
+	venueRepo := repository.NewVenueRepository(db)
+	deviceSvc := NewDeviceService(db, deviceRepo, venueRepo)
+
+	mqttSvc := NewMQTTService(deviceRepo, deviceSvc, nil)
+	device := seedDeviceForMQTT(t, db, "DEV_MQTT_ALARM")
+
+	payload := &mqtt.EventPayload{EventType: mqtt.EventAlarm, Data: map[string]interface{}{"message": "alarm triggered"}}
+	err := mqttSvc.OnEvent(context.Background(), device.DeviceNo, payload)
+	require.NoError(t, err)
+
+	var logs []models.DeviceLog
+	require.NoError(t, db.Where("device_id = ? AND type = ?", device.ID, models.DeviceLogTypeError).Find(&logs).Error)
+	assert.Len(t, logs, 1)
+}
+
+func TestMQTTService_OnEvent_UnknownType(t *testing.T) {
+	db := setupMQTTServiceTestDB(t)
+	deviceRepo := repository.NewDeviceRepository(db)
+	venueRepo := repository.NewVenueRepository(db)
+	deviceSvc := NewDeviceService(db, deviceRepo, venueRepo)
+
+	mqttSvc := NewMQTTService(deviceRepo, deviceSvc, nil)
+	device := seedDeviceForMQTT(t, db, "DEV_MQTT_UNKNOWN")
+
+	payload := &mqtt.EventPayload{EventType: "custom_event", Data: nil}
+	err := mqttSvc.OnEvent(context.Background(), device.DeviceNo, payload)
+	require.NoError(t, err)
+
+	var logs []models.DeviceLog
+	require.NoError(t, db.Where("device_id = ? AND type = ?", device.ID, "custom_event").Find(&logs).Error)
+	assert.Len(t, logs, 1)
+}
+
+func TestMQTTService_HelperFunctions(t *testing.T) {
+	t.Run("intPtr", func(t *testing.T) {
+		result := intPtr(42)
+		require.NotNil(t, result)
+		assert.Equal(t, 42, *result)
+	})
+
+	t.Run("int8Ptr", func(t *testing.T) {
+		result := int8Ptr(8)
+		require.NotNil(t, result)
+		assert.Equal(t, int8(8), *result)
+	})
+
+	t.Run("float64Ptr with value", func(t *testing.T) {
+		result := float64Ptr(3.14)
+		require.NotNil(t, result)
+		assert.Equal(t, 3.14, *result)
+	})
+
+	t.Run("float64Ptr with zero", func(t *testing.T) {
+		result := float64Ptr(0)
+		assert.Nil(t, result)
+	})
+}

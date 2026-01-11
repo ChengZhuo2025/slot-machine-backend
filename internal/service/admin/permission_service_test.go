@@ -175,6 +175,156 @@ func TestPermissionService_RoleAndPermissionCRUD(t *testing.T) {
 	})
 }
 
+func TestPermissionService_RoleOperations(t *testing.T) {
+	db := setupPermissionServiceTestDB(t)
+	svc := setupPermissionService(db)
+	ctx := context.Background()
+
+	perm := &models.Permission{Code: "ops:read", Name: "操作查看", Type: models.PermissionTypeMenu}
+	require.NoError(t, db.Create(perm).Error)
+
+	role := &models.Role{Code: "ops_role", Name: "操作角色"}
+	require.NoError(t, db.Create(role).Error)
+	require.NoError(t, repository.NewRoleRepository(db).SetPermissions(ctx, role.ID, []int64{perm.ID}))
+
+	t.Run("GetRole 获取角色详情", func(t *testing.T) {
+		got, err := svc.GetRole(ctx, role.ID)
+		require.NoError(t, err)
+		assert.Equal(t, "ops_role", got.Code)
+		assert.Len(t, got.Permissions, 1)
+	})
+
+	t.Run("GetRole 角色不存在", func(t *testing.T) {
+		_, err := svc.GetRole(ctx, 99999)
+		assert.Equal(t, ErrRoleNotFound, err)
+	})
+
+	t.Run("ListRoles 获取角色列表", func(t *testing.T) {
+		list, total, err := svc.ListRoles(ctx, 0, 10, nil)
+		require.NoError(t, err)
+		assert.True(t, total >= 1)
+		assert.NotEmpty(t, list)
+	})
+
+	t.Run("ListAllRoles 获取所有角色", func(t *testing.T) {
+		list, err := svc.ListAllRoles(ctx)
+		require.NoError(t, err)
+		assert.NotEmpty(t, list)
+	})
+
+	t.Run("SetRolePermissions 设置角色权限", func(t *testing.T) {
+		perm2 := &models.Permission{Code: "ops:write", Name: "操作写入", Type: models.PermissionTypeMenu}
+		require.NoError(t, db.Create(perm2).Error)
+
+		err := svc.SetRolePermissions(ctx, role.ID, []int64{perm.ID, perm2.ID})
+		require.NoError(t, err)
+
+		got, _ := svc.GetRole(ctx, role.ID)
+		assert.Len(t, got.Permissions, 2)
+	})
+
+	t.Run("SetRolePermissions 角色不存在", func(t *testing.T) {
+		err := svc.SetRolePermissions(ctx, 99999, []int64{perm.ID})
+		assert.Equal(t, ErrRoleNotFound, err)
+	})
+}
+
+func TestPermissionService_PermissionOperations(t *testing.T) {
+	db := setupPermissionServiceTestDB(t)
+	svc := setupPermissionService(db)
+	ctx := context.Background()
+
+	perm, err := svc.CreatePermission(ctx, &CreatePermissionRequest{
+		Code: "perm:test",
+		Name: "测试权限",
+		Type: models.PermissionTypeMenu,
+	})
+	require.NoError(t, err)
+
+	t.Run("GetPermission 获取权限详情", func(t *testing.T) {
+		got, err := svc.GetPermission(ctx, perm.ID)
+		require.NoError(t, err)
+		assert.Equal(t, "perm:test", got.Code)
+	})
+
+	t.Run("GetPermission 权限不存在", func(t *testing.T) {
+		_, err := svc.GetPermission(ctx, 99999)
+		assert.Equal(t, ErrPermissionNotFound, err)
+	})
+
+	t.Run("UpdatePermission 更新权限", func(t *testing.T) {
+		path := "/api/updated"
+		method := "POST"
+		err := svc.UpdatePermission(ctx, perm.ID, &UpdatePermissionRequest{
+			Name:   "更新后权限",
+			Path:   &path,
+			Method: &method,
+		})
+		require.NoError(t, err)
+
+		var updated models.Permission
+		db.First(&updated, perm.ID)
+		assert.Equal(t, "更新后权限", updated.Name)
+		assert.Equal(t, "/api/updated", *updated.Path)
+	})
+
+	t.Run("UpdatePermission 权限不存在", func(t *testing.T) {
+		err := svc.UpdatePermission(ctx, 99999, &UpdatePermissionRequest{Name: "x"})
+		assert.Equal(t, ErrPermissionNotFound, err)
+	})
+
+	t.Run("ListPermissions 获取权限列表", func(t *testing.T) {
+		list, err := svc.ListPermissions(ctx, nil)
+		require.NoError(t, err)
+		assert.NotEmpty(t, list)
+	})
+
+	t.Run("ListPermissionTree 获取权限树", func(t *testing.T) {
+		list, err := svc.ListPermissionTree(ctx)
+		require.NoError(t, err)
+		assert.NotNil(t, list)
+	})
+}
+
+func TestPermissionService_AdminPermissions(t *testing.T) {
+	db := setupPermissionServiceTestDB(t)
+	svc := setupPermissionService(db)
+	ctx := context.Background()
+
+	perm := &models.Permission{Code: "admin:menu", Name: "管理菜单", Type: models.PermissionTypeMenu}
+	require.NoError(t, db.Create(perm).Error)
+
+	role := &models.Role{Code: "admin_role", Name: "管理角色"}
+	require.NoError(t, db.Create(role).Error)
+	require.NoError(t, repository.NewRoleRepository(db).SetPermissions(ctx, role.ID, []int64{perm.ID}))
+
+	admin := &models.Admin{Username: "testadmin", PasswordHash: "x", Name: "测试管理员", RoleID: role.ID, Status: models.AdminStatusActive}
+	require.NoError(t, db.Create(admin).Error)
+
+	t.Run("GetAdminPermissions 获取管理员权限列表", func(t *testing.T) {
+		perms, err := svc.GetAdminPermissions(ctx, admin.ID)
+		require.NoError(t, err)
+		assert.Contains(t, perms, "admin:menu")
+	})
+
+	t.Run("GetAdminMenus 获取管理员菜单", func(t *testing.T) {
+		menus, err := svc.GetAdminMenus(ctx, admin.ID)
+		require.NoError(t, err)
+		assert.NotNil(t, menus)
+	})
+
+	t.Run("GetAdminMenus 超管获取所有菜单", func(t *testing.T) {
+		superRole := &models.Role{Code: models.RoleCodeSuperAdmin, Name: "超管", IsSystem: true}
+		require.NoError(t, db.Create(superRole).Error)
+		superAdmin := &models.Admin{Username: "superadmin", PasswordHash: "x", Name: "超管", RoleID: superRole.ID, Status: models.AdminStatusActive}
+		require.NoError(t, db.Create(superAdmin).Error)
+
+		menus, err := svc.GetAdminMenus(ctx, superAdmin.ID)
+		require.NoError(t, err)
+		assert.NotNil(t, menus)
+	})
+}
+
 func TestPermissionService_CheckPermission(t *testing.T) {
 	db := setupPermissionServiceTestDB(t)
 	svc := setupPermissionService(db)

@@ -71,3 +71,27 @@ func TestCommissionSettingService_UpdateConfig_ValidationAndHistory(t *testing.T
 	require.Len(t, history, 1)
 }
 
+func TestCommissionSettingService_InitDefaultConfig(t *testing.T) {
+	db := setupCommissionSettingTestDB(t)
+	svc := NewCommissionSettingService(db)
+	ctx := context.Background()
+
+	t.Run("初始化默认配置成功", func(t *testing.T) {
+		err := svc.InitDefaultConfig(ctx)
+		require.NoError(t, err)
+
+		var count int64
+		db.Model(&models.CommissionSetting{}).Count(&count)
+		assert.Equal(t, int64(1), count)
+	})
+
+	t.Run("已有配置时不重复初始化", func(t *testing.T) {
+		err := svc.InitDefaultConfig(ctx)
+		require.NoError(t, err)
+
+		var count int64
+		db.Model(&models.CommissionSetting{}).Count(&count)
+		assert.Equal(t, int64(1), count)
+	})
+}
+

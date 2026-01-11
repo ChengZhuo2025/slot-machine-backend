@@ -396,3 +396,137 @@ func TestDistributionAdminService_GetApprovedWithdrawals(t *testing.T) {
 	assert.Equal(t, int64(1), total)
 	assert.Len(t, list, 1)
 }
+
+func TestDistributionAdminService_WithdrawalOperations(t *testing.T) {
+	db := setupDistributionAdminTestDB(t)
+	distributorRepo := repository.NewDistributorRepository(db)
+	commissionRepo := repository.NewCommissionRepository(db)
+	withdrawalRepo := repository.NewWithdrawalRepository(db)
+	svc := NewDistributionAdminService(distributorRepo, commissionRepo, withdrawalRepo, db)
+	ctx := context.Background()
+
+	user := createDistributionAdminTestUser(db)
+
+	t.Run("GetWithdrawal 获取提现详情", func(t *testing.T) {
+		withdrawal := &models.Withdrawal{
+			WithdrawalNo: fmt.Sprintf("WG%d", time.Now().UnixNano()),
+			UserID:       user.ID,
+			Type:         models.WithdrawalTypeCommission,
+			Amount:       50.0,
+			Fee:          0.3,
+			ActualAmount: 49.7,
+			WithdrawTo:   models.WithdrawToWechat,
+			Status:       models.WithdrawalStatusPending,
+		}
+		db.Create(withdrawal)
+
+		got, err := svc.GetWithdrawal(ctx, withdrawal.ID)
+		require.NoError(t, err)
+		assert.Equal(t, withdrawal.ID, got.ID)
+	})
+
+	t.Run("ApproveWithdrawal 审核通过提现", func(t *testing.T) {
+		withdrawal := &models.Withdrawal{
+			WithdrawalNo: fmt.Sprintf("WAP%d", time.Now().UnixNano()),
+			UserID:       user.ID,
+			Type:         models.WithdrawalTypeCommission,
+			Amount:       50.0,
+			Fee:          0.3,
+			ActualAmount: 49.7,
+			WithdrawTo:   models.WithdrawToWechat,
+			Status:       models.WithdrawalStatusPending,
+		}
+		db.Create(withdrawal)
+
+		err := svc.ApproveWithdrawal(ctx, withdrawal.ID, 1)
+		require.NoError(t, err)
+
+		var updated models.Withdrawal
+		db.First(&updated, withdrawal.ID)
+		assert.Equal(t, models.WithdrawalStatusApproved, updated.Status)
+	})
+
+	t.Run("RejectWithdrawal 拒绝提现", func(t *testing.T) {
+		// 创建用户钱包
+		wallet := &models.UserWallet{
+			UserID:         user.ID,
+			Balance:        100.0,
+			FrozenBalance:  50.0,
+			TotalRecharged: 0,
+			TotalWithdrawn: 0,
+		}
+		db.Create(wallet)
+
+		withdrawal := &models.Withdrawal{
+			WithdrawalNo: fmt.Sprintf("WRJ%d", time.Now().UnixNano()),
+			UserID:       user.ID,
+			Type:         models.WithdrawalTypeCommission,
+			Amount:       50.0,
+			Fee:          0.3,
+			ActualAmount: 49.7,
+			WithdrawTo:   models.WithdrawToWechat,
+			Status:       models.WithdrawalStatusPending,
+		}
+		db.Create(withdrawal)
+
+		err := svc.RejectWithdrawal(ctx, withdrawal.ID, 1, "信息不完整")
+		require.NoError(t, err)
+
+		var updated models.Withdrawal
+		db.First(&updated, withdrawal.ID)
+		assert.Equal(t, models.WithdrawalStatusRejected, updated.Status)
+	})
+
+	t.Run("ProcessWithdrawal 处理中状态", func(t *testing.T) {
+		withdrawal := &models.Withdrawal{
+			WithdrawalNo: fmt.Sprintf("WPR%d", time.Now().UnixNano()),
+			UserID:       user.ID,
+			Type:         models.WithdrawalTypeCommission,
+			Amount:       50.0,
+			Fee:          0.3,
+			ActualAmount: 49.7,
+			WithdrawTo:   models.WithdrawToWechat,
+			Status:       models.WithdrawalStatusApproved,
+		}
+		db.Create(withdrawal)
+
+		err := svc.ProcessWithdrawal(ctx, withdrawal.ID)
+		require.NoError(t, err)
+
+		var updated models.Withdrawal
+		db.First(&updated, withdrawal.ID)
+		assert.Equal(t, models.WithdrawalStatusProcessing, updated.Status)
+	})
+
+	t.Run("CompleteWithdrawal 完成提现", func(t *testing.T) {
+		// 创建分销商
+		distributor := &models.Distributor{
+			UserID:              user.ID,
+			Level:               models.DistributorLevelDirect,
+			InviteCode:          fmt.Sprintf("CW%d", time.Now().UnixNano()%10000),
+			Status:              models.DistributorStatusApproved,
+			FrozenCommission:    50.0,
+			WithdrawnCommission: 0,
+		}
+		db.Create(distributor)
+
+		withdrawal := &models.Withdrawal{
+			WithdrawalNo: fmt.Sprintf("WCM%d", time.Now().UnixNano()),
+			UserID:       user.ID,
+			Type:         models.WithdrawalTypeCommission,
+			Amount:       50.0,
+			Fee:          0.3,
+			ActualAmount: 49.7,
+			WithdrawTo:   models.WithdrawToWechat,
+			Status:       models.WithdrawalStatusProcessing,
+		}
+		db.Create(withdrawal)
+
+		err := svc.CompleteWithdrawal(ctx, withdrawal.ID)
+		require.NoError(t, err)
+
+		var updated models.Withdrawal
+		db.First(&updated, withdrawal.ID)
+		assert.Equal(t, models.WithdrawalStatusSuccess, updated.Status)
+	})
+}

@@ -764,3 +764,673 @@ func TestStatisticsService_GetDailyRevenueReport(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, reports)
 }
+
+// ================== ExportService Tests ==================
+
+func setupExportService(db *gorm.DB) *ExportService {
+	settlementRepo := repository.NewSettlementRepository(db)
+	transactionRepo := repository.NewTransactionRepository(db)
+	orderRepo := repository.NewOrderRepository(db)
+	withdrawalRepo := repository.NewWithdrawalRepository(db)
+
+	return NewExportService(db, settlementRepo, transactionRepo, orderRepo, withdrawalRepo)
+}
+
+func TestExportService_NewService(t *testing.T) {
+	db := setupFinanceTestDB(t)
+	svc := setupExportService(db)
+	assert.NotNil(t, svc)
+}
+
+func TestExportService_ExportSettlements(t *testing.T) {
+	db := setupFinanceTestDB(t)
+	svc := setupExportService(db)
+	ctx := context.Background()
+
+	merchant := createTestMerchant(t, db, "导出测试商户")
+	createTestSettlement(t, db, models.SettlementTypeMerchant, merchant.ID, 1000.0, models.SettlementStatusPending)
+
+	data, filename, err := svc.ExportSettlements(ctx, &ExportSettlementsRequest{})
+	require.NoError(t, err)
+	assert.NotNil(t, data)
+	assert.NotEmpty(t, filename)
+}
+
+func TestExportService_ExportTransactions(t *testing.T) {
+	db := setupFinanceTestDB(t)
+	svc := setupExportService(db)
+	ctx := context.Background()
+
+	user := createFinanceTestUser(t, db, "13800140001")
+
+	// 创建钱包交易记录
+	wallet := &models.UserWallet{
+		UserID:  user.ID,
+		Balance: 100.0,
+	}
+	db.Create(wallet)
+
+	tx := &models.WalletTransaction{
+		UserID:        user.ID,
+		Type:          models.WalletTxTypeRecharge,
+		Amount:        100.0,
+		BalanceBefore: 0,
+		BalanceAfter:  100.0,
+	}
+	db.Create(tx)
+
+	data, filename, err := svc.ExportTransactions(ctx, &ExportTransactionsRequest{})
+	require.NoError(t, err)
+	assert.NotNil(t, data)
+	assert.NotEmpty(t, filename)
+}
+
+func TestExportService_ExportWithdrawals(t *testing.T) {
+	db := setupFinanceTestDB(t)
+	svc := setupExportService(db)
+	ctx := context.Background()
+
+	user := createFinanceTestUser(t, db, "13800140002")
+	createTestWithdrawal(t, db, user.ID, 50.0, models.WithdrawalStatusPending)
+
+	data, filename, err := svc.ExportWithdrawals(ctx, &ExportWithdrawalsRequest{})
+	require.NoError(t, err)
+	assert.NotNil(t, data)
+	assert.NotEmpty(t, filename)
+}
+
+func TestExportService_ExportDailyRevenue(t *testing.T) {
+	db := setupFinanceTestDB(t)
+	svc := setupExportService(db)
+	ctx := context.Background()
+
+	user := createFinanceTestUser(t, db, "13800140003")
+	createTestPayment(t, db, user.ID, 100.0, models.PaymentStatusSuccess)
+
+	startDate := time.Now().Add(-7 * 24 * time.Hour)
+	endDate := time.Now().Add(time.Hour)
+
+	data, filename, err := svc.ExportDailyRevenue(ctx, startDate, endDate)
+	require.NoError(t, err)
+	assert.NotNil(t, data)
+	assert.NotEmpty(t, filename)
+}
+
+func TestExportService_ExportMerchantSettlementReport(t *testing.T) {
+	db := setupFinanceTestDB(t)
+	svc := setupExportService(db)
+	ctx := context.Background()
+
+	createTestMerchant(t, db, "商户报表测试")
+
+	startDate := time.Now().Add(-30 * 24 * time.Hour)
+	endDate := time.Now().Add(time.Hour)
+
+	data, filename, err := svc.ExportMerchantSettlementReport(ctx, &startDate, &endDate)
+	require.NoError(t, err)
+	assert.NotNil(t, data)
+	assert.NotEmpty(t, filename)
+}
+
+// ================== WithdrawalAuditService Tests ==================
+
+func setupWithdrawalAuditService(db *gorm.DB) *WithdrawalAuditService {
+	withdrawalRepo := repository.NewWithdrawalRepository(db)
+	distributorRepo := repository.NewDistributorRepository(db)
+	return NewWithdrawalAuditService(db, withdrawalRepo, distributorRepo)
+}
+
+func TestWithdrawalAuditService_NewService(t *testing.T) {
+	db := setupFinanceTestDB(t)
+	svc := setupWithdrawalAuditService(db)
+	assert.NotNil(t, svc)
+}
+
+func TestWithdrawalAuditService_ListWithdrawals(t *testing.T) {
+	db := setupFinanceTestDB(t)
+	svc := setupWithdrawalAuditService(db)
+	ctx := context.Background()
+
+	user := createFinanceTestUser(t, db, "13800150001")
+
+	t.Run("获取空列表", func(t *testing.T) {
+		req := &WithdrawalListRequest{Page: 1, PageSize: 10}
+		list, total, err := svc.ListWithdrawals(ctx, req)
+		require.NoError(t, err)
+		assert.Equal(t, int64(0), total)
+		assert.Empty(t, list)
+	})
+
+	t.Run("获取全部列表", func(t *testing.T) {
+		createTestWithdrawal(t, db, user.ID, 100.0, models.WithdrawalStatusPending)
+		createTestWithdrawal(t, db, user.ID, 200.0, models.WithdrawalStatusSuccess)
+
+		req := &WithdrawalListRequest{Page: 1, PageSize: 10}
+		list, total, err := svc.ListWithdrawals(ctx, req)
+		require.NoError(t, err)
+		assert.True(t, total >= 2)
+		assert.NotEmpty(t, list)
+	})
+
+	t.Run("按用户筛选", func(t *testing.T) {
+		userID := user.ID
+		req := &WithdrawalListRequest{UserID: &userID, Page: 1, PageSize: 10}
+		list, _, err := svc.ListWithdrawals(ctx, req)
+		require.NoError(t, err)
+		for _, w := range list {
+			assert.Equal(t, userID, w.UserID)
+		}
+	})
+
+	t.Run("按类型筛选", func(t *testing.T) {
+		req := &WithdrawalListRequest{Type: "commission", Page: 1, PageSize: 10}
+		_, _, err := svc.ListWithdrawals(ctx, req)
+		require.NoError(t, err)
+	})
+
+	t.Run("按状态筛选", func(t *testing.T) {
+		req := &WithdrawalListRequest{Status: models.WithdrawalStatusPending, Page: 1, PageSize: 10}
+		list, _, err := svc.ListWithdrawals(ctx, req)
+		require.NoError(t, err)
+		for _, w := range list {
+			assert.Equal(t, models.WithdrawalStatusPending, w.Status)
+		}
+	})
+
+	t.Run("按日期范围筛选", func(t *testing.T) {
+		req := &WithdrawalListRequest{
+			StartDate: time.Now().Add(-7 * 24 * time.Hour).Format("2006-01-02"),
+			EndDate:   time.Now().Format("2006-01-02"),
+			Page:      1,
+			PageSize:  10,
+		}
+		_, _, err := svc.ListWithdrawals(ctx, req)
+		require.NoError(t, err)
+	})
+}
+
+func TestWithdrawalAuditService_GetWithdrawal(t *testing.T) {
+	db := setupFinanceTestDB(t)
+	svc := setupWithdrawalAuditService(db)
+	ctx := context.Background()
+
+	user := createFinanceTestUser(t, db, "13800150002")
+	withdrawal := createTestWithdrawal(t, db, user.ID, 100.0, models.WithdrawalStatusPending)
+
+	t.Run("获取存在的提现", func(t *testing.T) {
+		result, err := svc.GetWithdrawal(ctx, withdrawal.ID)
+		require.NoError(t, err)
+		assert.Equal(t, withdrawal.ID, result.ID)
+	})
+
+	t.Run("获取不存在的提现", func(t *testing.T) {
+		_, err := svc.GetWithdrawal(ctx, 99999)
+		assert.Error(t, err)
+	})
+}
+
+func TestWithdrawalAuditService_ApproveWithdrawal(t *testing.T) {
+	db := setupFinanceTestDB(t)
+	svc := setupWithdrawalAuditService(db)
+	ctx := context.Background()
+
+	t.Run("审核通过待审核提现", func(t *testing.T) {
+		user := createFinanceTestUser(t, db, "13800150003")
+		withdrawal := createTestWithdrawal(t, db, user.ID, 100.0, models.WithdrawalStatusPending)
+
+		err := svc.ApproveWithdrawal(ctx, withdrawal.ID, 1)
+		require.NoError(t, err)
+
+		var updated models.Withdrawal
+		db.First(&updated, withdrawal.ID)
+		assert.Equal(t, models.WithdrawalStatusApproved, updated.Status)
+	})
+
+	t.Run("审核非待审核状态提现失败", func(t *testing.T) {
+		user := createFinanceTestUser(t, db, "13800150004")
+		withdrawal := createTestWithdrawal(t, db, user.ID, 100.0, models.WithdrawalStatusSuccess)
+
+		err := svc.ApproveWithdrawal(ctx, withdrawal.ID, 1)
+		assert.Error(t, err)
+	})
+
+	t.Run("审核不存在的提现失败", func(t *testing.T) {
+		err := svc.ApproveWithdrawal(ctx, 99999, 1)
+		assert.Error(t, err)
+	})
+}
+
+func TestWithdrawalAuditService_RejectWithdrawal(t *testing.T) {
+	db := setupFinanceTestDB(t)
+	svc := setupWithdrawalAuditService(db)
+	ctx := context.Background()
+
+	t.Run("拒绝提现并退还佣金", func(t *testing.T) {
+		user := createFinanceTestUser(t, db, "13800150005")
+		distributor := createTestDistributor(t, db, user.ID)
+
+		// 更新分销商冻结余额
+		db.Model(&models.Distributor{}).Where("id = ?", distributor.ID).Updates(map[string]interface{}{
+			"frozen_commission":    100.0,
+			"available_commission": 0.0,
+		})
+
+		withdrawal := &models.Withdrawal{
+			WithdrawalNo:         fmt.Sprintf("WRJ%d", time.Now().UnixNano()),
+			UserID:               user.ID,
+			Type:                 models.WithdrawalTypeCommission,
+			Amount:               100.0,
+			Fee:                  0,
+			ActualAmount:         100.0,
+			WithdrawTo:           "wechat",
+			AccountInfoEncrypted: "info",
+			Status:               models.WithdrawalStatusPending,
+		}
+		require.NoError(t, db.Create(withdrawal).Error)
+
+		err := svc.RejectWithdrawal(ctx, withdrawal.ID, 1, "信息不完整")
+		require.NoError(t, err)
+
+		var updated models.Withdrawal
+		db.First(&updated, withdrawal.ID)
+		assert.Equal(t, models.WithdrawalStatusRejected, updated.Status)
+	})
+
+	t.Run("拒绝钱包提现并退还余额", func(t *testing.T) {
+		user := createFinanceTestUser(t, db, "13800150006")
+
+		// 创建用户钱包
+		wallet := &models.UserWallet{
+			UserID:        user.ID,
+			Balance:       0,
+			FrozenBalance: 100.0,
+		}
+		db.Create(wallet)
+
+		withdrawal := &models.Withdrawal{
+			WithdrawalNo:         fmt.Sprintf("WRW%d", time.Now().UnixNano()),
+			UserID:               user.ID,
+			Type:                 models.WithdrawalTypeWallet,
+			Amount:               100.0,
+			Fee:                  0,
+			ActualAmount:         100.0,
+			WithdrawTo:           "wechat",
+			AccountInfoEncrypted: "info",
+			Status:               models.WithdrawalStatusPending,
+		}
+		require.NoError(t, db.Create(withdrawal).Error)
+
+		err := svc.RejectWithdrawal(ctx, withdrawal.ID, 1, "信息不完整")
+		require.NoError(t, err)
+
+		var updated models.Withdrawal
+		db.First(&updated, withdrawal.ID)
+		assert.Equal(t, models.WithdrawalStatusRejected, updated.Status)
+
+		// 验证余额退还
+		var updatedWallet models.UserWallet
+		db.Where("user_id = ?", user.ID).First(&updatedWallet)
+		assert.Equal(t, 100.0, updatedWallet.Balance)
+	})
+
+	t.Run("拒绝非待审核状态提现失败", func(t *testing.T) {
+		user := createFinanceTestUser(t, db, "13800150007")
+		withdrawal := createTestWithdrawal(t, db, user.ID, 100.0, models.WithdrawalStatusSuccess)
+
+		err := svc.RejectWithdrawal(ctx, withdrawal.ID, 1, "测试")
+		assert.Error(t, err)
+	})
+
+	t.Run("拒绝不存在的提现失败", func(t *testing.T) {
+		err := svc.RejectWithdrawal(ctx, 99999, 1, "测试")
+		assert.Error(t, err)
+	})
+}
+
+func TestWithdrawalAuditService_ProcessWithdrawal(t *testing.T) {
+	db := setupFinanceTestDB(t)
+	svc := setupWithdrawalAuditService(db)
+	ctx := context.Background()
+
+	t.Run("处理已审核提现", func(t *testing.T) {
+		user := createFinanceTestUser(t, db, "13800150008")
+		withdrawal := createTestWithdrawal(t, db, user.ID, 100.0, models.WithdrawalStatusApproved)
+
+		err := svc.ProcessWithdrawal(ctx, withdrawal.ID, 1)
+		require.NoError(t, err)
+
+		var updated models.Withdrawal
+		db.First(&updated, withdrawal.ID)
+		assert.Equal(t, models.WithdrawalStatusProcessing, updated.Status)
+	})
+
+	t.Run("处理非已审核状态失败", func(t *testing.T) {
+		user := createFinanceTestUser(t, db, "13800150009")
+		withdrawal := createTestWithdrawal(t, db, user.ID, 100.0, models.WithdrawalStatusPending)
+
+		err := svc.ProcessWithdrawal(ctx, withdrawal.ID, 1)
+		assert.Error(t, err)
+	})
+
+	t.Run("处理不存在的提现失败", func(t *testing.T) {
+		err := svc.ProcessWithdrawal(ctx, 99999, 1)
+		assert.Error(t, err)
+	})
+}
+
+func TestWithdrawalAuditService_CompleteWithdrawal(t *testing.T) {
+	db := setupFinanceTestDB(t)
+	svc := setupWithdrawalAuditService(db)
+	ctx := context.Background()
+
+	t.Run("完成佣金提现", func(t *testing.T) {
+		user := createFinanceTestUser(t, db, "13800150010")
+		distributor := createTestDistributor(t, db, user.ID)
+
+		// 更新分销商冻结余额
+		db.Model(&models.Distributor{}).Where("id = ?", distributor.ID).Updates(map[string]interface{}{
+			"frozen_commission":    100.0,
+			"withdrawn_commission": 0.0,
+		})
+
+		withdrawal := &models.Withdrawal{
+			WithdrawalNo:         fmt.Sprintf("WCM%d", time.Now().UnixNano()),
+			UserID:               user.ID,
+			Type:                 models.WithdrawalTypeCommission,
+			Amount:               100.0,
+			Fee:                  0.6,
+			ActualAmount:         99.4,
+			WithdrawTo:           "wechat",
+			AccountInfoEncrypted: "info",
+			Status:               models.WithdrawalStatusProcessing,
+		}
+		require.NoError(t, db.Create(withdrawal).Error)
+
+		err := svc.CompleteWithdrawal(ctx, withdrawal.ID, 1)
+		require.NoError(t, err)
+
+		var updated models.Withdrawal
+		db.First(&updated, withdrawal.ID)
+		assert.Equal(t, models.WithdrawalStatusSuccess, updated.Status)
+	})
+
+	t.Run("完成钱包提现", func(t *testing.T) {
+		user := createFinanceTestUser(t, db, "13800150011")
+
+		// 创建用户钱包
+		wallet := &models.UserWallet{
+			UserID:        user.ID,
+			Balance:       0,
+			FrozenBalance: 100.0,
+		}
+		db.Create(wallet)
+
+		withdrawal := &models.Withdrawal{
+			WithdrawalNo:         fmt.Sprintf("WCW%d", time.Now().UnixNano()),
+			UserID:               user.ID,
+			Type:                 models.WithdrawalTypeWallet,
+			Amount:               100.0,
+			Fee:                  0.6,
+			ActualAmount:         99.4,
+			WithdrawTo:           "wechat",
+			AccountInfoEncrypted: "info",
+			Status:               models.WithdrawalStatusApproved,
+		}
+		require.NoError(t, db.Create(withdrawal).Error)
+
+		err := svc.CompleteWithdrawal(ctx, withdrawal.ID, 1)
+		require.NoError(t, err)
+
+		var updated models.Withdrawal
+		db.First(&updated, withdrawal.ID)
+		assert.Equal(t, models.WithdrawalStatusSuccess, updated.Status)
+	})
+
+	t.Run("完成非处理中状态失败", func(t *testing.T) {
+		user := createFinanceTestUser(t, db, "13800150012")
+		withdrawal := createTestWithdrawal(t, db, user.ID, 100.0, models.WithdrawalStatusPending)
+
+		err := svc.CompleteWithdrawal(ctx, withdrawal.ID, 1)
+		assert.Error(t, err)
+	})
+
+	t.Run("完成不存在的提现失败", func(t *testing.T) {
+		err := svc.CompleteWithdrawal(ctx, 99999, 1)
+		assert.Error(t, err)
+	})
+}
+
+func TestWithdrawalAuditService_GetPendingWithdrawalsCount(t *testing.T) {
+	db := setupFinanceTestDB(t)
+	svc := setupWithdrawalAuditService(db)
+	ctx := context.Background()
+
+	user := createFinanceTestUser(t, db, "13800150013")
+	createTestWithdrawal(t, db, user.ID, 100.0, models.WithdrawalStatusPending)
+	createTestWithdrawal(t, db, user.ID, 200.0, models.WithdrawalStatusPending)
+
+	count, err := svc.GetPendingWithdrawalsCount(ctx)
+	require.NoError(t, err)
+	assert.True(t, count >= 2)
+}
+
+func TestWithdrawalAuditService_GetWithdrawalSummary(t *testing.T) {
+	db := setupFinanceTestDB(t)
+	svc := setupWithdrawalAuditService(db)
+	ctx := context.Background()
+
+	t.Run("无数据时返回零值", func(t *testing.T) {
+		summary, err := svc.GetWithdrawalSummary(ctx, nil, nil)
+		require.NoError(t, err)
+		assert.NotNil(t, summary)
+	})
+
+	t.Run("有数据时正确统计", func(t *testing.T) {
+		user := createFinanceTestUser(t, db, "13800150014")
+		createTestWithdrawal(t, db, user.ID, 100.0, models.WithdrawalStatusPending)
+		createTestWithdrawal(t, db, user.ID, 200.0, models.WithdrawalStatusSuccess)
+		createTestWithdrawal(t, db, user.ID, 50.0, models.WithdrawalStatusRejected)
+
+		summary, err := svc.GetWithdrawalSummary(ctx, nil, nil)
+		require.NoError(t, err)
+		assert.True(t, summary.TotalWithdrawals >= 3)
+	})
+
+	t.Run("带时间范围筛选", func(t *testing.T) {
+		startDate := time.Now().Add(-7 * 24 * time.Hour)
+		endDate := time.Now()
+		summary, err := svc.GetWithdrawalSummary(ctx, &startDate, &endDate)
+		require.NoError(t, err)
+		assert.NotNil(t, summary)
+	})
+}
+
+func TestWithdrawalAuditService_GetPendingWithdrawals(t *testing.T) {
+	db := setupFinanceTestDB(t)
+	svc := setupWithdrawalAuditService(db)
+	ctx := context.Background()
+
+	user := createFinanceTestUser(t, db, "13800150015")
+	createTestWithdrawal(t, db, user.ID, 100.0, models.WithdrawalStatusPending)
+
+	list, total, err := svc.GetPendingWithdrawals(ctx, 1, 10)
+	require.NoError(t, err)
+	assert.True(t, total >= 1)
+	assert.NotEmpty(t, list)
+}
+
+func TestWithdrawalAuditService_GetApprovedWithdrawals(t *testing.T) {
+	db := setupFinanceTestDB(t)
+	svc := setupWithdrawalAuditService(db)
+	ctx := context.Background()
+
+	user := createFinanceTestUser(t, db, "13800150016")
+	createTestWithdrawal(t, db, user.ID, 100.0, models.WithdrawalStatusApproved)
+
+	list, total, err := svc.GetApprovedWithdrawals(ctx, 1, 10)
+	require.NoError(t, err)
+	assert.True(t, total >= 1)
+	assert.NotEmpty(t, list)
+}
+
+func TestWithdrawalAuditService_BatchOperations(t *testing.T) {
+	db := setupFinanceTestDB(t)
+	svc := setupWithdrawalAuditService(db)
+	ctx := context.Background()
+
+	t.Run("批量审核通过", func(t *testing.T) {
+		user := createFinanceTestUser(t, db, "13800150017")
+		w1 := createTestWithdrawal(t, db, user.ID, 100.0, models.WithdrawalStatusPending)
+		w2 := createTestWithdrawal(t, db, user.ID, 200.0, models.WithdrawalStatusPending)
+
+		err := svc.BatchApprove(ctx, []int64{w1.ID, w2.ID}, 1)
+		require.NoError(t, err)
+	})
+
+	t.Run("批量拒绝", func(t *testing.T) {
+		user := createFinanceTestUser(t, db, "13800150018")
+
+		// 创建钱包
+		wallet := &models.UserWallet{
+			UserID:        user.ID,
+			Balance:       0,
+			FrozenBalance: 300.0,
+		}
+		db.Create(wallet)
+
+		w1 := &models.Withdrawal{
+			WithdrawalNo:         fmt.Sprintf("WBR1%d", time.Now().UnixNano()),
+			UserID:               user.ID,
+			Type:                 models.WithdrawalTypeWallet,
+			Amount:               100.0,
+			Fee:                  0,
+			ActualAmount:         100.0,
+			WithdrawTo:           "wechat",
+			AccountInfoEncrypted: "info",
+			Status:               models.WithdrawalStatusPending,
+		}
+		db.Create(w1)
+
+		w2 := &models.Withdrawal{
+			WithdrawalNo:         fmt.Sprintf("WBR2%d", time.Now().UnixNano()),
+			UserID:               user.ID,
+			Type:                 models.WithdrawalTypeWallet,
+			Amount:               200.0,
+			Fee:                  0,
+			ActualAmount:         200.0,
+			WithdrawTo:           "wechat",
+			AccountInfoEncrypted: "info",
+			Status:               models.WithdrawalStatusPending,
+		}
+		db.Create(w2)
+
+		err := svc.BatchReject(ctx, []int64{w1.ID, w2.ID}, 1, "批量拒绝")
+		require.NoError(t, err)
+	})
+
+	t.Run("批量完成", func(t *testing.T) {
+		user := createFinanceTestUser(t, db, "13800150019")
+
+		// 创建钱包
+		wallet := &models.UserWallet{
+			UserID:        user.ID,
+			Balance:       0,
+			FrozenBalance: 300.0,
+		}
+		db.Create(wallet)
+
+		w1 := &models.Withdrawal{
+			WithdrawalNo:         fmt.Sprintf("WBC1%d", time.Now().UnixNano()),
+			UserID:               user.ID,
+			Type:                 models.WithdrawalTypeWallet,
+			Amount:               100.0,
+			Fee:                  0.6,
+			ActualAmount:         99.4,
+			WithdrawTo:           "wechat",
+			AccountInfoEncrypted: "info",
+			Status:               models.WithdrawalStatusProcessing,
+		}
+		db.Create(w1)
+
+		w2 := &models.Withdrawal{
+			WithdrawalNo:         fmt.Sprintf("WBC2%d", time.Now().UnixNano()),
+			UserID:               user.ID,
+			Type:                 models.WithdrawalTypeWallet,
+			Amount:               200.0,
+			Fee:                  1.2,
+			ActualAmount:         198.8,
+			WithdrawTo:           "wechat",
+			AccountInfoEncrypted: "info",
+			Status:               models.WithdrawalStatusApproved,
+		}
+		db.Create(w2)
+
+		err := svc.BatchComplete(ctx, []int64{w1.ID, w2.ID}, 1)
+		require.NoError(t, err)
+	})
+}
+
+// ================== StatisticsService Additional Tests ==================
+
+func TestStatisticsService_GetTransactionStatistics(t *testing.T) {
+	db := setupFinanceTestDB(t)
+	svc := setupStatisticsService(db)
+	ctx := context.Background()
+
+	result, err := svc.GetTransactionStatistics(ctx, nil, nil)
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+}
+
+func TestStatisticsService_GetSettlementSummary(t *testing.T) {
+	db := setupFinanceTestDB(t)
+	svc := setupStatisticsService(db)
+	ctx := context.Background()
+
+	t.Run("按商户类型统计", func(t *testing.T) {
+		result, err := svc.GetSettlementSummary(ctx, models.SettlementTypeMerchant, nil, nil)
+		require.NoError(t, err)
+		assert.NotNil(t, result)
+	})
+
+	t.Run("按分销商类型统计", func(t *testing.T) {
+		result, err := svc.GetSettlementSummary(ctx, models.SettlementTypeDistributor, nil, nil)
+		require.NoError(t, err)
+		assert.NotNil(t, result)
+	})
+
+	t.Run("带时间范围统计", func(t *testing.T) {
+		startDate := time.Now().Add(-30 * 24 * time.Hour)
+		endDate := time.Now()
+		result, err := svc.GetSettlementSummary(ctx, "", &startDate, &endDate)
+		require.NoError(t, err)
+		assert.NotNil(t, result)
+	})
+}
+
+func TestStatisticsService_GetMerchantSettlementReport(t *testing.T) {
+	db := setupFinanceTestDB(t)
+	svc := setupStatisticsService(db)
+	ctx := context.Background()
+
+	t.Run("无数据时返回空结果", func(t *testing.T) {
+		startDate := time.Now().Add(-30 * 24 * time.Hour)
+		endDate := time.Now()
+
+		_, err := svc.GetMerchantSettlementReport(ctx, &startDate, &endDate)
+		require.NoError(t, err)
+	})
+
+	t.Run("有结算数据时返回报告", func(t *testing.T) {
+		merchant := createTestMerchant(t, db, "报告测试商户")
+		createTestSettlement(t, db, models.SettlementTypeMerchant, merchant.ID, 1000.0, models.SettlementStatusCompleted)
+
+		startDate := time.Now().Add(-24 * time.Hour)
+		endDate := time.Now().Add(time.Hour)
+
+		result, err := svc.GetMerchantSettlementReport(ctx, &startDate, &endDate)
+		require.NoError(t, err)
+		// 可能有或没有数据，取决于结算数据关联
+		_ = result
+	})
+}

@@ -175,3 +175,103 @@ func TestOperationDashboardService_GetUserGrowthTrend_Bounds(t *testing.T) {
 	require.Len(t, trends, 30)
 }
 
+func TestOperationDashboardService_GetCouponUsageStats(t *testing.T) {
+	db := setupOperationDashboardTestDB(t)
+	svc := NewOperationDashboardService(db)
+	ctx := context.Background()
+
+	now := time.Now()
+	coupon := &models.Coupon{
+		Name:            "测试券",
+		Type:            models.CouponTypeFixed,
+		Value:           10,
+		MinAmount:       0,
+		TotalCount:      100,
+		ReceivedCount:   10,
+		UsedCount:       5,
+		PerUserLimit:    1,
+		ApplicableScope: models.CouponScopeAll,
+		StartTime:       now.Add(-time.Hour),
+		EndTime:         now.Add(time.Hour),
+		Status:          models.CouponStatusActive,
+	}
+	require.NoError(t, db.Create(coupon).Error)
+
+	stats, err := svc.GetCouponUsageStats(ctx, 10)
+	require.NoError(t, err)
+	assert.NotNil(t, stats)
+}
+
+func TestOperationDashboardService_GetMemberLevelDistribution(t *testing.T) {
+	db := setupOperationDashboardTestDB(t)
+	svc := NewOperationDashboardService(db)
+	ctx := context.Background()
+
+	require.NoError(t, db.Create(&models.MemberLevel{ID: 1, Name: "普通会员", Level: 1, MinPoints: 0, Discount: 1}).Error)
+	require.NoError(t, db.Create(&models.MemberLevel{ID: 2, Name: "VIP", Level: 2, MinPoints: 100, Discount: 0.9}).Error)
+
+	u1 := &models.User{Nickname: "U1", MemberLevelID: 1, Status: models.UserStatusActive}
+	u2 := &models.User{Nickname: "U2", MemberLevelID: 2, Status: models.UserStatusActive}
+	require.NoError(t, db.Create(u1).Error)
+	require.NoError(t, db.Create(u2).Error)
+
+	dist, err := svc.GetMemberLevelDistribution(ctx)
+	require.NoError(t, err)
+	assert.NotNil(t, dist)
+}
+
+func TestOperationDashboardService_GetDistributorRank(t *testing.T) {
+	db := setupOperationDashboardTestDB(t)
+	svc := NewOperationDashboardService(db)
+	ctx := context.Background()
+
+	require.NoError(t, db.Create(&models.MemberLevel{ID: 1, Name: "普通会员", Level: 1, MinPoints: 0, Discount: 1}).Error)
+
+	u1 := &models.User{Nickname: "U1", MemberLevelID: 1, Status: models.UserStatusActive}
+	require.NoError(t, db.Create(u1).Error)
+
+	distributor := &models.Distributor{
+		UserID:          u1.ID,
+		Level:           models.DistributorLevelDirect,
+		InviteCode:      "RANK01",
+		Status:          models.DistributorStatusApproved,
+		TotalCommission: 100.0,
+		TeamCount:       5,
+	}
+	require.NoError(t, db.Create(distributor).Error)
+
+	rank, err := svc.GetDistributorRank(ctx, 10)
+	require.NoError(t, err)
+	assert.NotNil(t, rank)
+}
+
+func TestOperationDashboardService_GetActiveCampaigns(t *testing.T) {
+	db := setupOperationDashboardTestDB(t)
+	svc := NewOperationDashboardService(db)
+	ctx := context.Background()
+
+	now := time.Now()
+	campaign := &models.Campaign{
+		Name:      "活动测试",
+		Type:      models.CampaignTypeDiscount,
+		StartTime: now.Add(-time.Hour),
+		EndTime:   now.Add(time.Hour),
+		Status:    models.CampaignStatusActive,
+	}
+	require.NoError(t, db.Create(campaign).Error)
+
+	campaigns, err := svc.GetActiveCampaigns(ctx, 10)
+	require.NoError(t, err)
+	assert.NotNil(t, campaigns)
+}
+
+func TestOperationDashboardService_GetUserFeedbackStats(t *testing.T) {
+	db := setupOperationDashboardTestDB(t)
+	svc := NewOperationDashboardService(db)
+	ctx := context.Background()
+
+	stats, err := svc.GetUserFeedbackStats(ctx)
+	require.NoError(t, err)
+	assert.NotNil(t, stats)
+}
+

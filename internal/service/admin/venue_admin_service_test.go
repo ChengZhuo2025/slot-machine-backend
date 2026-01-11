@@ -103,3 +103,59 @@ func TestVenueAdminService_CRUD(t *testing.T) {
 	})
 }
 
+func TestVenueAdminService_AdditionalOperations(t *testing.T) {
+	db := setupVenueAdminTestDB(t)
+	svc := NewVenueAdminService(
+		repository.NewVenueRepository(db),
+		repository.NewMerchantRepository(db),
+		repository.NewDeviceRepository(db),
+	)
+	ctx := context.Background()
+
+	merchant := &models.Merchant{Name: "M2", ContactName: "C", ContactPhone: "138", CommissionRate: 0.2, SettlementType: models.SettlementTypeMonthly, Status: models.MerchantStatusActive}
+	require.NoError(t, db.Create(merchant).Error)
+
+	venue, _ := svc.CreateVenue(ctx, &CreateVenueRequest{
+		MerchantID: merchant.ID,
+		Name:       "测试场地",
+		Type:       models.VenueTypeMall,
+		Province:   "广东省",
+		City:       "深圳市",
+		District:   "南山区",
+		Address:    "科技园",
+	})
+
+	t.Run("UpdateVenueStatus 更新场地状态", func(t *testing.T) {
+		err := svc.UpdateVenueStatus(ctx, venue.ID, models.VenueStatusDisabled)
+		require.NoError(t, err)
+
+		var updated models.Venue
+		db.First(&updated, venue.ID)
+		assert.Equal(t, int8(models.VenueStatusDisabled), updated.Status)
+	})
+
+	t.Run("GetVenue 获取场地详情", func(t *testing.T) {
+		result, err := svc.GetVenue(ctx, venue.ID)
+		require.NoError(t, err)
+		assert.Equal(t, venue.ID, result.ID)
+	})
+
+	t.Run("GetVenue 场地不存在", func(t *testing.T) {
+		_, err := svc.GetVenue(ctx, 99999)
+		assert.Error(t, err)
+	})
+
+	t.Run("ListVenues 获取场地列表", func(t *testing.T) {
+		list, total, err := svc.ListVenues(ctx, 0, 10, nil)
+		require.NoError(t, err)
+		assert.True(t, total >= 1)
+		assert.NotEmpty(t, list)
+	})
+
+	t.Run("ListVenuesByMerchant 按商户筛选场地", func(t *testing.T) {
+		list, err := svc.ListVenuesByMerchant(ctx, merchant.ID)
+		require.NoError(t, err)
+		assert.NotNil(t, list)
+	})
+}
+

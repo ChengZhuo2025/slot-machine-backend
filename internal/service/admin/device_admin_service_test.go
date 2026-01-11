@@ -648,3 +648,28 @@ func TestDeviceAdminService_RemoteLock_DeviceNotFound(t *testing.T) {
 	err := service.RemoteLock(ctx, 99999, 1001)
 	assert.ErrorIs(t, err, ErrDeviceNotFound)
 }
+
+func TestDeviceAdminService_GetMaintenanceRecords(t *testing.T) {
+	service, db, _ := setupDeviceAdminService(t)
+	ctx := context.Background()
+
+	venue := createTestVenue(t, db)
+	device := createTestDevice(t, db, "DEV_MAINT_REC", venue)
+
+	// 创建维护记录
+	for i := 0; i < 3; i++ {
+		maintenance := &models.DeviceMaintenance{
+			DeviceID:    device.ID,
+			Type:        "repair",
+			Description: "维护描述",
+			OperatorID:  1,
+			Status:      models.MaintenanceStatusCompleted,
+		}
+		require.NoError(t, db.Create(maintenance).Error)
+	}
+
+	records, total, err := service.GetMaintenanceRecords(ctx, 0, 10, nil)
+	require.NoError(t, err)
+	assert.Equal(t, int64(3), total)
+	assert.Len(t, records, 3)
+}

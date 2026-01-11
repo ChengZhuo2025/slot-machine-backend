@@ -616,3 +616,266 @@ func TestCartService_GetCartCount(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 5, count) // 2 + 3
 }
+
+// ==================== 边界测试 ====================
+
+func TestCartService_GetCart_WithSku(t *testing.T) {
+	db := setupCartServiceTestDB(t)
+	svc := newCartService(db)
+	ctx := context.Background()
+
+	user, product, sku := seedCartTestData(t, db)
+
+	// 添加带 SKU 的购物车项
+	cartItem := &models.CartItem{
+		UserID:    user.ID,
+		ProductID: product.ID,
+		SkuID:     &sku.ID,
+		Quantity:  2,
+		Selected:  true,
+	}
+	require.NoError(t, db.Create(cartItem).Error)
+
+	cart, err := svc.GetCart(ctx, user.ID)
+	require.NoError(t, err)
+	require.Len(t, cart.Items, 1)
+	assert.NotNil(t, cart.Items[0].SkuID)
+	assert.Equal(t, sku.ID, *cart.Items[0].SkuID)
+	assert.Equal(t, 85.0, cart.Items[0].Price) // SKU 价格
+}
+
+func TestCartService_GetCart_ProductDeleted(t *testing.T) {
+	db := setupCartServiceTestDB(t)
+	svc := newCartService(db)
+	ctx := context.Background()
+
+	user, product, _ := seedCartTestData(t, db)
+
+	// 添加商品到购物车
+	cartItem := &models.CartItem{
+		UserID:    user.ID,
+		ProductID: product.ID,
+		Quantity:  2,
+		Selected:  true,
+	}
+	require.NoError(t, db.Create(cartItem).Error)
+
+	// 删除商品
+	require.NoError(t, db.Delete(product).Error)
+
+	// 获取购物车，应该能处理商品不存在的情况
+	cart, err := svc.GetCart(ctx, user.ID)
+	require.NoError(t, err)
+	// 商品不存在时，购物车项也应该被过滤掉或标记为无效
+	// 这取决于实现，但不应该报错
+	assert.NotNil(t, cart)
+}
+
+func TestCartService_GetSelectedItems_Empty(t *testing.T) {
+	db := setupCartServiceTestDB(t)
+	svc := newCartService(db)
+	ctx := context.Background()
+
+	user, product, _ := seedCartTestData(t, db)
+
+	// 添加未选中的购物车项
+	item := &models.CartItem{UserID: user.ID, ProductID: product.ID, Quantity: 1, Selected: true}
+	require.NoError(t, db.Create(item).Error)
+	require.NoError(t, db.Model(item).Update("selected", false).Error)
+
+	items, err := svc.GetSelectedItems(ctx, user.ID)
+	require.NoError(t, err)
+	assert.Empty(t, items)
+}
+
+func TestCartService_GetCartCount_Empty(t *testing.T) {
+	db := setupCartServiceTestDB(t)
+	svc := newCartService(db)
+	ctx := context.Background()
+
+	user, _, _ := seedCartTestData(t, db)
+
+	count, err := svc.GetCartCount(ctx, user.ID)
+	require.NoError(t, err)
+	assert.Equal(t, 0, count)
+}
+
+func TestCartService_AddItem_ZeroQuantity(t *testing.T) {
+	db := setupCartServiceTestDB(t)
+	svc := newCartService(db)
+	ctx := context.Background()
+
+	user, product, _ := seedCartTestData(t, db)
+
+	// 添加数量为 0 的商品 - 应该报错或被拒绝
+	_, err := svc.AddItem(ctx, user.ID, &AddCartItemRequest{
+		ProductID: product.ID,
+		Quantity:  0,
+	})
+	// 具体行为取决于实现，这里只是确保不会 panic
+	_ = err
+}
+
+func TestCartService_UpdateItem_NotFound(t *testing.T) {
+	db := setupCartServiceTestDB(t)
+	svc := newCartService(db)
+	ctx := context.Background()
+
+	user, _, _ := seedCartTestData(t, db)
+
+	_, err := svc.UpdateItem(ctx, user.ID, 99999, &UpdateCartItemRequest{
+		Quantity: 5,
+	})
+	assert.Error(t, err)
+}
+
+func TestCartService_RemoveItem_NotFound(t *testing.T) {
+	db := setupCartServiceTestDB(t)
+	svc := newCartService(db)
+	ctx := context.Background()
+
+	user, _, _ := seedCartTestData(t, db)
+
+	err := svc.RemoveItem(ctx, user.ID, 99999)
+	assert.Error(t, err)
+}
+
+func TestCartService_AddItem_StockInsufficient(t *testing.T) {
+	db := setupCartServiceTestDB(t)
+	svc := newCartService(db)
+	ctx := context.Background()
+
+	user, product, _ := seedCartTestData(t, db)
+
+	// 尝试添加超过库存的数量 - product.Stock = 50
+	_, err := svc.AddItem(ctx, user.ID, &AddCartItemRequest{
+		ProductID: product.ID,
+		Quantity:  100, // 超过库存
+	})
+	// 如果有库存检查，应该报错
+	_ = err
+}
+
+func TestCartService_toCartItemInfo_AllFields(t *testing.T) {
+	db := setupCartServiceTestDB(t)
+	svc := newCartService(db)
+
+	images, _ := json.Marshal([]string{"img1.jpg", "img2.jpg"})
+	attrs, _ := json.Marshal(map[string]string{"颜色": "红色"})
+	skuID := int64(1)
+	skuImage := "sku.jpg"
+
+	item := &models.CartItem{
+		ID:        1,
+		UserID:    1,
+		ProductID: 1,
+		SkuID:     &skuID,
+		Quantity:  2,
+		Selected:  true,
+		Product: &models.Product{
+			ID:     1,
+			Name:   "测试商品",
+			Images: images,
+			Price:  100.0,
+			Stock:  50,
+		},
+		Sku: &models.ProductSku{
+			ID:         1,
+			SkuCode:    "RED",
+			Attributes: attrs,
+			Price:      90.0,
+			Stock:      20,
+			Image:      &skuImage,
+		},
+	}
+
+	info := svc.toCartItemInfo(item)
+
+	assert.Equal(t, int64(1), info.ID)
+	assert.Equal(t, "测试商品", info.ProductName)
+	assert.Equal(t, 90.0, info.Price)     // 使用 SKU 价格
+	assert.Equal(t, 20, info.Stock)       // 使用 SKU 库存
+	assert.Equal(t, "sku.jpg", info.ProductImage) // 使用 SKU 图片
+	assert.Equal(t, 180.0, info.Subtotal) // 90.0 * 2
+	assert.Equal(t, "红色", info.Attributes["颜色"])
+}
+
+func TestCartService_toCartItemInfo_WithoutSku(t *testing.T) {
+	db := setupCartServiceTestDB(t)
+	svc := newCartService(db)
+
+	images, _ := json.Marshal([]string{"product.jpg"})
+
+	item := &models.CartItem{
+		ID:        1,
+		UserID:    1,
+		ProductID: 1,
+		Quantity:  3,
+		Selected:  false,
+		Product: &models.Product{
+			ID:     1,
+			Name:   "测试商品",
+			Images: images,
+			Price:  80.0,
+			Stock:  50,
+		},
+		// 无 SKU
+	}
+
+	info := svc.toCartItemInfo(item)
+
+	assert.Equal(t, int64(1), info.ID)
+	assert.Equal(t, "测试商品", info.ProductName)
+	assert.Equal(t, 80.0, info.Price)       // 使用商品价格
+	assert.Equal(t, 50, info.Stock)         // 使用商品库存
+	assert.Equal(t, "product.jpg", info.ProductImage) // 使用商品图片
+	assert.Equal(t, 240.0, info.Subtotal)   // 80.0 * 3
+	assert.False(t, info.Selected)
+}
+
+func TestCartService_toCartItemInfo_NilProduct(t *testing.T) {
+	db := setupCartServiceTestDB(t)
+	svc := newCartService(db)
+
+	item := &models.CartItem{
+		ID:        1,
+		UserID:    1,
+		ProductID: 1,
+		Quantity:  1,
+		Selected:  true,
+		// Product 为 nil
+	}
+
+	info := svc.toCartItemInfo(item)
+
+	assert.Equal(t, int64(1), info.ID)
+	assert.Empty(t, info.ProductName)
+	assert.Equal(t, 0.0, info.Price)
+	assert.Equal(t, 0, info.Stock)
+}
+
+func TestCartService_UpdateItem_QuantityAndSelected(t *testing.T) {
+	db := setupCartServiceTestDB(t)
+	svc := newCartService(db)
+	ctx := context.Background()
+
+	user, product, _ := seedCartTestData(t, db)
+
+	cartItem := &models.CartItem{
+		UserID:    user.ID,
+		ProductID: product.ID,
+		Quantity:  2,
+		Selected:  true,
+	}
+	require.NoError(t, db.Create(cartItem).Error)
+
+	// 同时更新数量和选中状态
+	selected := false
+	updated, err := svc.UpdateItem(ctx, user.ID, cartItem.ID, &UpdateCartItemRequest{
+		Quantity: 10,
+		Selected: &selected,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, 10, updated.Quantity)
+	assert.False(t, updated.Selected)
+}

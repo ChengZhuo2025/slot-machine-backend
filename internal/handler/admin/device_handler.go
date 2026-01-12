@@ -88,8 +88,7 @@ func (h *DeviceHandler) Update(c *gin.Context) {
 		return
 	}
 
-	err = h.deviceService.UpdateDevice(c.Request.Context(), id, &req)
-	if err != nil {
+	if err := h.deviceService.UpdateDevice(c.Request.Context(), id, &req); err != nil {
 		switch {
 		case errors.Is(err, adminService.ErrDeviceNotFound):
 			response.NotFound(c, "设备不存在")
@@ -136,8 +135,7 @@ func (h *DeviceHandler) UpdateStatus(c *gin.Context) {
 		return
 	}
 
-	err = h.deviceService.UpdateDeviceStatus(c.Request.Context(), id, req.Status, adminID)
-	if err != nil {
+	if err := h.deviceService.UpdateDeviceStatus(c.Request.Context(), id, req.Status, adminID); err != nil {
 		switch {
 		case errors.Is(err, adminService.ErrDeviceNotFound):
 			response.NotFound(c, "设备不存在")
@@ -400,8 +398,7 @@ func (h *DeviceHandler) CompleteMaintenance(c *gin.Context) {
 		return
 	}
 
-	err = h.deviceService.CompleteMaintenance(c.Request.Context(), id, &req, adminID)
-	if err != nil {
+	if err := h.deviceService.CompleteMaintenance(c.Request.Context(), id, &req, adminID); err != nil {
 		switch {
 		case errors.Is(err, adminService.ErrMaintenanceNotFound):
 			response.NotFound(c, "维护记录不存在")

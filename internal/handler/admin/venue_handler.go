@@ -85,8 +85,7 @@ func (h *VenueHandler) Update(c *gin.Context) {
 		return
 	}
 
-	err = h.venueService.UpdateVenue(c.Request.Context(), id, &req)
-	if err != nil {
+	if err := h.venueService.UpdateVenue(c.Request.Context(), id, &req); err != nil {
 		switch {
 		case errors.Is(err, adminService.ErrVenueNotFound):
 			response.NotFound(c, "场地不存在")
@@ -133,8 +132,7 @@ func (h *VenueHandler) UpdateStatus(c *gin.Context) {
 		return
 	}
 
-	err = h.venueService.UpdateVenueStatus(c.Request.Context(), id, req.Status)
-	if err != nil {
+	if err := h.venueService.UpdateVenueStatus(c.Request.Context(), id, req.Status); err != nil {
 		if errors.Is(err, adminService.ErrVenueNotFound) {
 			response.NotFound(c, "场地不存在")
 			return
@@ -165,8 +163,7 @@ func (h *VenueHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	err = h.venueService.DeleteVenue(c.Request.Context(), id)
-	if err != nil {
+	if err := h.venueService.DeleteVenue(c.Request.Context(), id); err != nil {
 		switch {
 		case errors.Is(err, adminService.ErrVenueNotFound):
 			response.NotFound(c, "场地不存在")

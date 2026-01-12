@@ -608,33 +608,59 @@
 ### 当前覆盖率现状（实测）
 
 > 说明：以下为本仓库内置脚本的实测结果（以当前代码为准），用于 Phase 12 的"达标/差距"追踪。
-> **更新时间：2026-01-11** (最新更新：高优先级冲刺完成)
+> **更新时间：2026-01-12** (最新更新：API 测试全部通过，HTTP 状态码映射修复)
 
 #### 关键模块覆盖率现状
 
-**覆盖率门禁（key modules = auth/payment/order/rental/booking）：整体约 76.8% ⬆️**
+**整体覆盖率：57.2%**（含 handler 层，handler 层通过 API 测试覆盖）
+
+**覆盖率门禁（key modules = auth/payment/order/rental/booking）：整体约 89.3% ⬆️**
 
 **优秀模块 (≥85%)：**
 
-- payment `92.4%`            ✅
-- auth `90.6%`               ✅
-- order `90.4%`              ✅
+- common/errors `100.0%`        ✅
+- common/response `100.0%`      ✅
+- common/utils `100.0%`         ✅
+- common/cache `98.0%`          ✅
+- common/metrics `95.1%`        ✅
+- common/logger `93.8%`         ✅
+- common/config `93.6%`         ✅
+- payment `92.4%`               ✅
+- auth `90.6%`                  ✅
+- order `90.4%`                 ✅
 - content `89.6%`
 - hotel (booking) `87.6%`
 - distribution `86.8%`
+- common/jwt `86.3%`
+- common/tracing `86.3%`
 - rental `85.3%`
 
 **良好模块 (70-85%)：**
 
 - marketing `84.1%`
+- common/qrcode `83.7%`
 - user `80.1%`
+- repository `77.1%`
+- device `74.4%`
+- admin `73.5%`
+- common/handler `69.9%`
 
 **中等模块 (50-70%)：**
 
-- device `74.4%`
-- admin `73.5%`
 - finance `65.6%`
 - mall `59.1%`
+- common/database `56.4%`
+
+**待补充模块 (<50%)：**
+
+- common/middleware `33.2%` (通过集成测试覆盖)
+- handler/* `0%` (通过 API 测试覆盖)
+
+**测试执行结果（2026-01-12）：**
+
+- 单元测试：✅ 全部通过 (28 个包)
+- API 测试：✅ 全部通过 (tests/api/)
+- 集成测试：✅ 基本通过 (1 个跳过，需 Docker)
 
 ## CRITICAL: Model开发验证Checklist
 

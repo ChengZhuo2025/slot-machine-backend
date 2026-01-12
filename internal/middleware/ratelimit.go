@@ -2,8 +2,11 @@
 package middleware
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -130,10 +133,12 @@ func APIRateLimit(redisClient *redis.Client, limit int, window time.Duration) gi
 	return RateLimit(config)
 }
 
-// SmsRateLimit 短信发送限流
+// SmsRateLimit 短信发送限流（支持 JSON 和 Form 请求）
+// 限制规则：每分钟1条，每天10条
 func SmsRateLimit(redisClient *redis.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		phone := c.PostForm("phone")
+		// 尝试从 JSON 或 Form 获取手机号
+		phone := extractPhoneFromRequest(c)
 		if phone == "" {
 			c.Next()
 			return
@@ -171,6 +176,150 @@ func SmsRateLimit(redisClient *redis.Client) gin.HandlerFunc {
 
 		if dayCount > 10 {
 			response.TooManyRequests(c, "今日短信发送次数已达上限")
+			c.Abort()
+			return
+		}
+
+		c.Next()
+	}
+}
+
+// extractPhoneFromRequest 从请求中提取手机号（支持 JSON 和 Form）
+func extractPhoneFromRequest(c *gin.Context) string {
+	// 优先尝试 Form
+	if phone := c.PostForm("phone"); phone != "" {
+		return phone
+	}
+
+	// 尝试从 JSON body 读取
+	// 读取 body 后需要放回，以便后续 handler 继续使用
+	bodyBytes, err := c.GetRawData()
+	if err != nil || len(bodyBytes) == 0 {
+		return ""
+	}
+
+	// 将 body 放回，供后续使用
+	c.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+
+	var req struct {
+		Phone string `json:"phone"`
+	}
+	if err := json.Unmarshal(bodyBytes, &req); err == nil && req.Phone != "" {
+		return req.Phone
+	}
+
+	return ""
+}
+
+// LoginRateLimit 登录限流中间件
+// 限制规则：每 IP 每分钟最多 10 次登录尝试，每小时最多 30 次
+func LoginRateLimit(redisClient *redis.Client) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		ip := c.ClientIP()
+		ctx := context.Background()
+
+		// 每分钟限制
+		minuteKey := fmt.Sprintf("ratelimit:login:minute:%s", ip)
+		minuteCount, err := redisClient.Incr(ctx, minuteKey).Result()
+		if err != nil {
+			c.Next()
+			return
+		}
+
+		if minuteCount == 1 {
+			redisClient.Expire(ctx, minuteKey, time.Minute)
+		}
+
+		if minuteCount > 10 {
+			response.TooManyRequests(c, "登录尝试过于频繁，请稍后再试")
+			c.Abort()
+			return
+		}
+
+		// 每小时限制
+		hourKey := fmt.Sprintf("ratelimit:login:hour:%s", ip)
+		hourCount, _ := redisClient.Incr(ctx, hourKey).Result()
+		if hourCount == 1 {
+			redisClient.Expire(ctx, hourKey, time.Hour)
+		}
+
+		if hourCount > 30 {
+			response.TooManyRequests(c, "登录尝试次数过多，请1小时后再试")
+			c.Abort()
+			return
+		}
+
+		c.Next()
+	}
+}
+
+// PaymentRateLimit 支付限流中间件
+// 限制规则：每用户每分钟最多 5 次支付请求
+func PaymentRateLimit(redisClient *redis.Client) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := GetUserID(c)
+		if userID == 0 {
+			// 未登录用户使用 IP 限流
+			return
+		}
+
+		ctx := context.Background()
+		key := fmt.Sprintf("ratelimit:payment:%d", userID)
+
+		count, err := redisClient.Incr(ctx, key).Result()
+		if err != nil {
+			c.Next()
+			return
+		}
+
+		if count == 1 {
+			redisClient.Expire(ctx, key, time.Minute)
+		}
+
+		if count > 5 {
+			response.TooManyRequests(c, "支付请求过于频繁，请稍后再试")
+			c.Abort()
+			return
+		}
+
+		c.Next()
+	}
+}
+
+// AdminLoginRateLimit 管理员登录限流中间件
+// 限制规则：每 IP 每分钟最多 5 次，每小时最多 20 次
+func AdminLoginRateLimit(redisClient *redis.Client) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		ip := c.ClientIP()
+		ctx := context.Background()
+
+		// 每分钟限制（更严格）
+		minuteKey := fmt.Sprintf("ratelimit:admin:login:minute:%s", ip)
+		minuteCount, err := redisClient.Incr(ctx, minuteKey).Result()
+		if err != nil {
+			c.Next()
+			return
+		}
+
+		if minuteCount == 1 {
+			redisClient.Expire(ctx, minuteKey, time.Minute)
+		}
+
+		if minuteCount > 5 {
+			response.TooManyRequests(c, "登录尝试过于频繁，请稍后再试")
+			c.Abort()
+			return
+		}
+
+		// 每小时限制
+		hourKey := fmt.Sprintf("ratelimit:admin:login:hour:%s", ip)
+		hourCount, _ := redisClient.Incr(ctx, hourKey).Result()
+		if hourCount == 1 {
+			redisClient.Expire(ctx, hourKey, time.Hour)
+		}
+
+		if hourCount > 20 {
+			response.TooManyRequests(c, "登录尝试次数过多，请1小时后再试")
 			c.Abort()
 			return
 		}

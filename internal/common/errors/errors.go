@@ -119,6 +119,7 @@ var (
 	ErrVenueNotFound     = New(4010, "场地不存在")
 	ErrVenueDisabled     = New(4011, "场地已禁用")
 	ErrPricingNotFound   = New(4012, "定价方案不存在")
+	ErrVenueHasDevices   = New(4013, "场地下有设备，无法删除")
 )
 
 // 订单错误码 (5000-5999)

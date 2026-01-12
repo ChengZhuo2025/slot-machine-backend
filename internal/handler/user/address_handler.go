@@ -2,10 +2,9 @@
 package user
 
 import (
-	"strconv"
-
 	"github.com/gin-gonic/gin"
 
+	"github.com/dumeirei/smart-locker-backend/internal/common/handler"
 	"github.com/dumeirei/smart-locker-backend/internal/common/response"
 	userService "github.com/dumeirei/smart-locker-backend/internal/service/user"
 )
@@ -30,9 +29,8 @@ func NewAddressHandler(addressService *userService.AddressService) *AddressHandl
 // @Success 200 {object} response.Response{data=models.Address}
 // @Router /api/v1/user/addresses [post]
 func (h *AddressHandler) Create(c *gin.Context) {
-	userID := c.GetInt64("user_id")
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
@@ -43,12 +41,7 @@ func (h *AddressHandler) Create(c *gin.Context) {
 	}
 
 	address, err := h.addressService.Create(c.Request.Context(), userID, &req)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, address)
+	handler.MustSucceed(c, err, address)
 }
 
 // List 获取地址列表
@@ -59,19 +52,13 @@ func (h *AddressHandler) Create(c *gin.Context) {
 // @Success 200 {object} response.Response{data=[]models.Address}
 // @Router /api/v1/user/addresses [get]
 func (h *AddressHandler) List(c *gin.Context) {
-	userID := c.GetInt64("user_id")
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
 	addresses, err := h.addressService.List(c.Request.Context(), userID)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, addresses)
+	handler.MustSucceed(c, err, addresses)
 }
 
 // GetByID 获取地址详情
@@ -83,25 +70,13 @@ func (h *AddressHandler) List(c *gin.Context) {
 // @Success 200 {object} response.Response{data=models.Address}
 // @Router /api/v1/user/addresses/{id} [get]
 func (h *AddressHandler) GetByID(c *gin.Context) {
-	userID := c.GetInt64("user_id")
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
-		return
-	}
-
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的地址ID")
+	userID, id, ok := handler.RequireUserAndParseID(c, "地址")
+	if !ok {
 		return
 	}
 
 	address, err := h.addressService.GetByID(c.Request.Context(), id, userID)
-	if err != nil {
-		response.NotFound(c, "地址不存在")
-		return
-	}
-
-	response.Success(c, address)
+	handler.MustSucceed(c, err, address)
 }
 
 // Update 更新地址
@@ -115,15 +90,8 @@ func (h *AddressHandler) GetByID(c *gin.Context) {
 // @Success 200 {object} response.Response{data=models.Address}
 // @Router /api/v1/user/addresses/{id} [put]
 func (h *AddressHandler) Update(c *gin.Context) {
-	userID := c.GetInt64("user_id")
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
-		return
-	}
-
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的地址ID")
+	userID, id, ok := handler.RequireUserAndParseID(c, "地址")
+	if !ok {
 		return
 	}
 
@@ -134,12 +102,7 @@ func (h *AddressHandler) Update(c *gin.Context) {
 	}
 
 	address, err := h.addressService.Update(c.Request.Context(), id, userID, &req)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, address)
+	handler.MustSucceed(c, err, address)
 }
 
 // Delete 删除地址
@@ -151,24 +114,13 @@ func (h *AddressHandler) Update(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/v1/user/addresses/{id} [delete]
 func (h *AddressHandler) Delete(c *gin.Context) {
-	userID := c.GetInt64("user_id")
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, id, ok := handler.RequireUserAndParseID(c, "地址")
+	if !ok {
 		return
 	}
 
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的地址ID")
-		return
-	}
-
-	if err := h.addressService.Delete(c.Request.Context(), id, userID); err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, nil)
+	err := h.addressService.Delete(c.Request.Context(), id, userID)
+	handler.MustSucceed(c, err, nil)
 }
 
 // GetDefault 获取默认地址
@@ -179,19 +131,13 @@ func (h *AddressHandler) Delete(c *gin.Context) {
 // @Success 200 {object} response.Response{data=models.Address}
 // @Router /api/v1/user/addresses/default [get]
 func (h *AddressHandler) GetDefault(c *gin.Context) {
-	userID := c.GetInt64("user_id")
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
 	address, err := h.addressService.GetDefault(c.Request.Context(), userID)
-	if err != nil {
-		response.NotFound(c, "暂无默认地址")
-		return
-	}
-
-	response.Success(c, address)
+	handler.MustSucceed(c, err, address)
 }
 
 // SetDefault 设置默认地址
@@ -203,22 +149,11 @@ func (h *AddressHandler) GetDefault(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/v1/user/addresses/{id}/default [put]
 func (h *AddressHandler) SetDefault(c *gin.Context) {
-	userID := c.GetInt64("user_id")
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, id, ok := handler.RequireUserAndParseID(c, "地址")
+	if !ok {
 		return
 	}
 
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的地址ID")
-		return
-	}
-
-	if err := h.addressService.SetDefault(c.Request.Context(), id, userID); err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, nil)
+	err := h.addressService.SetDefault(c.Request.Context(), id, userID)
+	handler.MustSucceed(c, err, nil)
 }

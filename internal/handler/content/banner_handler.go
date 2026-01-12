@@ -6,6 +6,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/dumeirei/smart-locker-backend/internal/common/handler"
+	"github.com/dumeirei/smart-locker-backend/internal/common/logger"
 	"github.com/dumeirei/smart-locker-backend/internal/common/response"
 	contentService "github.com/dumeirei/smart-locker-backend/internal/service/content"
 )
@@ -38,12 +40,7 @@ func (h *BannerHandler) ListByPosition(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 
 	banners, err := h.bannerService.ListByPosition(c.Request.Context(), position, limit)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, banners)
+	handler.MustSucceed(c, err, banners)
 }
 
 // RecordClick 记录点击
@@ -54,15 +51,16 @@ func (h *BannerHandler) ListByPosition(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/v1/banners/{id}/click [post]
 func (h *BannerHandler) RecordClick(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的轮播图ID")
+	id, ok := handler.ParseID(c, "轮播图")
+	if !ok {
 		return
 	}
 
 	if err := h.bannerService.RecordClick(c.Request.Context(), id); err != nil {
-		// 点击记录失败不影响用户体验，只记录日志
-		// log.Printf("记录轮播图点击失败: %v", err)
+		logger.Warn("记录轮播图点击失败",
+			logger.Int64("banner_id", id),
+			logger.Err(err),
+		)
 	}
 
 	response.Success(c, nil)

@@ -15,12 +15,32 @@ import (
 )
 
 // ============================================================================
+// 常量定义
+// ============================================================================
+
+// 分页相关常量
+const (
+	DefaultPageSize      = 10  // 用户端默认每页数量
+	DefaultAdminPageSize = 20  // 管理端默认每页数量
+	MaxPageSize          = 100 // 最大每页数量
+	DefaultListLimit     = 10  // 默认列表限制数量
+	MaxBannerLimit       = 10  // 轮播图最大数量
+)
+
+// ============================================================================
 // Phase 1: 统一错误处理
 // ============================================================================
 
 // HandleError 处理错误并发送适当的响应
 // 如果 err 为 nil，返回 false（表示无错误需要处理）
 // 如果 err 不为 nil，发送错误响应并返回 true（表示已处理错误，调用方应该 return）
+//
+// HTTP 状态码映射规则：
+//   - 1002, 1010, 3000, 4000, 4010, 5000, 5007, 6000, 6003, 8000, 8010, 8020, 8500, 9000, 9006, 10000, 10002, 10004 -> 404 Not Found
+//   - 1001, 1003, 1008, 1009, 4001-4013, 5001-5009, 6001-6007, 7000-7006, 8001-8514, 9001-9007, 10001, 10003, 10005-10007 -> 400 Bad Request
+//   - 2000-2003 -> 401 Unauthorized
+//   - 2004-2006 -> 403 Forbidden
+//   - 其他 -> 500 Internal Server Error
 //
 // 使用示例:
 //
@@ -33,11 +53,103 @@ func HandleError(c *gin.Context, err error) bool {
 		return false
 	}
 	if appErr, ok := err.(*errors.AppError); ok {
-		response.Error(c, appErr.Code, appErr.Message)
+		httpStatus := mapErrorCodeToHTTPStatus(appErr.Code)
+		c.JSON(httpStatus, response.Response{
+			Code:    appErr.Code,
+			Message: appErr.Message,
+		})
 		return true
 	}
 	response.InternalError(c, err.Error())
 	return true
+}
+
+// mapErrorCodeToHTTPStatus 将业务错误码映射到 HTTP 状态码
+func mapErrorCodeToHTTPStatus(code int) int {
+	// 404 Not Found - 资源不存在类错误
+	notFoundCodes := map[int]bool{
+		1002:  true, // ErrNotFound
+		1010:  true, // ErrResourceNotFound
+		3000:  true, // ErrUserNotFound
+		4000:  true, // ErrDeviceNotFound
+		4010:  true, // ErrVenueNotFound
+		5000:  true, // ErrOrderNotFound
+		5007:  true, // ErrProductNotFound
+		6000:  true, // ErrPaymentNotFound
+		6003:  true, // ErrRefundNotFound
+		7000:  true, // ErrRentalNotFound
+		8000:  true, // ErrHotelNotFound
+		8010:  true, // ErrRoomNotFound
+		8020:  true, // ErrTimeSlotNotFound
+		8500:  true, // ErrBookingNotFound
+		9000:  true, // ErrCouponNotFound
+		9006:  true, // ErrCampaignNotFound
+		10000: true, // ErrSettlementNotFound
+		10002: true, // ErrMerchantNotFound
+		10004: true, // ErrWithdrawalNotFound
+	}
+	if notFoundCodes[code] {
+		return 404
+	}
+
+	// 401 Unauthorized - 认证错误
+	if code >= 2000 && code <= 2003 {
+		return 401
+	}
+
+	// 403 Forbidden - 权限错误
+	if code >= 2004 && code <= 2006 {
+		return 403
+	}
+
+	// 400 Bad Request - 业务规则错误（包括参数错误、状态错误、资源已存在等）
+	// 通用错误 (1000-1999)
+	if code == 1001 || code == 1003 || code == 1008 || code == 1009 {
+		return 400
+	}
+	// 认证相关业务错误 (2007-2012)
+	if code >= 2007 && code <= 2012 {
+		return 400
+	}
+	// 用户相关业务错误 (3001-3007)
+	if code >= 3001 && code <= 3007 {
+		return 400
+	}
+	// 设备相关业务错误 (4001-4013，排除 4000, 4010)
+	if code >= 4001 && code <= 4013 {
+		return 400
+	}
+	// 订单相关业务错误 (5001-5009，排除 5000, 5007)
+	if code >= 5001 && code <= 5009 && code != 5007 {
+		return 400
+	}
+	// 支付相关业务错误 (6001-6007，排除 6000, 6003)
+	if code >= 6001 && code <= 6007 && code != 6003 {
+		return 400
+	}
+	// 租借相关业务错误 (7001-7006，7000 是 not found)
+	if code >= 7001 && code <= 7006 {
+		return 400
+	}
+	// 酒店相关业务错误 (8001-8022，排除 8000, 8010, 8020)
+	if code >= 8001 && code <= 8022 && code != 8010 && code != 8020 {
+		return 400
+	}
+	// 预订相关业务错误 (8501-8514，排除 8500)
+	if code >= 8501 && code <= 8514 {
+		return 400
+	}
+	// 营销相关业务错误 (9001-9007，排除 9000, 9006)
+	if code >= 9001 && code <= 9007 && code != 9006 {
+		return 400
+	}
+	// 财务相关业务错误 (10001, 10003, 10005-10007)
+	if code == 10001 || code == 10003 || (code >= 10005 && code <= 10007) {
+		return 400
+	}
+
+	// 默认返回 500 Internal Server Error
+	return 500
 }
 
 // HandleErrorWithMessage 处理错误，对非 AppError 使用自定义消息
@@ -54,7 +166,11 @@ func HandleErrorWithMessage(c *gin.Context, err error, message string) bool {
 		return false
 	}
 	if appErr, ok := err.(*errors.AppError); ok {
-		response.Error(c, appErr.Code, appErr.Message)
+		httpStatus := mapErrorCodeToHTTPStatus(appErr.Code)
+		c.JSON(httpStatus, response.Response{
+			Code:    appErr.Code,
+			Message: appErr.Message,
+		})
 		return true
 	}
 	response.InternalError(c, message)
@@ -368,6 +484,23 @@ func BindPaginationWithDefaults(c *gin.Context, defaultPage, defaultPageSize int
 	p.PageSize, _ = strconv.Atoi(c.DefaultQuery("page_size", strconv.Itoa(defaultPageSize)))
 	p.Normalize()
 	return p
+}
+
+// BindAdminPagination 管理端分页参数绑定（默认每页20条）
+func BindAdminPagination(c *gin.Context) utils.Pagination {
+	return BindPaginationWithDefaults(c, 1, DefaultAdminPageSize)
+}
+
+// ParseQueryLimit 解析查询参数中的 limit，使用默认值
+func ParseQueryLimit(c *gin.Context, defaultLimit int) int {
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", strconv.Itoa(defaultLimit)))
+	if limit <= 0 {
+		return defaultLimit
+	}
+	if limit > MaxPageSize {
+		return MaxPageSize
+	}
+	return limit
 }
 
 // ============================================================================

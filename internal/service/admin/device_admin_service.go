@@ -8,6 +8,7 @@ import (
 
 	"gorm.io/gorm"
 
+	commonErrors "github.com/dumeirei/smart-locker-backend/internal/common/errors"
 	"github.com/dumeirei/smart-locker-backend/internal/models"
 	"github.com/dumeirei/smart-locker-backend/internal/repository"
 	"github.com/dumeirei/smart-locker-backend/internal/service/device"
@@ -39,15 +40,15 @@ func NewDeviceAdminService(
 	}
 }
 
-// 预定义错误
+// 预定义错误 - 使用 common/errors 中的 AppError 类型
 var (
-	ErrDeviceNotFound       = errors.New("设备不存在")
-	ErrDeviceNoExists       = errors.New("设备编号已存在")
-	ErrVenueNotFound        = errors.New("场地不存在")
-	ErrDeviceInUse          = errors.New("设备正在使用中")
-	ErrDeviceOffline        = errors.New("设备离线")
-	ErrMaintenanceNotFound  = errors.New("维护记录不存在")
-	ErrMaintenanceCompleted = errors.New("维护已完成")
+	ErrDeviceNotFound       = commonErrors.ErrDeviceNotFound
+	ErrDeviceNoExists       = commonErrors.ErrAlreadyExists.WithMessage("设备编号已存在")
+	ErrVenueNotFound        = commonErrors.ErrVenueNotFound
+	ErrDeviceInUse          = commonErrors.ErrDeviceBusy.WithMessage("设备正在使用中")
+	ErrDeviceOffline        = commonErrors.ErrDeviceOffline
+	ErrMaintenanceNotFound  = commonErrors.ErrNotFound.WithMessage("维护记录不存在")
+	ErrMaintenanceCompleted = commonErrors.ErrInvalidParams.WithMessage("维护已完成")
 )
 
 // DeviceInfo 设备信息

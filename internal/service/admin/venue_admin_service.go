@@ -7,6 +7,7 @@ import (
 
 	"gorm.io/gorm"
 
+	commonErrors "github.com/dumeirei/smart-locker-backend/internal/common/errors"
 	"github.com/dumeirei/smart-locker-backend/internal/models"
 	"github.com/dumeirei/smart-locker-backend/internal/repository"
 )
@@ -31,9 +32,10 @@ func NewVenueAdminService(
 	}
 }
 
-// 预定义错误（ErrVenueNotFound 已在 device_admin_service.go 中定义）
+// 预定义错误（使用 common/errors 包的 AppError）
 var (
-	ErrVenueHasDevices = errors.New("场地下有设备，无法删除")
+	venueNotFoundErr   = commonErrors.ErrVenueNotFound
+	venueHasDevicesErr = commonErrors.ErrVenueHasDevices
 )
 
 // VenueInfo 场地信息
@@ -76,7 +78,7 @@ func (s *VenueAdminService) CreateVenue(ctx context.Context, req *CreateVenueReq
 	_, err := s.merchantRepo.GetByID(ctx, req.MerchantID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrMerchantNotFound
+			return nil, commonErrors.ErrMerchantNotFound
 		}
 		return nil, err
 	}
@@ -123,7 +125,7 @@ func (s *VenueAdminService) UpdateVenue(ctx context.Context, id int64, req *Upda
 	venue, err := s.venueRepo.GetByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return ErrVenueNotFound
+			return venueNotFoundErr
 		}
 		return err
 	}
@@ -133,7 +135,7 @@ func (s *VenueAdminService) UpdateVenue(ctx context.Context, id int64, req *Upda
 		_, err = s.merchantRepo.GetByID(ctx, req.MerchantID)
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return ErrMerchantNotFound
+				return commonErrors.ErrMerchantNotFound
 			}
 			return err
 		}
@@ -159,7 +161,7 @@ func (s *VenueAdminService) UpdateVenueStatus(ctx context.Context, id int64, sta
 	_, err := s.venueRepo.GetByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return ErrVenueNotFound
+			return venueNotFoundErr
 		}
 		return err
 	}
@@ -173,7 +175,7 @@ func (s *VenueAdminService) DeleteVenue(ctx context.Context, id int64) error {
 	_, err := s.venueRepo.GetByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return ErrVenueNotFound
+			return venueNotFoundErr
 		}
 		return err
 	}
@@ -184,7 +186,7 @@ func (s *VenueAdminService) DeleteVenue(ctx context.Context, id int64) error {
 		return err
 	}
 	if count > 0 {
-		return ErrVenueHasDevices
+		return venueHasDevicesErr
 	}
 
 	return s.venueRepo.Delete(ctx, id)
@@ -195,7 +197,7 @@ func (s *VenueAdminService) GetVenue(ctx context.Context, id int64) (*VenueInfo,
 	venue, err := s.venueRepo.GetByIDWithMerchant(ctx, id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrVenueNotFound
+			return nil, venueNotFoundErr
 		}
 		return nil, err
 	}

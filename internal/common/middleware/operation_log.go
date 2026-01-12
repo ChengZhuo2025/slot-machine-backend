@@ -36,76 +36,289 @@ type OperationConfig struct {
 
 // ModuleAction 模块操作映射
 var moduleActionMap = map[string]OperationConfig{
+	// 设备管理
 	"POST /admin/devices": {
-		Module: "device",
-		Action: "create",
+		Module:     "device",
+		Action:     "create",
 		TargetType: "device",
 	},
 	"PUT /admin/devices/:id": {
-		Module: "device",
-		Action: "update",
+		Module:     "device",
+		Action:     "update",
 		TargetType: "device",
 	},
 	"PUT /admin/devices/:id/status": {
-		Module: "device",
-		Action: "update_status",
+		Module:     "device",
+		Action:     "update_status",
 		TargetType: "device",
 	},
 	"DELETE /admin/devices/:id": {
-		Module: "device",
-		Action: "delete",
+		Module:     "device",
+		Action:     "delete",
 		TargetType: "device",
 	},
 	"POST /admin/devices/:id/unlock": {
-		Module: "device",
-		Action: "remote_unlock",
+		Module:     "device",
+		Action:     "remote_unlock",
 		TargetType: "device",
 	},
 	"POST /admin/devices/:id/lock": {
-		Module: "device",
-		Action: "remote_lock",
+		Module:     "device",
+		Action:     "remote_lock",
 		TargetType: "device",
 	},
+	"POST /admin/devices/maintenance": {
+		Module:     "device",
+		Action:     "create_maintenance",
+		TargetType: "device_maintenance",
+	},
+	"POST /admin/devices/maintenance/:id/complete": {
+		Module:     "device",
+		Action:     "complete_maintenance",
+		TargetType: "device_maintenance",
+	},
+
+	// 场地管理
 	"POST /admin/venues": {
-		Module: "venue",
-		Action: "create",
+		Module:     "venue",
+		Action:     "create",
 		TargetType: "venue",
 	},
 	"PUT /admin/venues/:id": {
-		Module: "venue",
-		Action: "update",
+		Module:     "venue",
+		Action:     "update",
 		TargetType: "venue",
 	},
 	"PUT /admin/venues/:id/status": {
-		Module: "venue",
-		Action: "update_status",
+		Module:     "venue",
+		Action:     "update_status",
 		TargetType: "venue",
 	},
 	"DELETE /admin/venues/:id": {
-		Module: "venue",
-		Action: "delete",
+		Module:     "venue",
+		Action:     "delete",
 		TargetType: "venue",
 	},
+
+	// 商户管理
 	"POST /admin/merchants": {
-		Module: "merchant",
-		Action: "create",
+		Module:     "merchant",
+		Action:     "create",
 		TargetType: "merchant",
 	},
 	"PUT /admin/merchants/:id": {
-		Module: "merchant",
-		Action: "update",
+		Module:     "merchant",
+		Action:     "update",
 		TargetType: "merchant",
 	},
 	"PUT /admin/merchants/:id/status": {
-		Module: "merchant",
-		Action: "update_status",
+		Module:     "merchant",
+		Action:     "update_status",
 		TargetType: "merchant",
 	},
 	"DELETE /admin/merchants/:id": {
-		Module: "merchant",
-		Action: "delete",
+		Module:     "merchant",
+		Action:     "delete",
 		TargetType: "merchant",
 	},
+
+	// 商品管理
+	"POST /admin/products": {
+		Module:     "product",
+		Action:     "create",
+		TargetType: "product",
+	},
+	"PUT /admin/products/:id": {
+		Module:     "product",
+		Action:     "update",
+		TargetType: "product",
+	},
+	"PUT /admin/products/:id/status": {
+		Module:     "product",
+		Action:     "update_status",
+		TargetType: "product",
+	},
+	"DELETE /admin/products/:id": {
+		Module:     "product",
+		Action:     "delete",
+		TargetType: "product",
+	},
+
+	// 分类管理
+	"POST /admin/categories": {
+		Module:     "category",
+		Action:     "create",
+		TargetType: "category",
+	},
+	"PUT /admin/categories/:id": {
+		Module:     "category",
+		Action:     "update",
+		TargetType: "category",
+	},
+	"DELETE /admin/categories/:id": {
+		Module:     "category",
+		Action:     "delete",
+		TargetType: "category",
+	},
+
+	// 酒店管理
+	"POST /admin/hotels": {
+		Module:     "hotel",
+		Action:     "create",
+		TargetType: "hotel",
+	},
+	"PUT /admin/hotels/:id": {
+		Module:     "hotel",
+		Action:     "update",
+		TargetType: "hotel",
+	},
+	"PUT /admin/hotels/:id/status": {
+		Module:     "hotel",
+		Action:     "update_status",
+		TargetType: "hotel",
+	},
+	"DELETE /admin/hotels/:id": {
+		Module:     "hotel",
+		Action:     "delete",
+		TargetType: "hotel",
+	},
+	"POST /admin/hotels/:id/rooms": {
+		Module:     "hotel",
+		Action:     "create_room",
+		TargetType: "room",
+	},
+	"PUT /admin/rooms/:id": {
+		Module:     "hotel",
+		Action:     "update_room",
+		TargetType: "room",
+	},
+	"DELETE /admin/rooms/:id": {
+		Module:     "hotel",
+		Action:     "delete_room",
+		TargetType: "room",
+	},
+
+	// 营销管理 - 优惠券
+	"POST /admin/marketing/coupons": {
+		Module:     "marketing",
+		Action:     "create_coupon",
+		TargetType: "coupon",
+	},
+	"PUT /admin/marketing/coupons/:id": {
+		Module:     "marketing",
+		Action:     "update_coupon",
+		TargetType: "coupon",
+	},
+	"PUT /admin/marketing/coupons/:id/status": {
+		Module:     "marketing",
+		Action:     "update_coupon_status",
+		TargetType: "coupon",
+	},
+	"DELETE /admin/marketing/coupons/:id": {
+		Module:     "marketing",
+		Action:     "delete_coupon",
+		TargetType: "coupon",
+	},
+
+	// 营销管理 - 活动
+	"POST /admin/marketing/campaigns": {
+		Module:     "marketing",
+		Action:     "create_campaign",
+		TargetType: "campaign",
+	},
+	"PUT /admin/marketing/campaigns/:id": {
+		Module:     "marketing",
+		Action:     "update_campaign",
+		TargetType: "campaign",
+	},
+	"PUT /admin/marketing/campaigns/:id/status": {
+		Module:     "marketing",
+		Action:     "update_campaign_status",
+		TargetType: "campaign",
+	},
+	"DELETE /admin/marketing/campaigns/:id": {
+		Module:     "marketing",
+		Action:     "delete_campaign",
+		TargetType: "campaign",
+	},
+
+	// 会员管理
+	"POST /admin/member/levels": {
+		Module:     "member",
+		Action:     "create_level",
+		TargetType: "member_level",
+	},
+	"PUT /admin/member/levels/:id": {
+		Module:     "member",
+		Action:     "update_level",
+		TargetType: "member_level",
+	},
+	"DELETE /admin/member/levels/:id": {
+		Module:     "member",
+		Action:     "delete_level",
+		TargetType: "member_level",
+	},
+	"POST /admin/member/packages": {
+		Module:     "member",
+		Action:     "create_package",
+		TargetType: "member_package",
+	},
+	"PUT /admin/member/packages/:id": {
+		Module:     "member",
+		Action:     "update_package",
+		TargetType: "member_package",
+	},
+	"PUT /admin/member/packages/:id/status": {
+		Module:     "member",
+		Action:     "update_package_status",
+		TargetType: "member_package",
+	},
+	"DELETE /admin/member/packages/:id": {
+		Module:     "member",
+		Action:     "delete_package",
+		TargetType: "member_package",
+	},
+
+	// 分销管理
+	"POST /admin/distribution/distributors/:id/approve": {
+		Module:     "distribution",
+		Action:     "approve_distributor",
+		TargetType: "distributor",
+	},
+	"POST /admin/distribution/withdrawals/:id/handle": {
+		Module:     "distribution",
+		Action:     "handle_withdrawal",
+		TargetType: "withdrawal",
+	},
+
+	// 财务管理
+	"POST /admin/finance/settlements": {
+		Module:     "finance",
+		Action:     "create_settlement",
+		TargetType: "settlement",
+	},
+	"POST /admin/finance/settlements/generate": {
+		Module:     "finance",
+		Action:     "generate_settlements",
+		TargetType: "settlement",
+	},
+	"POST /admin/finance/settlements/:id/process": {
+		Module:     "finance",
+		Action:     "process_settlement",
+		TargetType: "settlement",
+	},
+	"POST /admin/finance/withdrawals/:id/handle": {
+		Module:     "finance",
+		Action:     "handle_withdrawal",
+		TargetType: "withdrawal",
+	},
+	"POST /admin/finance/withdrawals/batch": {
+		Module:     "finance",
+		Action:     "batch_handle_withdrawals",
+		TargetType: "withdrawal",
+	},
+
+	// 认证管理
 	"POST /admin/auth/login": {
 		Module: "auth",
 		Action: "login",
@@ -117,6 +330,101 @@ var moduleActionMap = map[string]OperationConfig{
 	"PUT /admin/auth/password": {
 		Module: "auth",
 		Action: "change_password",
+	},
+
+	// 用户管理
+	"PUT /admin/users/:id/status": {
+		Module:     "user",
+		Action:     "update_status",
+		TargetType: "user",
+	},
+
+	// 订单管理
+	"POST /admin/orders/:id/refund": {
+		Module:     "order",
+		Action:     "refund",
+		TargetType: "order",
+	},
+
+	// 系统管理 - 管理员
+	"POST /admin/admins": {
+		Module:     "system",
+		Action:     "create_admin",
+		TargetType: "admin",
+	},
+	"PUT /admin/admins/:id": {
+		Module:     "system",
+		Action:     "update_admin",
+		TargetType: "admin",
+	},
+	"DELETE /admin/admins/:id": {
+		Module:     "system",
+		Action:     "delete_admin",
+		TargetType: "admin",
+	},
+
+	// 系统管理 - 角色
+	"POST /admin/roles": {
+		Module:     "system",
+		Action:     "create_role",
+		TargetType: "role",
+	},
+	"PUT /admin/roles/:id": {
+		Module:     "system",
+		Action:     "update_role",
+		TargetType: "role",
+	},
+	"DELETE /admin/roles/:id": {
+		Module:     "system",
+		Action:     "delete_role",
+		TargetType: "role",
+	},
+
+	// 系统管理 - 配置
+	"PUT /admin/configs": {
+		Module: "system",
+		Action: "update_config",
+	},
+
+	// 系统管理 - 轮播图
+	"POST /admin/banners": {
+		Module:     "content",
+		Action:     "create_banner",
+		TargetType: "banner",
+	},
+	"PUT /admin/banners/:id": {
+		Module:     "content",
+		Action:     "update_banner",
+		TargetType: "banner",
+	},
+	"DELETE /admin/banners/:id": {
+		Module:     "content",
+		Action:     "delete_banner",
+		TargetType: "banner",
+	},
+
+	// 系统管理 - 文章
+	"POST /admin/articles": {
+		Module:     "content",
+		Action:     "create_article",
+		TargetType: "article",
+	},
+	"PUT /admin/articles/:id": {
+		Module:     "content",
+		Action:     "update_article",
+		TargetType: "article",
+	},
+	"DELETE /admin/articles/:id": {
+		Module:     "content",
+		Action:     "delete_article",
+		TargetType: "article",
+	},
+
+	// 系统管理 - 反馈
+	"PUT /admin/feedbacks/:id/reply": {
+		Module:     "content",
+		Action:     "reply_feedback",
+		TargetType: "feedback",
 	},
 }
 
@@ -243,19 +551,52 @@ func (l *OperationLogger) getDefaultConfig(c *gin.Context) OperationConfig {
 	path := c.FullPath()
 	method := c.Request.Method
 
-	// 从路径推断模块
+	// 从路径推断模块（按优先级排序）
 	module := "unknown"
-	if strings.Contains(path, "/devices") {
+	switch {
+	case strings.Contains(path, "/devices"):
 		module = "device"
-	} else if strings.Contains(path, "/venues") {
+	case strings.Contains(path, "/venues"):
 		module = "venue"
-	} else if strings.Contains(path, "/merchants") {
+	case strings.Contains(path, "/merchants"):
 		module = "merchant"
-	} else if strings.Contains(path, "/admins") {
-		module = "admin"
-	} else if strings.Contains(path, "/roles") {
-		module = "role"
-	} else if strings.Contains(path, "/auth") {
+	case strings.Contains(path, "/products"):
+		module = "product"
+	case strings.Contains(path, "/categories"):
+		module = "category"
+	case strings.Contains(path, "/hotels"):
+		module = "hotel"
+	case strings.Contains(path, "/rooms"):
+		module = "hotel"
+	case strings.Contains(path, "/bookings"):
+		module = "booking"
+	case strings.Contains(path, "/marketing"):
+		module = "marketing"
+	case strings.Contains(path, "/member"):
+		module = "member"
+	case strings.Contains(path, "/distribution"):
+		module = "distribution"
+	case strings.Contains(path, "/finance"):
+		module = "finance"
+	case strings.Contains(path, "/orders"):
+		module = "order"
+	case strings.Contains(path, "/users"):
+		module = "user"
+	case strings.Contains(path, "/admins"):
+		module = "system"
+	case strings.Contains(path, "/roles"):
+		module = "system"
+	case strings.Contains(path, "/permissions"):
+		module = "system"
+	case strings.Contains(path, "/configs"):
+		module = "system"
+	case strings.Contains(path, "/banners"):
+		module = "content"
+	case strings.Contains(path, "/articles"):
+		module = "content"
+	case strings.Contains(path, "/feedbacks"):
+		module = "content"
+	case strings.Contains(path, "/auth"):
 		module = "auth"
 	}
 

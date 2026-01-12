@@ -206,8 +206,16 @@ func setupRouter(
 		// 公开接口（无需认证）
 		public := v1.Group("")
 		{
-			// 注册认证路由
-			authH.RegisterRoutes(public)
+			// 认证路由（带限流保护）
+			auth := public.Group("/auth")
+			{
+				// 短信发送接口 - 严格限流（每分钟1条，每天10条）
+				auth.POST("/sms/send", userMiddleware.SmsRateLimit(redisClient), authH.SendSmsCode)
+				// 登录接口 - IP 限流（每分钟10次，每小时30次）
+				auth.POST("/login/sms", userMiddleware.LoginRateLimit(redisClient), authH.SmsLogin)
+				auth.POST("/login/wechat", userMiddleware.LoginRateLimit(redisClient), authH.WechatLogin)
+				auth.POST("/refresh", authH.RefreshToken)
+			}
 
 			// 设备和场地公开接口
 			deviceH.RegisterRoutes(public)
@@ -247,8 +255,13 @@ func setupRouter(
 			// 租借路由
 			rentalH.RegisterRoutes(user)
 
-			// 支付路由
-			paymentH.RegisterRoutes(user)
+			// 支付路由（带限流保护）
+			payment := user.Group("/payment")
+			{
+				payment.POST("", userMiddleware.PaymentRateLimit(redisClient), paymentH.CreatePayment)
+				payment.GET("/:payment_no", paymentH.QueryPayment)
+				payment.POST("/refund", userMiddleware.PaymentRateLimit(redisClient), paymentH.CreateRefund)
+			}
 
 			// 收货地址
 			user.GET("/addresses", placeholderHandler("获取地址列表"))
@@ -404,8 +417,12 @@ func setupRouter(
 		// 操作日志中间件
 		operationLogger := middleware.NewOperationLogger(operationLogRepo)
 
-		// 管理员认证路由（公开）
-		adminAuthH.RegisterRoutes(admin)
+		// 管理员认证路由（公开，带限流保护）
+		adminAuthGroup := admin.Group("/auth")
+		{
+			adminAuthGroup.POST("/login", userMiddleware.AdminLoginRateLimit(redisClient), adminAuthH.Login)
+			adminAuthGroup.POST("/refresh", adminAuthH.RefreshToken)
+		}
 
 		// 需要管理员认证
 		adminAuth := admin.Group("")

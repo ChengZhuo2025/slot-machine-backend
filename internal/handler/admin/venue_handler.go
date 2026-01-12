@@ -2,7 +2,6 @@
 package admin
 
 import (
-	"errors"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -23,6 +22,8 @@ func NewVenueHandler(venueSvc *adminService.VenueAdminService) *VenueHandler {
 		venueService: venueSvc,
 	}
 }
+
+// ============ CRUD 操作 ============
 
 // Create 创建场地
 // @Summary 创建场地
@@ -46,16 +47,77 @@ func (h *VenueHandler) Create(c *gin.Context) {
 	}
 
 	venue, err := h.venueService.CreateVenue(c.Request.Context(), &req)
-	if err != nil {
-		if errors.Is(err, adminService.ErrMerchantNotFound) {
-			response.BadRequest(c, "商户不存在")
-			return
-		}
-		response.InternalError(c, err.Error())
+	handler.MustSucceed(c, err, venue)
+}
+
+// Get 获取场地详情
+// @Summary 获取场地详情
+// @Tags 场地管理
+// @Produce json
+// @Security Bearer
+// @Param id path int true "场地ID"
+// @Success 200 {object} response.Response{data=adminService.VenueInfo}
+// @Router /admin/venues/{id} [get]
+func (h *VenueHandler) Get(c *gin.Context) {
+	_, ok := handler.RequireAdminID(c)
+	if !ok {
 		return
 	}
 
-	response.Success(c, venue)
+	id, ok := handler.ParseID(c, "场地")
+	if !ok {
+		return
+	}
+
+	venue, err := h.venueService.GetVenue(c.Request.Context(), id)
+	handler.MustSucceed(c, err, venue)
+}
+
+// List 获取场地列表
+// @Summary 获取场地列表
+// @Tags 场地管理
+// @Produce json
+// @Security Bearer
+// @Param page query int false "页码"
+// @Param page_size query int false "每页数量"
+// @Param merchant_id query int false "商户ID"
+// @Param name query string false "场地名称"
+// @Param type query string false "场地类型"
+// @Param city query string false "城市"
+// @Param status query int false "状态"
+// @Success 200 {object} response.Response{data=response.PageData}
+// @Router /admin/venues [get]
+func (h *VenueHandler) List(c *gin.Context) {
+	_, ok := handler.RequireAdminID(c)
+	if !ok {
+		return
+	}
+
+	p := handler.BindAdminPagination(c)
+
+	filters := make(map[string]interface{})
+	if merchantIDStr := c.Query("merchant_id"); merchantIDStr != "" {
+		if merchantID, err := strconv.ParseInt(merchantIDStr, 10, 64); err == nil {
+			filters["merchant_id"] = merchantID
+		}
+	}
+	if name := c.Query("name"); name != "" {
+		filters["name"] = name
+	}
+	if venueType := c.Query("type"); venueType != "" {
+		filters["type"] = venueType
+	}
+	if city := c.Query("city"); city != "" {
+		filters["city"] = city
+	}
+	if statusStr := c.Query("status"); statusStr != "" {
+		if status, err := strconv.ParseInt(statusStr, 10, 8); err == nil {
+			filters["status"] = int8(status)
+		}
+	}
+
+	venues, total, err := h.venueService.ListVenues(c.Request.Context(), p.GetOffset(), p.GetLimit(), filters)
+	handler.MustSucceedPage(c, err, venues, total, p.Page, p.PageSize)
 }
 
 // Update 更新场地
@@ -85,22 +147,36 @@ func (h *VenueHandler) Update(c *gin.Context) {
 		return
 	}
 
-	if err := h.venueService.UpdateVenue(c.Request.Context(), id, &req); err != nil {
-		switch {
-		case errors.Is(err, adminService.ErrVenueNotFound):
-			response.NotFound(c, "场地不存在")
-		case errors.Is(err, adminService.ErrMerchantNotFound):
-			response.BadRequest(c, "商户不存在")
-		default:
-			response.InternalError(c, err.Error())
-		}
+	err := h.venueService.UpdateVenue(c.Request.Context(), id, &req)
+	handler.MustSucceed(c, err, nil)
+}
+
+// Delete 删除场地
+// @Summary 删除场地
+// @Tags 场地管理
+// @Produce json
+// @Security Bearer
+// @Param id path int true "场地ID"
+// @Success 200 {object} response.Response
+// @Router /admin/venues/{id} [delete]
+func (h *VenueHandler) Delete(c *gin.Context) {
+	_, ok := handler.RequireAdminID(c)
+	if !ok {
 		return
 	}
 
-	response.Success(c, nil)
+	id, ok := handler.ParseID(c, "场地")
+	if !ok {
+		return
+	}
+
+	err := h.venueService.DeleteVenue(c.Request.Context(), id)
+	handler.MustSucceed(c, err, nil)
 }
 
-// UpdateStatusRequest 更新状态请求
+// ============ 状态更新 ============
+
+// VenueUpdateStatusRequest 更新状态请求
 type VenueUpdateStatusRequest struct {
 	Status int8 `json:"status" binding:"oneof=0 1"`
 }
@@ -132,130 +208,11 @@ func (h *VenueHandler) UpdateStatus(c *gin.Context) {
 		return
 	}
 
-	if err := h.venueService.UpdateVenueStatus(c.Request.Context(), id, req.Status); err != nil {
-		if errors.Is(err, adminService.ErrVenueNotFound) {
-			response.NotFound(c, "场地不存在")
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, nil)
+	err := h.venueService.UpdateVenueStatus(c.Request.Context(), id, req.Status)
+	handler.MustSucceed(c, err, nil)
 }
 
-// Delete 删除场地
-// @Summary 删除场地
-// @Tags 场地管理
-// @Produce json
-// @Security Bearer
-// @Param id path int true "场地ID"
-// @Success 200 {object} response.Response
-// @Router /admin/venues/{id} [delete]
-func (h *VenueHandler) Delete(c *gin.Context) {
-	_, ok := handler.RequireAdminID(c)
-	if !ok {
-		return
-	}
-
-	id, ok := handler.ParseID(c, "场地")
-	if !ok {
-		return
-	}
-
-	if err := h.venueService.DeleteVenue(c.Request.Context(), id); err != nil {
-		switch {
-		case errors.Is(err, adminService.ErrVenueNotFound):
-			response.NotFound(c, "场地不存在")
-		case errors.Is(err, adminService.ErrVenueHasDevices):
-			response.BadRequest(c, "场地下有设备，无法删除")
-		default:
-			response.InternalError(c, err.Error())
-		}
-		return
-	}
-
-	response.Success(c, nil)
-}
-
-// Get 获取场地详情
-// @Summary 获取场地详情
-// @Tags 场地管理
-// @Produce json
-// @Security Bearer
-// @Param id path int true "场地ID"
-// @Success 200 {object} response.Response{data=adminService.VenueInfo}
-// @Router /admin/venues/{id} [get]
-func (h *VenueHandler) Get(c *gin.Context) {
-	_, ok := handler.RequireAdminID(c)
-	if !ok {
-		return
-	}
-
-	id, ok := handler.ParseID(c, "场地")
-	if !ok {
-		return
-	}
-
-	venue, err := h.venueService.GetVenue(c.Request.Context(), id)
-	if err != nil {
-		if errors.Is(err, adminService.ErrVenueNotFound) {
-			response.NotFound(c, "场地不存在")
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, venue)
-}
-
-// List 获取场地列表
-// @Summary 获取场地列表
-// @Tags 场地管理
-// @Produce json
-// @Security Bearer
-// @Param page query int false "页码"
-// @Param page_size query int false "每页数量"
-// @Param merchant_id query int false "商户ID"
-// @Param name query string false "场地名称"
-// @Param type query string false "场地类型"
-// @Param city query string false "城市"
-// @Param status query int false "状态"
-// @Success 200 {object} response.Response{data=response.PageData}
-// @Router /admin/venues [get]
-func (h *VenueHandler) List(c *gin.Context) {
-	_, ok := handler.RequireAdminID(c)
-	if !ok {
-		return
-	}
-
-	p := handler.BindPaginationWithDefaults(c, 1, 20)
-
-	filters := make(map[string]interface{})
-	if merchantIDStr := c.Query("merchant_id"); merchantIDStr != "" {
-		if merchantID, err := strconv.ParseInt(merchantIDStr, 10, 64); err == nil {
-			filters["merchant_id"] = merchantID
-		}
-	}
-	if name := c.Query("name"); name != "" {
-		filters["name"] = name
-	}
-	if venueType := c.Query("type"); venueType != "" {
-		filters["type"] = venueType
-	}
-	if city := c.Query("city"); city != "" {
-		filters["city"] = city
-	}
-	if statusStr := c.Query("status"); statusStr != "" {
-		if status, err := strconv.ParseInt(statusStr, 10, 8); err == nil {
-			filters["status"] = int8(status)
-		}
-	}
-
-	venues, total, err := h.venueService.ListVenues(c.Request.Context(), p.GetOffset(), p.GetLimit(), filters)
-	handler.MustSucceedPage(c, err, venues, total, p.Page, p.PageSize)
-}
+// ============ 关联资源查询 ============
 
 // ListByMerchant 获取商户下的场地列表
 // @Summary 获取商户下的场地列表
@@ -279,6 +236,8 @@ func (h *VenueHandler) ListByMerchant(c *gin.Context) {
 	venues, err := h.venueService.ListVenuesByMerchant(c.Request.Context(), merchantID)
 	handler.MustSucceed(c, err, venues)
 }
+
+// ============ 路由注册 ============
 
 // RegisterRoutes 注册路由
 func (h *VenueHandler) RegisterRoutes(r *gin.RouterGroup) {

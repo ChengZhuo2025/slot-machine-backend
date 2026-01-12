@@ -2,13 +2,10 @@
 package mall
 
 import (
-	"strconv"
-
 	"github.com/gin-gonic/gin"
 
-	"github.com/dumeirei/smart-locker-backend/internal/common/errors"
+	"github.com/dumeirei/smart-locker-backend/internal/common/handler"
 	"github.com/dumeirei/smart-locker-backend/internal/common/response"
-	"github.com/dumeirei/smart-locker-backend/internal/middleware"
 	mallService "github.com/dumeirei/smart-locker-backend/internal/service/mall"
 )
 
@@ -34,9 +31,8 @@ func NewReviewHandler(reviewSvc *mallService.ReviewService) *ReviewHandler {
 // @Success 200 {object} response.Response{data=mall.ReviewInfo}
 // @Router /api/v1/reviews [post]
 func (h *ReviewHandler) CreateReview(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
@@ -47,16 +43,7 @@ func (h *ReviewHandler) CreateReview(c *gin.Context) {
 	}
 
 	review, err := h.reviewService.CreateReview(c.Request.Context(), userID, &req)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, review)
+	handler.MustSucceed(c, err, review)
 }
 
 // GetProductReviews 获取商品评价列表
@@ -69,26 +56,15 @@ func (h *ReviewHandler) CreateReview(c *gin.Context) {
 // @Success 200 {object} response.Response{data=mall.ReviewListResponse}
 // @Router /api/v1/products/{id}/reviews [get]
 func (h *ReviewHandler) GetProductReviews(c *gin.Context) {
-	productID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的商品ID")
+	productID, ok := handler.ParseID(c, "商品")
+	if !ok {
 		return
 	}
 
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+	p := handler.BindPagination(c)
 
-	result, err := h.reviewService.GetProductReviews(c.Request.Context(), productID, page, pageSize)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, result)
+	result, err := h.reviewService.GetProductReviews(c.Request.Context(), productID, p.Page, p.PageSize)
+	handler.MustSucceed(c, err, result)
 }
 
 // GetProductReviewStats 获取商品评价统计
@@ -99,23 +75,13 @@ func (h *ReviewHandler) GetProductReviews(c *gin.Context) {
 // @Success 200 {object} response.Response{data=mall.ReviewStats}
 // @Router /api/v1/products/{id}/review-stats [get]
 func (h *ReviewHandler) GetProductReviewStats(c *gin.Context) {
-	productID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的商品ID")
+	productID, ok := handler.ParseID(c, "商品")
+	if !ok {
 		return
 	}
 
 	stats, err := h.reviewService.GetProductReviewStats(c.Request.Context(), productID)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, stats)
+	handler.MustSucceed(c, err, stats)
 }
 
 // GetUserReviews 获取用户评价列表
@@ -128,26 +94,15 @@ func (h *ReviewHandler) GetProductReviewStats(c *gin.Context) {
 // @Success 200 {object} response.Response{data=mall.ReviewListResponse}
 // @Router /api/v1/user/reviews [get]
 func (h *ReviewHandler) GetUserReviews(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+	p := handler.BindPagination(c)
 
-	result, err := h.reviewService.GetUserReviews(c.Request.Context(), userID, page, pageSize)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, result)
+	result, err := h.reviewService.GetUserReviews(c.Request.Context(), userID, p.Page, p.PageSize)
+	handler.MustSucceed(c, err, result)
 }
 
 // DeleteReview 删除评价
@@ -159,26 +114,10 @@ func (h *ReviewHandler) GetUserReviews(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/v1/reviews/{id} [delete]
 func (h *ReviewHandler) DeleteReview(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, reviewID, ok := handler.RequireUserAndParseID(c, "评价")
+	if !ok {
 		return
 	}
 
-	reviewID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的评价ID")
-		return
-	}
-
-	if err := h.reviewService.DeleteReview(c.Request.Context(), userID, reviewID); err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, nil)
+	handler.MustSucceed(c, h.reviewService.DeleteReview(c.Request.Context(), userID, reviewID), nil)
 }

@@ -121,20 +121,26 @@
 
 ```text
 specs/001-smart-locker-backend/
-├── plan.md              # This file
-├── research.md          # Phase 0 output
-├── data-model.md        # Phase 1 output
-├── quickstart.md        # Phase 1 output
-├── contracts/           # Phase 1 output (OpenAPI specs)
-└── tasks.md             # Phase 2 output
+├── plan.md                     # This file - 实施计划
+├── spec.md                     # 功能规格说明
+├── research.md                 # Phase 0 output - 技术调研
+├── data-model.md               # Phase 1 output - 数据模型设计
+├── quickstart.md               # Phase 1 output - 快速开始指南
+├── model-development-guide.md  # 模型开发指南
+├── tasks.md                    # Phase 2 output - 任务清单
+├── checklists/                 # 检查清单目录
+│   └── requirements.md         # 需求检查清单
+└── contracts/                  # Phase 1 output (OpenAPI specs)
+    ├── admin-api.yaml          # 管理后台 API 规范
+    └── user-api.yaml           # 用户端 API 规范
 ```
 
 ### Source Code (repository root)
 
 ```text
 backend/
-├── cmd/                          # 服务入口
-│   ├── api-gateway/              # API 网关
+├── cmd/                          # 服务入口 (模块化单体架构，为未来微服务拆分预留)
+│   ├── api-gateway/              # API 网关 (当前主入口)
 │   ├── user-service/             # 用户服务
 │   ├── device-service/           # 设备服务
 │   ├── order-service/            # 订单服务
@@ -151,83 +157,119 @@ backend/
 │
 ├── internal/                     # 内部包（不对外暴露）
 │   ├── common/                   # 公共组件
-│   │   ├── config/               # 配置管理
-│   │   ├── database/             # 数据库连接
 │   │   ├── cache/                # Redis 缓存
+│   │   ├── config/               # 配置管理
+│   │   ├── crypto/               # 加密解密
+│   │   ├── database/             # 数据库连接
+│   │   ├── errors/               # 错误定义
+│   │   ├── handler/              # 通用 handler 辅助函数
+│   │   ├── jwt/                  # JWT 工具
+│   │   ├── logger/               # 日志组件
+│   │   ├── metrics/              # 监控指标
+│   │   ├── middleware/           # 公共中间件
 │   │   ├── mq/                   # 消息队列
 │   │   ├── mqtt/                 # MQTT 客户端
-│   │   ├── logger/               # 日志组件
-│   │   ├── middleware/           # 中间件
+│   │   ├── qrcode/               # 二维码生成
+│   │   ├── response/             # 统一响应格式
+│   │   ├── tracing/              # 分布式追踪
 │   │   └── utils/                # 工具函数
 │   │
 │   ├── models/                   # 数据模型
-│   │   ├── user.go
-│   │   ├── device.go
-│   │   ├── order.go
 │   │   └── ...
 │   │
 │   ├── repository/               # 数据访问层
-│   │   ├── user_repo.go
-│   │   ├── device_repo.go
+│   │   └── ...
+│   │
+│   ├── middleware/               # 业务中间件
+│   │   └── ...
+│   │
+│   ├── scheduler/                # 定时任务调度
 │   │   └── ...
 │   │
 │   ├── service/                  # 业务逻辑层
-│   │   ├── user/
-│   │   ├── device/
-│   │   ├── order/
-│   │   └── ...
+│   │   ├── admin/                # 管理后台服务
+│   │   ├── auth/                 # 认证服务
+│   │   ├── content/              # 内容服务
+│   │   ├── device/               # 设备服务
+│   │   ├── distribution/         # 分销服务
+│   │   ├── finance/              # 财务服务
+│   │   ├── hotel/                # 酒店服务
+│   │   ├── mall/                 # 商城服务
+│   │   ├── marketing/            # 营销服务
+│   │   ├── order/                # 订单服务
+│   │   ├── payment/              # 支付服务
+│   │   ├── rental/               # 租借服务
+│   │   └── user/                 # 用户服务
 │   │
 │   └── handler/                  # HTTP 处理器
-│       ├── user/
-│       ├── device/
-│       └── ...
+│       ├── admin/                # 管理后台 API
+│       ├── auth/                 # 认证 API
+│       ├── content/              # 内容 API
+│       ├── device/               # 设备 API
+│       ├── distribution/         # 分销 API
+│       ├── health/               # 健康检查
+│       ├── hotel/                # 酒店 API
+│       ├── mall/                 # 商城 API
+│       ├── marketing/            # 营销 API
+│       ├── order/                # 订单 API
+│       ├── payment/              # 支付 API
+│       ├── rental/               # 租借 API
+│       └── user/                 # 用户 API
 │
 ├── pkg/                          # 可复用公共包
 │   ├── auth/                     # JWT 认证
 │   ├── crypto/                   # 加密解密
+│   ├── mqtt/                     # MQTT 客户端封装
+│   ├── oss/                      # 对象存储
 │   ├── payment/                  # 支付集成
 │   │   ├── wechat/
 │   │   └── alipay/
-│   ├── sms/                      # 短信服务
-│   ├── oss/                      # 对象存储
 │   ├── qrcode/                   # 二维码生成
-│   └── response/                 # 统一响应格式
+│   ├── response/                 # 统一响应格式
+│   ├── sms/                      # 短信服务
+│   └── wechatpay/                # 微信支付 SDK
 │
 ├── api/                          # API 定义
-│   └── openapi/                  # OpenAPI 3.0 规范
-│       ├── user.yaml
-│       ├── device.yaml
-│       └── ...
+│   └── openapi/                  # OpenAPI 规范 (Swagger 自动生成)
+│       ├── docs.go               # Swag 生成的 Go 文档代码
+│       ├── swagger.json          # OpenAPI JSON 格式
+│       └── swagger.yaml          # OpenAPI YAML 格式
 │
 ├── migrations/                   # 数据库迁移
-│   ├── 000001_init_users.up.sql
-│   ├── 000001_init_users.down.sql
+│   └── ...
+│
+├── seeds/                        # 种子数据
 │   └── ...
 │
 ├── configs/                      # 配置文件
-│   ├── config.yaml
-│   ├── config.dev.yaml
-│   └── config.prod.yaml
+│   └── ...
+│
+├── docs/                         # 项目文档 (非 API 文档)
+│   ├── api-improvement-plan.md   # API 改进计划
+│   └── ...                       # 其他开发文档
 │
 ├── deployments/                  # 部署配置
 │   ├── docker/
-│   │   ├── Dockerfile
-│   │   └── docker-compose.yml
-│   └── k8s/
-│       ├── deployment.yaml
-│       └── service.yaml
+│   │   └── init-db/              # 数据库初始化脚本
+│   ├── k8s/
+│   └── kubernetes/
 │
 ├── scripts/                      # 脚本
-│   ├── build.sh
-│   └── migrate.sh
+│   └── ...
+│
+├── build/                        # 构建输出
+│   └── ...
 │
 └── tests/                        # 测试
-    ├── unit/
-    ├── integration/
-    └── e2e/
+    ├── api/                      # API 测试
+    ├── unit/                     # 单元测试
+    ├── integration/              # 集成测试
+    ├── e2e/                      # 端到端测试
+    ├── helpers/                  # 测试辅助工具
+    └── output/                   # 测试输出
 ```
 
-**Structure Decision**: 采用微服务架构，每个业务模块独立服务。使用 `internal/` 目录隔离内部实现，`pkg/` 目录放置可复用组件。服务间通过 HTTP API 和消息队列通信。
+**Structure Decision**: 采用模块化单体架构（Modular Monolith），当前所有业务模块通过单一 API Gateway 对外提供服务。使用 `internal/` 目录隔离内部实现，`pkg/` 目录放置可复用组件。`cmd/` 目录预留了 14 个服务入口，为未来微服务拆分做好准备。
 
 ## Complexity Tracking
 

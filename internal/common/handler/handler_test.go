@@ -78,7 +78,7 @@ func TestHandleError_AppError(t *testing.T) {
 	handled := HandleError(c, appErr)
 
 	assert.True(t, handled, "AppError should be handled")
-	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
 
 	resp := parseResponse(w)
 	assert.Equal(t, 1001, resp.Code)
@@ -126,7 +126,7 @@ func TestMustSucceed_Error(t *testing.T) {
 
 	MustSucceed(c, appErr, nil)
 
-	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, http.StatusNotFound, w.Code)
 	resp := parseResponse(w)
 	assert.Equal(t, appErr.Code, resp.Code)
 }

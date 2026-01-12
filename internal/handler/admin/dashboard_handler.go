@@ -3,12 +3,10 @@ package admin
 
 import (
 	"strconv"
-	"time"
 
 	"github.com/gin-gonic/gin"
 
 	"github.com/dumeirei/smart-locker-backend/internal/common/handler"
-	"github.com/dumeirei/smart-locker-backend/internal/common/response"
 	adminService "github.com/dumeirei/smart-locker-backend/internal/service/admin"
 	distributionService "github.com/dumeirei/smart-locker-backend/internal/service/distribution"
 	financeService "github.com/dumeirei/smart-locker-backend/internal/service/finance"
@@ -88,15 +86,9 @@ func (h *DashboardHandler) GetDeviceStatusSummary(c *gin.Context) {
 // @Success 200 {object} response.Response{data=[]adminService.OrderTypeSummary}
 // @Router /api/v1/admin/dashboard/platform/order-type [get]
 func (h *DashboardHandler) GetOrderTypeSummary(c *gin.Context) {
-	var startDate, endDate *time.Time
-	if s := c.Query("start_date"); s != "" {
-		t, _ := time.Parse("2006-01-02", s)
-		startDate = &t
-	}
-	if s := c.Query("end_date"); s != "" {
-		t, _ := time.Parse("2006-01-02", s)
-		endOfDay := t.Add(24*time.Hour - time.Second)
-		endDate = &endOfDay
+	startDate, endDate, ok := handler.ParseQueryDateRange(c)
+	if !ok {
+		return
 	}
 
 	summary, err := h.dashboardService.GetOrderTypeSummary(c.Request.Context(), startDate, endDate)
@@ -114,17 +106,11 @@ func (h *DashboardHandler) GetOrderTypeSummary(c *gin.Context) {
 // @Success 200 {object} response.Response{data=[]adminService.TopVenue}
 // @Router /api/v1/admin/dashboard/platform/top-venues [get]
 func (h *DashboardHandler) GetTopVenues(c *gin.Context) {
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	limit := handler.ParseQueryLimit(c, handler.DefaultListLimit)
 
-	var startDate, endDate *time.Time
-	if s := c.Query("start_date"); s != "" {
-		t, _ := time.Parse("2006-01-02", s)
-		startDate = &t
-	}
-	if s := c.Query("end_date"); s != "" {
-		t, _ := time.Parse("2006-01-02", s)
-		endOfDay := t.Add(24*time.Hour - time.Second)
-		endDate = &endOfDay
+	startDate, endDate, ok := handler.ParseQueryDateRange(c)
+	if !ok {
+		return
 	}
 
 	venues, err := h.dashboardService.GetTopVenues(c.Request.Context(), limit, startDate, endDate)
@@ -140,7 +126,7 @@ func (h *DashboardHandler) GetTopVenues(c *gin.Context) {
 // @Success 200 {object} response.Response{data=[]adminService.RecentOrder}
 // @Router /api/v1/admin/dashboard/platform/recent-orders [get]
 func (h *DashboardHandler) GetRecentOrders(c *gin.Context) {
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	limit := handler.ParseQueryLimit(c, handler.DefaultListLimit)
 
 	orders, err := h.dashboardService.GetRecentOrders(c.Request.Context(), limit)
 	handler.MustSucceed(c, err, orders)
@@ -155,7 +141,7 @@ func (h *DashboardHandler) GetRecentOrders(c *gin.Context) {
 // @Success 200 {object} response.Response{data=[]adminService.AlertInfo}
 // @Router /api/v1/admin/dashboard/platform/alerts [get]
 func (h *DashboardHandler) GetAlerts(c *gin.Context) {
-	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+	limit := handler.ParseQueryLimit(c, handler.DefaultListLimit)
 
 	alerts, err := h.dashboardService.GetAlerts(c.Request.Context(), limit)
 	handler.MustSucceed(c, err, alerts)
@@ -298,15 +284,9 @@ func (h *DashboardHandler) GetRevenueTrend(c *gin.Context) {
 // @Success 200 {object} response.Response{data=[]financeService.PaymentChannelSummary}
 // @Router /api/v1/admin/dashboard/finance/payment-channels [get]
 func (h *DashboardHandler) GetPaymentChannelSummary(c *gin.Context) {
-	var startDate, endDate *time.Time
-	if s := c.Query("start_date"); s != "" {
-		t, _ := time.Parse("2006-01-02", s)
-		startDate = &t
-	}
-	if s := c.Query("end_date"); s != "" {
-		t, _ := time.Parse("2006-01-02", s)
-		endOfDay := t.Add(24*time.Hour - time.Second)
-		endDate = &endOfDay
+	startDate, endDate, ok := handler.ParseQueryDateRange(c)
+	if !ok {
+		return
 	}
 
 	summary, err := h.financeDashboard.GetPaymentChannelSummary(c.Request.Context(), startDate, endDate)
@@ -350,15 +330,9 @@ func (h *DashboardHandler) GetPendingWithdrawals(c *gin.Context) {
 // @Success 200 {object} response.Response{data=[]financeService.RefundStat}
 // @Router /api/v1/admin/dashboard/finance/refund-stats [get]
 func (h *DashboardHandler) GetRefundStats(c *gin.Context) {
-	var startDate, endDate *time.Time
-	if s := c.Query("start_date"); s != "" {
-		t, _ := time.Parse("2006-01-02", s)
-		startDate = &t
-	}
-	if s := c.Query("end_date"); s != "" {
-		t, _ := time.Parse("2006-01-02", s)
-		endOfDay := t.Add(24*time.Hour - time.Second)
-		endDate = &endOfDay
+	startDate, endDate, ok := handler.ParseQueryDateRange(c)
+	if !ok {
+		return
 	}
 
 	stats, err := h.financeDashboard.GetRefundStats(c.Request.Context(), startDate, endDate)
@@ -376,9 +350,8 @@ func (h *DashboardHandler) GetRefundStats(c *gin.Context) {
 // @Success 200 {object} response.Response{data=distributionService.DistributorOverview}
 // @Router /api/v1/admin/dashboard/distributor/{distributor_id}/overview [get]
 func (h *DashboardHandler) GetDistributorOverview(c *gin.Context) {
-	distributorID, err := strconv.ParseInt(c.Param("distributor_id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的分销商ID")
+	distributorID, ok := handler.ParseParamID(c, "distributor_id", "分销商")
+	if !ok {
 		return
 	}
 
@@ -396,9 +369,8 @@ func (h *DashboardHandler) GetDistributorOverview(c *gin.Context) {
 // @Success 200 {object} response.Response{data=[]distributionService.CommissionTrend}
 // @Router /api/v1/admin/dashboard/distributor/{distributor_id}/commission-trend [get]
 func (h *DashboardHandler) GetDistributorCommissionTrend(c *gin.Context) {
-	distributorID, err := strconv.ParseInt(c.Param("distributor_id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的分销商ID")
+	distributorID, ok := handler.ParseParamID(c, "distributor_id", "分销商")
+	if !ok {
 		return
 	}
 
@@ -420,23 +392,16 @@ func (h *DashboardHandler) GetDistributorCommissionTrend(c *gin.Context) {
 // @Success 200 {object} response.Response{data=[]distributionService.TeamMemberRank}
 // @Router /api/v1/admin/dashboard/distributor/{distributor_id}/team-rank [get]
 func (h *DashboardHandler) GetDistributorTeamRank(c *gin.Context) {
-	distributorID, err := strconv.ParseInt(c.Param("distributor_id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的分销商ID")
+	distributorID, ok := handler.ParseParamID(c, "distributor_id", "分销商")
+	if !ok {
 		return
 	}
 
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 
-	var startDate, endDate *time.Time
-	if s := c.Query("start_date"); s != "" {
-		t, _ := time.Parse("2006-01-02", s)
-		startDate = &t
-	}
-	if s := c.Query("end_date"); s != "" {
-		t, _ := time.Parse("2006-01-02", s)
-		endOfDay := t.Add(24*time.Hour - time.Second)
-		endDate = &endOfDay
+	startDate, endDate, ok := handler.ParseQueryDateRange(c)
+	if !ok {
+		return
 	}
 
 	rank, err := h.distributionDashboard.GetTeamRank(c.Request.Context(), distributorID, limit, startDate, endDate)
@@ -453,9 +418,8 @@ func (h *DashboardHandler) GetDistributorTeamRank(c *gin.Context) {
 // @Success 200 {object} response.Response{data=[]distributionService.CommissionRecord}
 // @Router /api/v1/admin/dashboard/distributor/{distributor_id}/recent-commissions [get]
 func (h *DashboardHandler) GetDistributorRecentCommissions(c *gin.Context) {
-	distributorID, err := strconv.ParseInt(c.Param("distributor_id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的分销商ID")
+	distributorID, ok := handler.ParseParamID(c, "distributor_id", "分销商")
+	if !ok {
 		return
 	}
 
@@ -476,21 +440,14 @@ func (h *DashboardHandler) GetDistributorRecentCommissions(c *gin.Context) {
 // @Success 200 {object} response.Response{data=[]distributionService.CommissionTypeSummary}
 // @Router /api/v1/admin/dashboard/distributor/{distributor_id}/commission-type [get]
 func (h *DashboardHandler) GetDistributorCommissionTypeSummary(c *gin.Context) {
-	distributorID, err := strconv.ParseInt(c.Param("distributor_id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的分销商ID")
+	distributorID, ok := handler.ParseParamID(c, "distributor_id", "分销商")
+	if !ok {
 		return
 	}
 
-	var startDate, endDate *time.Time
-	if s := c.Query("start_date"); s != "" {
-		t, _ := time.Parse("2006-01-02", s)
-		startDate = &t
-	}
-	if s := c.Query("end_date"); s != "" {
-		t, _ := time.Parse("2006-01-02", s)
-		endOfDay := t.Add(24*time.Hour - time.Second)
-		endDate = &endOfDay
+	startDate, endDate, ok := handler.ParseQueryDateRange(c)
+	if !ok {
+		return
 	}
 
 	summary, err := h.distributionDashboard.GetCommissionTypeSummary(c.Request.Context(), distributorID, startDate, endDate)

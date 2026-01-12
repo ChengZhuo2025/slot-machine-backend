@@ -2,7 +2,6 @@
 package admin
 
 import (
-	"errors"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -46,19 +45,7 @@ func (h *DeviceHandler) Create(c *gin.Context) {
 	}
 
 	device, err := h.deviceService.CreateDevice(c.Request.Context(), &req, adminID)
-	if err != nil {
-		switch {
-		case errors.Is(err, adminService.ErrDeviceNoExists):
-			response.BadRequest(c, "设备编号已存在")
-		case errors.Is(err, adminService.ErrVenueNotFound):
-			response.BadRequest(c, "场地不存在")
-		default:
-			response.InternalError(c, err.Error())
-		}
-		return
-	}
-
-	response.Success(c, device)
+	handler.MustSucceed(c, err, device)
 }
 
 // Update 更新设备
@@ -88,19 +75,8 @@ func (h *DeviceHandler) Update(c *gin.Context) {
 		return
 	}
 
-	if err := h.deviceService.UpdateDevice(c.Request.Context(), id, &req); err != nil {
-		switch {
-		case errors.Is(err, adminService.ErrDeviceNotFound):
-			response.NotFound(c, "设备不存在")
-		case errors.Is(err, adminService.ErrVenueNotFound):
-			response.BadRequest(c, "场地不存在")
-		default:
-			response.InternalError(c, err.Error())
-		}
-		return
-	}
-
-	response.Success(c, nil)
+	err := h.deviceService.UpdateDevice(c.Request.Context(), id, &req)
+	handler.MustSucceed(c, err, nil)
 }
 
 // DeviceUpdateStatusRequest 更新设备状态请求
@@ -135,19 +111,8 @@ func (h *DeviceHandler) UpdateStatus(c *gin.Context) {
 		return
 	}
 
-	if err := h.deviceService.UpdateDeviceStatus(c.Request.Context(), id, req.Status, adminID); err != nil {
-		switch {
-		case errors.Is(err, adminService.ErrDeviceNotFound):
-			response.NotFound(c, "设备不存在")
-		case errors.Is(err, adminService.ErrDeviceInUse):
-			response.BadRequest(c, "设备正在使用中，无法禁用")
-		default:
-			response.InternalError(c, err.Error())
-		}
-		return
-	}
-
-	response.Success(c, nil)
+	err := h.deviceService.UpdateDeviceStatus(c.Request.Context(), id, req.Status, adminID)
+	handler.MustSucceed(c, err, nil)
 }
 
 // Get 获取设备详情
@@ -170,16 +135,7 @@ func (h *DeviceHandler) Get(c *gin.Context) {
 	}
 
 	device, err := h.deviceService.GetDevice(c.Request.Context(), id)
-	if err != nil {
-		if errors.Is(err, adminService.ErrDeviceNotFound) {
-			response.NotFound(c, "设备不存在")
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, device)
+	handler.MustSucceed(c, err, device)
 }
 
 // List 获取设备列表
@@ -202,7 +158,7 @@ func (h *DeviceHandler) List(c *gin.Context) {
 		return
 	}
 
-	p := handler.BindPaginationWithDefaults(c, 1, 20)
+	p := handler.BindAdminPagination(c)
 
 	filters := make(map[string]interface{})
 	if venueIDStr := c.Query("venue_id"); venueIDStr != "" {
@@ -251,19 +207,7 @@ func (h *DeviceHandler) RemoteUnlock(c *gin.Context) {
 	}
 
 	err := h.deviceService.RemoteUnlock(c.Request.Context(), id, adminID)
-	if err != nil {
-		switch {
-		case errors.Is(err, adminService.ErrDeviceNotFound):
-			response.NotFound(c, "设备不存在")
-		case errors.Is(err, adminService.ErrDeviceOffline):
-			response.BadRequest(c, "设备离线，无法开锁")
-		default:
-			response.InternalError(c, err.Error())
-		}
-		return
-	}
-
-	response.Success(c, nil)
+	handler.MustSucceed(c, err, nil)
 }
 
 // RemoteLock 远程锁定
@@ -286,19 +230,7 @@ func (h *DeviceHandler) RemoteLock(c *gin.Context) {
 	}
 
 	err := h.deviceService.RemoteLock(c.Request.Context(), id, adminID)
-	if err != nil {
-		switch {
-		case errors.Is(err, adminService.ErrDeviceNotFound):
-			response.NotFound(c, "设备不存在")
-		case errors.Is(err, adminService.ErrDeviceOffline):
-			response.BadRequest(c, "设备离线，无法锁定")
-		default:
-			response.InternalError(c, err.Error())
-		}
-		return
-	}
-
-	response.Success(c, nil)
+	handler.MustSucceed(c, err, nil)
 }
 
 // GetLogs 获取设备日志
@@ -323,7 +255,7 @@ func (h *DeviceHandler) GetLogs(c *gin.Context) {
 		return
 	}
 
-	p := handler.BindPaginationWithDefaults(c, 1, 20)
+	p := handler.BindAdminPagination(c)
 
 	filters := make(map[string]interface{})
 	if logType := c.Query("type"); logType != "" {
@@ -356,19 +288,7 @@ func (h *DeviceHandler) CreateMaintenance(c *gin.Context) {
 	}
 
 	maintenance, err := h.deviceService.CreateMaintenance(c.Request.Context(), &req, adminID)
-	if err != nil {
-		switch {
-		case errors.Is(err, adminService.ErrDeviceNotFound):
-			response.NotFound(c, "设备不存在")
-		case errors.Is(err, adminService.ErrDeviceInUse):
-			response.BadRequest(c, "设备正在使用中，无法开始维护")
-		default:
-			response.InternalError(c, err.Error())
-		}
-		return
-	}
-
-	response.Success(c, maintenance)
+	handler.MustSucceed(c, err, maintenance)
 }
 
 // CompleteMaintenance 完成维护
@@ -398,19 +318,8 @@ func (h *DeviceHandler) CompleteMaintenance(c *gin.Context) {
 		return
 	}
 
-	if err := h.deviceService.CompleteMaintenance(c.Request.Context(), id, &req, adminID); err != nil {
-		switch {
-		case errors.Is(err, adminService.ErrMaintenanceNotFound):
-			response.NotFound(c, "维护记录不存在")
-		case errors.Is(err, adminService.ErrMaintenanceCompleted):
-			response.BadRequest(c, "维护已完成")
-		default:
-			response.InternalError(c, err.Error())
-		}
-		return
-	}
-
-	response.Success(c, nil)
+	err := h.deviceService.CompleteMaintenance(c.Request.Context(), id, &req, adminID)
+	handler.MustSucceed(c, err, nil)
 }
 
 // ListMaintenance 获取维护记录列表
@@ -431,7 +340,7 @@ func (h *DeviceHandler) ListMaintenance(c *gin.Context) {
 		return
 	}
 
-	p := handler.BindPaginationWithDefaults(c, 1, 20)
+	p := handler.BindAdminPagination(c)
 
 	filters := make(map[string]interface{})
 	if deviceIDStr := c.Query("device_id"); deviceIDStr != "" {

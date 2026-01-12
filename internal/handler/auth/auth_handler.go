@@ -183,7 +183,8 @@ func (h *Handler) GetCurrentUser(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /auth/logout [post]
 func (h *Handler) Logout(c *gin.Context) {
-	// TODO: 如果需要，可以将 token 加入黑名单
+	// 当前设计：依赖 JWT 自然过期机制，无需 token 黑名单
+	// 如需立即吊销 token，可使用 Redis 实现黑名单机制
 	response.Success(c, nil)
 }
 

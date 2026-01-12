@@ -30,7 +30,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 
-	_ "github.com/dumeirei/smart-locker-backend/docs" // 导入生成的 docs
+	_ "github.com/dumeirei/smart-locker-backend/api/openapi" // 导入生成的 OpenAPI 文档
 	"github.com/dumeirei/smart-locker-backend/internal/common/cache"
 	"github.com/dumeirei/smart-locker-backend/internal/common/config"
 	"github.com/dumeirei/smart-locker-backend/internal/common/database"

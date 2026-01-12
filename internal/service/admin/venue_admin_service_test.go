@@ -12,6 +12,7 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
+	commonErrors "github.com/dumeirei/smart-locker-backend/internal/common/errors"
 	"github.com/dumeirei/smart-locker-backend/internal/models"
 	"github.com/dumeirei/smart-locker-backend/internal/repository"
 )
@@ -52,7 +53,7 @@ func TestVenueAdminService_CRUD(t *testing.T) {
 			Address:    "科技园",
 		})
 		require.Error(t, err)
-		assert.Equal(t, ErrMerchantNotFound, err)
+		assert.Equal(t, commonErrors.ErrMerchantNotFound, err)
 	})
 
 	merchant := &models.Merchant{Name: "M1", ContactName: "C", ContactPhone: "138", CommissionRate: 0.2, SettlementType: models.SettlementTypeMonthly, Status: models.MerchantStatusActive}
@@ -85,7 +86,7 @@ func TestVenueAdminService_CRUD(t *testing.T) {
 
 		err := svc.DeleteVenue(ctx, venue.ID)
 		require.Error(t, err)
-		assert.Equal(t, ErrVenueHasDevices, err)
+		assert.Equal(t, commonErrors.ErrVenueHasDevices, err)
 	})
 
 	t.Run("UpdateVenue 场地不存在", func(t *testing.T) {
@@ -99,7 +100,7 @@ func TestVenueAdminService_CRUD(t *testing.T) {
 			Address:    "科技园",
 		})
 		require.Error(t, err)
-		assert.Equal(t, ErrVenueNotFound, err)
+		assert.Equal(t, commonErrors.ErrVenueNotFound, err)
 	})
 }
 

@@ -273,7 +273,8 @@ func TestDeviceAPI_Create_VenueNotFound(t *testing.T) {
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
-	assert.Equal(t, http.StatusBadRequest, w.Code)
+	// 场地不存在时返回 404
+	assert.Equal(t, http.StatusNotFound, w.Code)
 }
 
 func TestDeviceAPI_Create_NoToken(t *testing.T) {

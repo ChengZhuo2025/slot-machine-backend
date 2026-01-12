@@ -2,13 +2,10 @@
 package mall
 
 import (
-	"strconv"
-
 	"github.com/gin-gonic/gin"
 
-	"github.com/dumeirei/smart-locker-backend/internal/common/errors"
+	"github.com/dumeirei/smart-locker-backend/internal/common/handler"
 	"github.com/dumeirei/smart-locker-backend/internal/common/response"
-	"github.com/dumeirei/smart-locker-backend/internal/middleware"
 	mallService "github.com/dumeirei/smart-locker-backend/internal/service/mall"
 )
 
@@ -34,9 +31,8 @@ func NewOrderHandler(orderSvc *mallService.MallOrderService) *OrderHandler {
 // @Success 200 {object} response.Response{data=mall.MallOrderInfo}
 // @Router /api/v1/orders [post]
 func (h *OrderHandler) CreateOrder(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
@@ -47,16 +43,7 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 	}
 
 	order, err := h.orderService.CreateOrder(c.Request.Context(), userID, &req)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, order)
+	handler.MustSucceed(c, err, order)
 }
 
 // CreateOrderFromCart 从购物车创建订单
@@ -69,9 +56,8 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 // @Success 200 {object} response.Response{data=mall.MallOrderInfo}
 // @Router /api/v1/orders/from-cart [post]
 func (h *OrderHandler) CreateOrderFromCart(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
@@ -82,16 +68,7 @@ func (h *OrderHandler) CreateOrderFromCart(c *gin.Context) {
 	}
 
 	order, err := h.orderService.CreateOrderFromCart(c.Request.Context(), userID, &req)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, order)
+	handler.MustSucceed(c, err, order)
 }
 
 // GetOrderDetail 获取订单详情
@@ -103,29 +80,13 @@ func (h *OrderHandler) CreateOrderFromCart(c *gin.Context) {
 // @Success 200 {object} response.Response{data=mall.MallOrderInfo}
 // @Router /api/v1/orders/{id} [get]
 func (h *OrderHandler) GetOrderDetail(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
-		return
-	}
-
-	orderID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的订单ID")
+	userID, orderID, ok := handler.RequireUserAndParseID(c, "订单")
+	if !ok {
 		return
 	}
 
 	order, err := h.orderService.GetOrderDetail(c.Request.Context(), userID, orderID)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, order)
+	handler.MustSucceed(c, err, order)
 }
 
 // GetOrders 获取订单列表
@@ -139,32 +100,16 @@ func (h *OrderHandler) GetOrderDetail(c *gin.Context) {
 // @Success 200 {object} response.Response{data=[]mall.MallOrderInfo}
 // @Router /api/v1/orders [get]
 func (h *OrderHandler) GetOrders(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
 	status := c.Query("status")
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+	p := handler.BindPagination(c)
 
-	orders, total, err := h.orderService.GetUserOrders(c.Request.Context(), userID, status, page, pageSize)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, gin.H{
-		"list":       orders,
-		"total":      total,
-		"page":       page,
-		"page_size":  pageSize,
-	})
+	orders, total, err := h.orderService.GetUserOrders(c.Request.Context(), userID, status, p.Page, p.PageSize)
+	handler.MustSucceedPage(c, err, orders, total, p.Page, p.PageSize)
 }
 
 // CancelOrder 取消订单
@@ -178,30 +123,14 @@ func (h *OrderHandler) GetOrders(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/v1/orders/{id}/cancel [post]
 func (h *OrderHandler) CancelOrder(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
-		return
-	}
-
-	orderID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的订单ID")
+	userID, orderID, ok := handler.RequireUserAndParseID(c, "订单")
+	if !ok {
 		return
 	}
 
 	reason := c.Query("reason")
 
-	if err := h.orderService.CancelOrder(c.Request.Context(), userID, orderID, reason); err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, nil)
+	handler.MustSucceed(c, h.orderService.CancelOrder(c.Request.Context(), userID, orderID, reason), nil)
 }
 
 // ConfirmReceive 确认收货
@@ -213,26 +142,10 @@ func (h *OrderHandler) CancelOrder(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/v1/orders/{id}/confirm [post]
 func (h *OrderHandler) ConfirmReceive(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, orderID, ok := handler.RequireUserAndParseID(c, "订单")
+	if !ok {
 		return
 	}
 
-	orderID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的订单ID")
-		return
-	}
-
-	if err := h.orderService.ConfirmReceive(c.Request.Context(), userID, orderID); err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, nil)
+	handler.MustSucceed(c, h.orderService.ConfirmReceive(c.Request.Context(), userID, orderID), nil)
 }

@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/dumeirei/smart-locker-backend/internal/common/handler"
 	"github.com/dumeirei/smart-locker-backend/internal/common/response"
 	adminService "github.com/dumeirei/smart-locker-backend/internal/service/admin"
 )
@@ -33,6 +34,11 @@ func NewMerchantHandler(merchantSvc *adminService.MerchantAdminService) *Merchan
 // @Success 200 {object} response.Response{data=models.Merchant}
 // @Router /admin/merchants [post]
 func (h *MerchantHandler) Create(c *gin.Context) {
+	_, ok := handler.RequireAdminID(c)
+	if !ok {
+		return
+	}
+
 	var req adminService.CreateMerchantRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, "参数错误")
@@ -63,10 +69,13 @@ func (h *MerchantHandler) Create(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /admin/merchants/{id} [put]
 func (h *MerchantHandler) Update(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的商户ID")
+	_, ok := handler.RequireAdminID(c)
+	if !ok {
+		return
+	}
+
+	id, ok := handler.ParseID(c, "商户")
+	if !ok {
 		return
 	}
 
@@ -108,10 +117,13 @@ type MerchantUpdateStatusRequest struct {
 // @Success 200 {object} response.Response
 // @Router /admin/merchants/{id}/status [put]
 func (h *MerchantHandler) UpdateStatus(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的商户ID")
+	_, ok := handler.RequireAdminID(c)
+	if !ok {
+		return
+	}
+
+	id, ok := handler.ParseID(c, "商户")
+	if !ok {
 		return
 	}
 
@@ -143,10 +155,13 @@ func (h *MerchantHandler) UpdateStatus(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /admin/merchants/{id} [delete]
 func (h *MerchantHandler) Delete(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的商户ID")
+	_, ok := handler.RequireAdminID(c)
+	if !ok {
+		return
+	}
+
+	id, ok := handler.ParseID(c, "商户")
+	if !ok {
 		return
 	}
 
@@ -175,10 +190,13 @@ func (h *MerchantHandler) Delete(c *gin.Context) {
 // @Success 200 {object} response.Response{data=adminService.MerchantInfo}
 // @Router /admin/merchants/{id} [get]
 func (h *MerchantHandler) Get(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的商户ID")
+	_, ok := handler.RequireAdminID(c)
+	if !ok {
+		return
+	}
+
+	id, ok := handler.ParseID(c, "商户")
+	if !ok {
 		return
 	}
 
@@ -209,16 +227,12 @@ func (h *MerchantHandler) Get(c *gin.Context) {
 // @Success 200 {object} response.Response{data=response.PageData}
 // @Router /admin/merchants [get]
 func (h *MerchantHandler) List(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	_, ok := handler.RequireAdminID(c)
+	if !ok {
+		return
+	}
 
-	if page < 1 {
-		page = 1
-	}
-	if pageSize < 1 || pageSize > 100 {
-		pageSize = 20
-	}
-	offset := (page - 1) * pageSize
+	p := handler.BindPaginationWithDefaults(c, 1, 20)
 
 	filters := make(map[string]interface{})
 	if name := c.Query("name"); name != "" {
@@ -236,13 +250,8 @@ func (h *MerchantHandler) List(c *gin.Context) {
 		}
 	}
 
-	merchants, total, err := h.merchantService.ListMerchants(c.Request.Context(), offset, pageSize, filters)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.SuccessWithPage(c, merchants, total, page, pageSize)
+	merchants, total, err := h.merchantService.ListMerchants(c.Request.Context(), p.GetOffset(), p.GetLimit(), filters)
+	handler.MustSucceedPage(c, err, merchants, total, p.Page, p.PageSize)
 }
 
 // ListAll 获取所有商户（下拉选择用）
@@ -253,13 +262,13 @@ func (h *MerchantHandler) List(c *gin.Context) {
 // @Success 200 {object} response.Response{data=[]models.Merchant}
 // @Router /admin/merchants/all [get]
 func (h *MerchantHandler) ListAll(c *gin.Context) {
-	merchants, err := h.merchantService.ListAllMerchants(c.Request.Context())
-	if err != nil {
-		response.InternalError(c, err.Error())
+	_, ok := handler.RequireAdminID(c)
+	if !ok {
 		return
 	}
 
-	response.Success(c, merchants)
+	merchants, err := h.merchantService.ListAllMerchants(c.Request.Context())
+	handler.MustSucceed(c, err, merchants)
 }
 
 // RegisterRoutes 注册路由

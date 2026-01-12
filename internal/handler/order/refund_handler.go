@@ -2,13 +2,10 @@
 package order
 
 import (
-	"strconv"
-
 	"github.com/gin-gonic/gin"
 
-	"github.com/dumeirei/smart-locker-backend/internal/common/errors"
+	"github.com/dumeirei/smart-locker-backend/internal/common/handler"
 	"github.com/dumeirei/smart-locker-backend/internal/common/response"
-	"github.com/dumeirei/smart-locker-backend/internal/middleware"
 	orderService "github.com/dumeirei/smart-locker-backend/internal/service/order"
 )
 
@@ -34,9 +31,8 @@ func NewRefundHandler(refundSvc *orderService.RefundService) *RefundHandler {
 // @Success 200 {object} response.Response{data=orderService.RefundInfo}
 // @Router /api/v1/refunds [post]
 func (h *RefundHandler) CreateRefund(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
@@ -47,16 +43,7 @@ func (h *RefundHandler) CreateRefund(c *gin.Context) {
 	}
 
 	refund, err := h.refundService.CreateRefund(c.Request.Context(), userID, &req)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, refund)
+	handler.MustSucceed(c, err, refund)
 }
 
 // GetRefundDetail 获取退款详情
@@ -68,29 +55,13 @@ func (h *RefundHandler) CreateRefund(c *gin.Context) {
 // @Success 200 {object} response.Response{data=orderService.RefundInfo}
 // @Router /api/v1/refunds/{id} [get]
 func (h *RefundHandler) GetRefundDetail(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
-		return
-	}
-
-	refundID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的退款ID")
+	userID, refundID, ok := handler.RequireUserAndParseID(c, "退款")
+	if !ok {
 		return
 	}
 
 	refund, err := h.refundService.GetRefundDetail(c.Request.Context(), userID, refundID)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, refund)
+	handler.MustSucceed(c, err, refund)
 }
 
 // GetRefunds 获取退款列表
@@ -103,26 +74,15 @@ func (h *RefundHandler) GetRefundDetail(c *gin.Context) {
 // @Success 200 {object} response.Response{data=orderService.RefundListResponse}
 // @Router /api/v1/refunds [get]
 func (h *RefundHandler) GetRefunds(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+	p := handler.BindPagination(c)
 
-	result, err := h.refundService.GetUserRefunds(c.Request.Context(), userID, page, pageSize)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, result)
+	result, err := h.refundService.GetUserRefunds(c.Request.Context(), userID, p.Page, p.PageSize)
+	handler.MustSucceed(c, err, result)
 }
 
 // CancelRefund 取消退款申请
@@ -134,26 +94,10 @@ func (h *RefundHandler) GetRefunds(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/v1/refunds/{id}/cancel [post]
 func (h *RefundHandler) CancelRefund(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, refundID, ok := handler.RequireUserAndParseID(c, "退款")
+	if !ok {
 		return
 	}
 
-	refundID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的退款ID")
-		return
-	}
-
-	if err := h.refundService.CancelRefund(c.Request.Context(), userID, refundID); err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, nil)
+	handler.MustSucceed(c, h.refundService.CancelRefund(c.Request.Context(), userID, refundID), nil)
 }

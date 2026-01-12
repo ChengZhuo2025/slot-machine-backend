@@ -2,12 +2,9 @@
 package hotel
 
 import (
-	"strconv"
-	"time"
-
 	"github.com/gin-gonic/gin"
 
-	"github.com/dumeirei/smart-locker-backend/internal/common/errors"
+	"github.com/dumeirei/smart-locker-backend/internal/common/handler"
 	"github.com/dumeirei/smart-locker-backend/internal/common/response"
 	hotelService "github.com/dumeirei/smart-locker-backend/internal/service/hotel"
 )
@@ -48,16 +45,7 @@ func (h *Handler) GetHotelList(c *gin.Context) {
 	}
 
 	hotels, total, err := h.hotelService.GetHotelList(c.Request.Context(), &req)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.SuccessWithPage(c, hotels, total, req.Page, req.PageSize)
+	handler.MustSucceedPage(c, err, hotels, total, req.Page, req.PageSize)
 }
 
 // GetHotelDetail 获取酒店详情
@@ -68,23 +56,13 @@ func (h *Handler) GetHotelList(c *gin.Context) {
 // @Success 200 {object} response.Response{data=hotelService.HotelInfo}
 // @Router /api/v1/hotels/{id} [get]
 func (h *Handler) GetHotelDetail(c *gin.Context) {
-	hotelID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的酒店ID")
+	hotelID, ok := handler.ParseID(c, "酒店")
+	if !ok {
 		return
 	}
 
 	hotel, err := h.hotelService.GetHotelDetail(c.Request.Context(), hotelID)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, hotel)
+	handler.MustSucceed(c, err, hotel)
 }
 
 // GetRoomList 获取房间列表
@@ -95,23 +73,13 @@ func (h *Handler) GetHotelDetail(c *gin.Context) {
 // @Success 200 {object} response.Response{data=[]hotelService.RoomInfo}
 // @Router /api/v1/hotels/{id}/rooms [get]
 func (h *Handler) GetRoomList(c *gin.Context) {
-	hotelID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的酒店ID")
+	hotelID, ok := handler.ParseID(c, "酒店")
+	if !ok {
 		return
 	}
 
 	rooms, err := h.hotelService.GetRoomList(c.Request.Context(), hotelID)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, rooms)
+	handler.MustSucceed(c, err, rooms)
 }
 
 // GetRoomDetail 获取房间详情
@@ -122,23 +90,13 @@ func (h *Handler) GetRoomList(c *gin.Context) {
 // @Success 200 {object} response.Response{data=hotelService.RoomInfo}
 // @Router /api/v1/rooms/{id} [get]
 func (h *Handler) GetRoomDetail(c *gin.Context) {
-	roomID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的房间ID")
+	roomID, ok := handler.ParseID(c, "房间")
+	if !ok {
 		return
 	}
 
 	room, err := h.hotelService.GetRoomDetail(c.Request.Context(), roomID)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, room)
+	handler.MustSucceed(c, err, room)
 }
 
 // CheckRoomAvailability 检查房间可用性
@@ -151,9 +109,8 @@ func (h *Handler) GetRoomDetail(c *gin.Context) {
 // @Success 200 {object} response.Response{data=bool}
 // @Router /api/v1/rooms/{id}/availability [get]
 func (h *Handler) CheckRoomAvailability(c *gin.Context) {
-	roomID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的房间ID")
+	roomID, ok := handler.ParseID(c, "房间")
+	if !ok {
 		return
 	}
 
@@ -166,29 +123,20 @@ func (h *Handler) CheckRoomAvailability(c *gin.Context) {
 		return
 	}
 
-	checkIn, err := parseTime(req.CheckIn)
+	checkIn, err := handler.ParseDateTime(req.CheckIn)
 	if err != nil {
 		response.BadRequest(c, "入住时间格式错误")
 		return
 	}
 
-	checkOut, err := parseTime(req.CheckOut)
+	checkOut, err := handler.ParseDateTime(req.CheckOut)
 	if err != nil {
 		response.BadRequest(c, "退房时间格式错误")
 		return
 	}
 
 	available, err := h.hotelService.CheckRoomAvailability(c.Request.Context(), roomID, checkIn, checkOut)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, gin.H{"available": available})
+	handler.MustSucceed(c, err, gin.H{"available": available})
 }
 
 // GetCities 获取城市列表
@@ -199,16 +147,7 @@ func (h *Handler) CheckRoomAvailability(c *gin.Context) {
 // @Router /api/v1/hotels/cities [get]
 func (h *Handler) GetCities(c *gin.Context) {
 	cities, err := h.hotelService.GetCities(c.Request.Context())
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, cities)
+	handler.MustSucceed(c, err, cities)
 }
 
 // GetRoomTimeSlots 获取房间时段价格
@@ -219,40 +158,11 @@ func (h *Handler) GetCities(c *gin.Context) {
 // @Success 200 {object} response.Response{data=[]hotelService.TimeSlotInfo}
 // @Router /api/v1/rooms/{id}/time-slots [get]
 func (h *Handler) GetRoomTimeSlots(c *gin.Context) {
-	roomID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的房间ID")
+	roomID, ok := handler.ParseID(c, "房间")
+	if !ok {
 		return
 	}
 
 	slots, err := h.hotelService.GetTimeSlotsByRoom(c.Request.Context(), roomID)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, slots)
-}
-
-// parseTime 解析时间字符串
-func parseTime(s string) (time.Time, error) {
-	// 支持多种格式
-	formats := []string{
-		"2006-01-02T15:04:05Z07:00",
-		"2006-01-02 15:04:05",
-		"2006-01-02T15:04:05",
-		"2006-01-02 15:04",
-	}
-
-	for _, format := range formats {
-		if t, err := time.Parse(format, s); err == nil {
-			return t, nil
-		}
-	}
-
-	return time.Time{}, errors.ErrInvalidParams.WithMessage("时间格式错误")
+	handler.MustSucceed(c, err, slots)
 }

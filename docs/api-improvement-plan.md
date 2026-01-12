@@ -3,7 +3,7 @@
 **项目**: Smart Locker Backend
 **审计日期**: 2026-01-11
 **审计范围**: 所有 API Handler 实现
-**最后更新**: 2026-01-11
+**最后更新**: 2026-01-12
 
 ---
 
@@ -13,8 +13,8 @@
 |------|------|------|------|
 | 准备 | 创建 Handler 辅助函数包 | ✅ 已完成 | `internal/common/handler/handler.go` |
 | 准备 | 编写单元测试 | ✅ 已完成 | 40个测试用例全部通过 |
-| 迁移 | 用户端 Handler 迁移 | ⏳ 待执行 | 13个文件待迁移 |
-| 迁移 | 管理端 Handler 迁移 | ⏳ 待执行 | 15+个文件待迁移 |
+| 迁移 | 用户端 Handler 迁移 | ✅ 已完成 | 已完成 16/16（批次一+二+三） |
+| 迁移 | 管理端 Handler 迁移 | ✅ 已完成 | 已完成 16/16（admin/auth、admin/booking_verify、admin/device、admin/venue、admin/user、admin/order、admin/merchant、admin/banner_feedback、admin/system、admin/dashboard、admin/finance、admin/member、admin/marketing、admin/distribution、admin/hotel、admin/product） |
 
 ---
 
@@ -794,22 +794,23 @@ p := handler.BindPagination(c)
 
 | 文件 | 状态 | 迁移日期 | 备注 |
 |------|------|----------|------|
-| auth/auth_handler.go | ⏳ 待迁移 | - | - |
-| user/user_handler.go | ⏳ 待迁移 | - | - |
-| user/member_handler.go | ⏳ 待迁移 | - | - |
-| rental/rental_handler.go | ⏳ 待迁移 | - | - |
-| payment/payment_handler.go | ⏳ 待迁移 | - | - |
-| hotel/hotel_handler.go | ⏳ 待迁移 | - | - |
-| hotel/booking_handler.go | ⏳ 待迁移 | - | - |
-| mall/cart_handler.go | ⏳ 待迁移 | - | - |
-| mall/order_handler.go | ⏳ 待迁移 | - | - |
-| mall/product_handler.go | ⏳ 待迁移 | - | - |
-| distribution/distribution_handler.go | ⏳ 待迁移 | - | - |
-| marketing/coupon_handler.go | ⏳ 待迁移 | - | - |
-| order/refund_handler.go | ⏳ 待迁移 | - | - |
-| device/device_handler.go | ⏳ 待迁移 | - | - |
-| content/content_handler.go | ⏳ 待迁移 | - | - |
-| admin/* (15个文件) | ⏳ 待迁移 | - | - |
+| auth/auth_handler.go | ✅ 已迁移 | 2026-01-12 | 批次一 |
+| user/user_handler.go | ✅ 已迁移 | 2026-01-12 | 批次一 |
+| user/member_handler.go | ✅ 已迁移 | 2026-01-12 | 批次一 |
+| rental/rental_handler.go | ✅ 已迁移 | 2026-01-12 | 批次一 |
+| payment/payment_handler.go | ✅ 已迁移 | 2026-01-12 | 批次一 |
+| hotel/hotel_handler.go | ✅ 已迁移 | 2026-01-12 | 批次二 |
+| hotel/booking_handler.go | ✅ 已迁移 | 2026-01-12 | 批次二 |
+| mall/cart_handler.go | ✅ 已迁移 | 2026-01-12 | 批次二 |
+| mall/order_handler.go | ✅ 已迁移 | 2026-01-12 | 批次二 |
+| mall/product_handler.go | ✅ 已迁移 | 2026-01-12 | 批次二 |
+| distribution/distribution_handler.go | ✅ 已迁移 | 2026-01-12 | 批次三 |
+| marketing/coupon_handler.go | ✅ 已迁移 | 2026-01-12 | 批次三 |
+| order/refund_handler.go | ✅ 已迁移 | 2026-01-12 | 批次三 |
+| device/device_handler.go | ✅ 已迁移 | 2026-01-12 | 批次三 |
+| content/content_handler.go | ✅ 已迁移 | 2026-01-12 | 批次三 |
+| user/feedback_handler.go | ✅ 已迁移 | 2026-01-12 | 批次三 |
+| admin/* (16个文件) | ✅ 已迁移 | 2026-01-12 | 已迁移：auth_handler.go、booking_verify_handler.go、device_handler.go、venue_handler.go、user_handler.go、order_handler.go、product_handler.go、merchant_handler.go、banner_feedback_handler.go、system_handler.go、dashboard_handler.go、finance_handler.go、member_handler.go、marketing_handler.go、distribution_handler.go、hotel_handler.go |
 
 ---
 

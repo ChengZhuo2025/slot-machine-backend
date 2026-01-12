@@ -2,14 +2,10 @@
 package user
 
 import (
-	"strconv"
-
 	"github.com/gin-gonic/gin"
 
-	"github.com/dumeirei/smart-locker-backend/internal/common/errors"
+	"github.com/dumeirei/smart-locker-backend/internal/common/handler"
 	"github.com/dumeirei/smart-locker-backend/internal/common/response"
-	"github.com/dumeirei/smart-locker-backend/internal/common/utils"
-	"github.com/dumeirei/smart-locker-backend/internal/middleware"
 	userService "github.com/dumeirei/smart-locker-backend/internal/service/user"
 )
 
@@ -42,23 +38,13 @@ func NewMemberHandler(
 // @Success 200 {object} response.Response{data=userService.UserMemberInfo}
 // @Router /api/v1/member/info [get]
 func (h *MemberHandler) GetMemberInfo(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
 	info, err := h.memberLevelService.GetUserMemberInfo(c.Request.Context(), userID)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, info)
+	handler.MustSucceed(c, err, info)
 }
 
 // GetMemberLevels 获取所有会员等级
@@ -70,16 +56,7 @@ func (h *MemberHandler) GetMemberInfo(c *gin.Context) {
 // @Router /api/v1/member/levels [get]
 func (h *MemberHandler) GetMemberLevels(c *gin.Context) {
 	levels, err := h.memberLevelService.GetAllLevels(c.Request.Context())
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, levels)
+	handler.MustSucceed(c, err, levels)
 }
 
 // GetMemberPackages 获取会员套餐列表
@@ -91,16 +68,7 @@ func (h *MemberHandler) GetMemberLevels(c *gin.Context) {
 // @Router /api/v1/member/packages [get]
 func (h *MemberHandler) GetMemberPackages(c *gin.Context) {
 	packages, err := h.memberPackageService.GetActivePackages(c.Request.Context())
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, packages)
+	handler.MustSucceed(c, err, packages)
 }
 
 // GetRecommendedPackages 获取推荐套餐
@@ -112,16 +80,7 @@ func (h *MemberHandler) GetMemberPackages(c *gin.Context) {
 // @Router /api/v1/member/packages/recommended [get]
 func (h *MemberHandler) GetRecommendedPackages(c *gin.Context) {
 	packages, err := h.memberPackageService.GetRecommendedPackages(c.Request.Context())
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, packages)
+	handler.MustSucceed(c, err, packages)
 }
 
 // GetPackageDetail 获取套餐详情
@@ -133,24 +92,13 @@ func (h *MemberHandler) GetRecommendedPackages(c *gin.Context) {
 // @Success 200 {object} response.Response{data=userService.PackageInfo}
 // @Router /api/v1/member/packages/{id} [get]
 func (h *MemberHandler) GetPackageDetail(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的套餐ID")
+	id, ok := handler.ParseID(c, "套餐")
+	if !ok {
 		return
 	}
 
 	pkg, err := h.memberPackageService.GetPackageByID(c.Request.Context(), id)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, pkg)
+	handler.MustSucceed(c, err, pkg)
 }
 
 // PurchasePackageRequest 购买套餐请求
@@ -169,9 +117,8 @@ type PurchasePackageRequest struct {
 // @Success 200 {object} response.Response{data=userService.PurchaseResult}
 // @Router /api/v1/member/packages/purchase [post]
 func (h *MemberHandler) PurchasePackage(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
@@ -182,16 +129,7 @@ func (h *MemberHandler) PurchasePackage(c *gin.Context) {
 	}
 
 	result, err := h.memberPackageService.PurchasePackage(c.Request.Context(), userID, req.PackageID)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, result)
+	handler.MustSucceed(c, err, result)
 }
 
 // GetPointsInfo 获取积分信息
@@ -203,23 +141,13 @@ func (h *MemberHandler) PurchasePackage(c *gin.Context) {
 // @Success 200 {object} response.Response{data=userService.PointsInfo}
 // @Router /api/v1/member/points [get]
 func (h *MemberHandler) GetPointsInfo(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
 	info, err := h.pointsService.GetPointsInfo(c.Request.Context(), userID)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, info)
+	handler.MustSucceed(c, err, info)
 }
 
 // GetPointsHistory 获取积分历史
@@ -234,36 +162,23 @@ func (h *MemberHandler) GetPointsInfo(c *gin.Context) {
 // @Success 200 {object} response.Response{data=response.PageData}
 // @Router /api/v1/member/points/history [get]
 func (h *MemberHandler) GetPointsHistory(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
-	var pagination utils.Pagination
-	pagination.Page, _ = strconv.Atoi(c.DefaultQuery("page", "1"))
-	pagination.PageSize, _ = strconv.Atoi(c.DefaultQuery("page_size", "10"))
-	pagination.Normalize()
+	p := handler.BindPagination(c)
 
 	pointsType := c.Query("type")
 
 	records, total, err := h.pointsService.GetPointsHistory(
 		c.Request.Context(),
 		userID,
-		pagination.GetOffset(),
-		pagination.GetLimit(),
+		p.GetOffset(),
+		p.GetLimit(),
 		pointsType,
 	)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.SuccessPage(c, records, total, pagination.Page, pagination.PageSize)
+	handler.MustSucceedPage(c, err, records, total, p.Page, p.PageSize)
 }
 
 // GetMemberBenefits 获取会员权益
@@ -275,19 +190,13 @@ func (h *MemberHandler) GetPointsHistory(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/v1/member/benefits [get]
 func (h *MemberHandler) GetMemberBenefits(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
 	info, err := h.memberLevelService.GetUserMemberInfo(c.Request.Context(), userID)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
+	if handler.HandleError(c, err) {
 		return
 	}
 
@@ -318,25 +227,13 @@ func (h *MemberHandler) GetMemberBenefits(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/v1/member/discount [get]
 func (h *MemberHandler) GetDiscount(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
 	discount, err := h.memberLevelService.GetDiscount(c.Request.Context(), userID)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, gin.H{
-		"discount": discount,
-	})
+	handler.MustSucceed(c, err, gin.H{"discount": discount})
 }
 
 // RegisterRoutes 注册会员相关路由

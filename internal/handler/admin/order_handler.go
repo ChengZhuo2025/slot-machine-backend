@@ -3,10 +3,10 @@ package admin
 
 import (
 	"strconv"
-	"time"
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/dumeirei/smart-locker-backend/internal/common/handler"
 	"github.com/dumeirei/smart-locker-backend/internal/common/response"
 	adminService "github.com/dumeirei/smart-locker-backend/internal/service/admin"
 )
@@ -37,8 +37,12 @@ func NewOrderHandler(orderService *adminService.OrderAdminService) *OrderHandler
 // @Success 200 {object} response.Response{data=response.ListData}
 // @Router /api/v1/admin/orders [get]
 func (h *OrderHandler) List(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	_, ok := handler.RequireAdminID(c)
+	if !ok {
+		return
+	}
+
+	p := handler.BindPaginationWithDefaults(c, 1, 20)
 
 	filters := &adminService.OrderListFilters{
 		OrderNo: c.Query("order_no"),
@@ -47,25 +51,20 @@ func (h *OrderHandler) List(c *gin.Context) {
 	}
 
 	if s := c.Query("user_id"); s != "" {
-		filters.UserID, _ = strconv.ParseInt(s, 10, 64)
-	}
-	if s := c.Query("start_date"); s != "" {
-		t, _ := time.Parse("2006-01-02", s)
-		filters.StartDate = &t
-	}
-	if s := c.Query("end_date"); s != "" {
-		t, _ := time.Parse("2006-01-02", s)
-		endOfDay := t.Add(24*time.Hour - time.Second)
-		filters.EndDate = &endOfDay
+		if userID, err := strconv.ParseInt(s, 10, 64); err == nil {
+			filters.UserID = userID
+		}
 	}
 
-	orders, total, err := h.orderService.List(c.Request.Context(), page, pageSize, filters)
-	if err != nil {
-		response.InternalError(c, err.Error())
+	startDate, endDate, ok := handler.ParseQueryDateRange(c)
+	if !ok {
 		return
 	}
+	filters.StartDate = startDate
+	filters.EndDate = endDate
 
-	response.SuccessList(c, orders, total, page, pageSize)
+	orders, total, err := h.orderService.List(c.Request.Context(), p.Page, p.PageSize, filters)
+	handler.MustSucceedPage(c, err, orders, total, p.Page, p.PageSize)
 }
 
 // GetByID 获取订单详情
@@ -77,9 +76,13 @@ func (h *OrderHandler) List(c *gin.Context) {
 // @Success 200 {object} response.Response{data=models.Order}
 // @Router /api/v1/admin/orders/{id} [get]
 func (h *OrderHandler) GetByID(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的订单ID")
+	_, ok := handler.RequireAdminID(c)
+	if !ok {
+		return
+	}
+
+	id, ok := handler.ParseID(c, "订单")
+	if !ok {
 		return
 	}
 
@@ -88,7 +91,6 @@ func (h *OrderHandler) GetByID(c *gin.Context) {
 		response.NotFound(c, "订单不存在")
 		return
 	}
-
 	response.Success(c, order)
 }
 
@@ -101,6 +103,11 @@ func (h *OrderHandler) GetByID(c *gin.Context) {
 // @Success 200 {object} response.Response{data=models.Order}
 // @Router /api/v1/admin/orders/no/{order_no} [get]
 func (h *OrderHandler) GetByOrderNo(c *gin.Context) {
+	_, ok := handler.RequireAdminID(c)
+	if !ok {
+		return
+	}
+
 	orderNo := c.Param("order_no")
 	if orderNo == "" {
 		response.BadRequest(c, "订单号不能为空")
@@ -112,7 +119,6 @@ func (h *OrderHandler) GetByOrderNo(c *gin.Context) {
 		response.NotFound(c, "订单不存在")
 		return
 	}
-
 	response.Success(c, order)
 }
 
@@ -132,9 +138,13 @@ type CancelRequest struct {
 // @Success 200 {object} response.Response
 // @Router /api/v1/admin/orders/{id}/cancel [post]
 func (h *OrderHandler) Cancel(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的订单ID")
+	_, ok := handler.RequireAdminID(c)
+	if !ok {
+		return
+	}
+
+	id, ok := handler.ParseID(c, "订单")
+	if !ok {
 		return
 	}
 
@@ -144,12 +154,7 @@ func (h *OrderHandler) Cancel(c *gin.Context) {
 		return
 	}
 
-	if err := h.orderService.CancelOrder(c.Request.Context(), id, req.Reason); err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, nil)
+	handler.MustSucceed(c, h.orderService.CancelOrder(c.Request.Context(), id, req.Reason), nil)
 }
 
 // ShipRequest 发货请求
@@ -169,9 +174,13 @@ type ShipRequest struct {
 // @Success 200 {object} response.Response
 // @Router /api/v1/admin/orders/{id}/ship [post]
 func (h *OrderHandler) Ship(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的订单ID")
+	_, ok := handler.RequireAdminID(c)
+	if !ok {
+		return
+	}
+
+	id, ok := handler.ParseID(c, "订单")
+	if !ok {
 		return
 	}
 
@@ -181,12 +190,7 @@ func (h *OrderHandler) Ship(c *gin.Context) {
 		return
 	}
 
-	if err := h.orderService.ShipOrder(c.Request.Context(), id, req.ExpressCompany, req.ExpressNo); err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, nil)
+	handler.MustSucceed(c, h.orderService.ShipOrder(c.Request.Context(), id, req.ExpressCompany, req.ExpressNo), nil)
 }
 
 // ConfirmReceipt 确认收货
@@ -198,18 +202,17 @@ func (h *OrderHandler) Ship(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/v1/admin/orders/{id}/confirm-receipt [post]
 func (h *OrderHandler) ConfirmReceipt(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的订单ID")
+	_, ok := handler.RequireAdminID(c)
+	if !ok {
 		return
 	}
 
-	if err := h.orderService.ConfirmReceipt(c.Request.Context(), id); err != nil {
-		response.InternalError(c, err.Error())
+	id, ok := handler.ParseID(c, "订单")
+	if !ok {
 		return
 	}
 
-	response.Success(c, nil)
+	handler.MustSucceed(c, h.orderService.ConfirmReceipt(c.Request.Context(), id), nil)
 }
 
 // RemarkRequest 备注请求
@@ -228,9 +231,13 @@ type RemarkRequest struct {
 // @Success 200 {object} response.Response
 // @Router /api/v1/admin/orders/{id}/remark [post]
 func (h *OrderHandler) AddRemark(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的订单ID")
+	_, ok := handler.RequireAdminID(c)
+	if !ok {
+		return
+	}
+
+	id, ok := handler.ParseID(c, "订单")
+	if !ok {
 		return
 	}
 
@@ -240,12 +247,7 @@ func (h *OrderHandler) AddRemark(c *gin.Context) {
 		return
 	}
 
-	if err := h.orderService.AddRemark(c.Request.Context(), id, req.Remark); err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, nil)
+	handler.MustSucceed(c, h.orderService.AddRemark(c.Request.Context(), id, req.Remark), nil)
 }
 
 // GetStatistics 获取订单统计
@@ -256,13 +258,13 @@ func (h *OrderHandler) AddRemark(c *gin.Context) {
 // @Success 200 {object} response.Response{data=adminService.OrderStatistics}
 // @Router /api/v1/admin/orders/statistics [get]
 func (h *OrderHandler) GetStatistics(c *gin.Context) {
-	stats, err := h.orderService.GetStatistics(c.Request.Context())
-	if err != nil {
-		response.InternalError(c, err.Error())
+	_, ok := handler.RequireAdminID(c)
+	if !ok {
 		return
 	}
 
-	response.Success(c, stats)
+	stats, err := h.orderService.GetStatistics(c.Request.Context())
+	handler.MustSucceed(c, err, stats)
 }
 
 // Export 导出订单
@@ -279,6 +281,11 @@ func (h *OrderHandler) GetStatistics(c *gin.Context) {
 // @Success 200 {object} response.Response{data=[]models.Order}
 // @Router /api/v1/admin/orders/export [get]
 func (h *OrderHandler) Export(c *gin.Context) {
+	_, ok := handler.RequireAdminID(c)
+	if !ok {
+		return
+	}
+
 	filters := &adminService.OrderListFilters{
 		OrderNo: c.Query("order_no"),
 		Type:    c.Query("type"),
@@ -286,23 +293,18 @@ func (h *OrderHandler) Export(c *gin.Context) {
 	}
 
 	if s := c.Query("user_id"); s != "" {
-		filters.UserID, _ = strconv.ParseInt(s, 10, 64)
-	}
-	if s := c.Query("start_date"); s != "" {
-		t, _ := time.Parse("2006-01-02", s)
-		filters.StartDate = &t
-	}
-	if s := c.Query("end_date"); s != "" {
-		t, _ := time.Parse("2006-01-02", s)
-		endOfDay := t.Add(24*time.Hour - time.Second)
-		filters.EndDate = &endOfDay
+		if userID, err := strconv.ParseInt(s, 10, 64); err == nil {
+			filters.UserID = userID
+		}
 	}
 
-	orders, err := h.orderService.ExportOrders(c.Request.Context(), filters)
-	if err != nil {
-		response.InternalError(c, err.Error())
+	startDate, endDate, ok := handler.ParseQueryDateRange(c)
+	if !ok {
 		return
 	}
+	filters.StartDate = startDate
+	filters.EndDate = endDate
 
-	response.Success(c, orders)
+	orders, err := h.orderService.ExportOrders(c.Request.Context(), filters)
+	handler.MustSucceed(c, err, orders)
 }

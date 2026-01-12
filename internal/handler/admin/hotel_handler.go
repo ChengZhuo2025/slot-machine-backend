@@ -6,7 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/dumeirei/smart-locker-backend/internal/common/errors"
+	"github.com/dumeirei/smart-locker-backend/internal/common/handler"
 	"github.com/dumeirei/smart-locker-backend/internal/common/response"
 	adminService "github.com/dumeirei/smart-locker-backend/internal/service/admin"
 )
@@ -33,6 +33,10 @@ func NewHotelHandler(hotelSvc *adminService.HotelAdminService) *HotelHandler {
 // @Success 200 {object} response.Response{data=models.Hotel}
 // @Router /admin/hotels [post]
 func (h *HotelHandler) CreateHotel(c *gin.Context) {
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
 	var req adminService.CreateHotelRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, "参数错误")
@@ -40,16 +44,7 @@ func (h *HotelHandler) CreateHotel(c *gin.Context) {
 	}
 
 	hotel, err := h.hotelService.CreateHotel(c.Request.Context(), &req)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, hotel)
+	handler.MustSucceed(c, err, hotel)
 }
 
 // UpdateHotel 更新酒店
@@ -63,9 +58,12 @@ func (h *HotelHandler) CreateHotel(c *gin.Context) {
 // @Success 200 {object} response.Response{data=models.Hotel}
 // @Router /admin/hotels/{id} [put]
 func (h *HotelHandler) UpdateHotel(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的酒店ID")
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
+	id, ok := handler.ParseID(c, "酒店")
+	if !ok {
 		return
 	}
 
@@ -76,16 +74,7 @@ func (h *HotelHandler) UpdateHotel(c *gin.Context) {
 	}
 
 	hotel, err := h.hotelService.UpdateHotel(c.Request.Context(), id, &req)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, hotel)
+	handler.MustSucceed(c, err, hotel)
 }
 
 // GetHotel 获取酒店详情
@@ -97,23 +86,17 @@ func (h *HotelHandler) UpdateHotel(c *gin.Context) {
 // @Success 200 {object} response.Response{data=models.Hotel}
 // @Router /admin/hotels/{id} [get]
 func (h *HotelHandler) GetHotel(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的酒店ID")
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
+	id, ok := handler.ParseID(c, "酒店")
+	if !ok {
 		return
 	}
 
 	hotel, err := h.hotelService.GetHotelByID(c.Request.Context(), id)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, hotel)
+	handler.MustSucceed(c, err, hotel)
 }
 
 // ListHotels 获取酒店列表
@@ -129,15 +112,11 @@ func (h *HotelHandler) GetHotel(c *gin.Context) {
 // @Success 200 {object} response.Response{data=response.PageData}
 // @Router /admin/hotels [get]
 func (h *HotelHandler) ListHotels(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
 
-	if page < 1 {
-		page = 1
-	}
-	if pageSize < 1 || pageSize > 100 {
-		pageSize = 20
-	}
+	p := handler.BindPaginationWithDefaults(c, 1, 20)
 
 	filters := make(map[string]interface{})
 	if name := c.Query("name"); name != "" {
@@ -152,17 +131,8 @@ func (h *HotelHandler) ListHotels(c *gin.Context) {
 		}
 	}
 
-	hotels, total, err := h.hotelService.GetHotelList(c.Request.Context(), page, pageSize, filters)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.SuccessWithPage(c, hotels, total, page, pageSize)
+	hotels, total, err := h.hotelService.GetHotelList(c.Request.Context(), p.Page, p.PageSize, filters)
+	handler.MustSucceedPage(c, err, hotels, total, p.Page, p.PageSize)
 }
 
 // DeleteHotel 删除酒店
@@ -174,22 +144,16 @@ func (h *HotelHandler) ListHotels(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /admin/hotels/{id} [delete]
 func (h *HotelHandler) DeleteHotel(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的酒店ID")
+	if _, ok := handler.RequireAdminID(c); !ok {
 		return
 	}
 
-	if err := h.hotelService.DeleteHotel(c.Request.Context(), id); err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
+	id, ok := handler.ParseID(c, "酒店")
+	if !ok {
 		return
 	}
 
-	response.Success(c, nil)
+	handler.MustSucceed(c, h.hotelService.DeleteHotel(c.Request.Context(), id), nil)
 }
 
 // HotelUpdateStatusRequest 更新酒店状态请求
@@ -208,9 +172,12 @@ type HotelUpdateStatusRequest struct {
 // @Success 200 {object} response.Response
 // @Router /admin/hotels/{id}/status [put]
 func (h *HotelHandler) UpdateHotelStatus(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的酒店ID")
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
+	id, ok := handler.ParseID(c, "酒店")
+	if !ok {
 		return
 	}
 
@@ -220,16 +187,7 @@ func (h *HotelHandler) UpdateHotelStatus(c *gin.Context) {
 		return
 	}
 
-	if err := h.hotelService.UpdateHotelStatus(c.Request.Context(), id, req.Status); err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, nil)
+	handler.MustSucceed(c, h.hotelService.UpdateHotelStatus(c.Request.Context(), id, req.Status), nil)
 }
 
 // CreateRoom 创建房间
@@ -242,6 +200,10 @@ func (h *HotelHandler) UpdateHotelStatus(c *gin.Context) {
 // @Success 200 {object} response.Response{data=models.Room}
 // @Router /admin/rooms [post]
 func (h *HotelHandler) CreateRoom(c *gin.Context) {
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
 	var req adminService.CreateRoomRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, "参数错误")
@@ -249,16 +211,7 @@ func (h *HotelHandler) CreateRoom(c *gin.Context) {
 	}
 
 	room, err := h.hotelService.CreateRoom(c.Request.Context(), &req)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, room)
+	handler.MustSucceed(c, err, room)
 }
 
 // UpdateRoom 更新房间
@@ -272,9 +225,12 @@ func (h *HotelHandler) CreateRoom(c *gin.Context) {
 // @Success 200 {object} response.Response{data=models.Room}
 // @Router /admin/rooms/{id} [put]
 func (h *HotelHandler) UpdateRoom(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的房间ID")
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
+	id, ok := handler.ParseID(c, "房间")
+	if !ok {
 		return
 	}
 
@@ -285,16 +241,7 @@ func (h *HotelHandler) UpdateRoom(c *gin.Context) {
 	}
 
 	room, err := h.hotelService.UpdateRoom(c.Request.Context(), id, &req)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, room)
+	handler.MustSucceed(c, err, room)
 }
 
 // GetRoom 获取房间详情
@@ -306,23 +253,17 @@ func (h *HotelHandler) UpdateRoom(c *gin.Context) {
 // @Success 200 {object} response.Response{data=models.Room}
 // @Router /admin/rooms/{id} [get]
 func (h *HotelHandler) GetRoom(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的房间ID")
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
+	id, ok := handler.ParseID(c, "房间")
+	if !ok {
 		return
 	}
 
 	room, err := h.hotelService.GetRoomByID(c.Request.Context(), id)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, room)
+	handler.MustSucceed(c, err, room)
 }
 
 // ListRooms 获取房间列表
@@ -338,15 +279,11 @@ func (h *HotelHandler) GetRoom(c *gin.Context) {
 // @Success 200 {object} response.Response{data=response.PageData}
 // @Router /admin/rooms [get]
 func (h *HotelHandler) ListRooms(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
 
-	if page < 1 {
-		page = 1
-	}
-	if pageSize < 1 || pageSize > 100 {
-		pageSize = 20
-	}
+	p := handler.BindPaginationWithDefaults(c, 1, 20)
 
 	filters := make(map[string]interface{})
 	if hotelIDStr := c.Query("hotel_id"); hotelIDStr != "" {
@@ -363,17 +300,8 @@ func (h *HotelHandler) ListRooms(c *gin.Context) {
 		}
 	}
 
-	rooms, total, err := h.hotelService.GetRoomList(c.Request.Context(), page, pageSize, filters)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.SuccessWithPage(c, rooms, total, page, pageSize)
+	rooms, total, err := h.hotelService.GetRoomList(c.Request.Context(), p.Page, p.PageSize, filters)
+	handler.MustSucceedPage(c, err, rooms, total, p.Page, p.PageSize)
 }
 
 // DeleteRoom 删除房间
@@ -385,22 +313,16 @@ func (h *HotelHandler) ListRooms(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /admin/rooms/{id} [delete]
 func (h *HotelHandler) DeleteRoom(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的房间ID")
+	if _, ok := handler.RequireAdminID(c); !ok {
 		return
 	}
 
-	if err := h.hotelService.DeleteRoom(c.Request.Context(), id); err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
+	id, ok := handler.ParseID(c, "房间")
+	if !ok {
 		return
 	}
 
-	response.Success(c, nil)
+	handler.MustSucceed(c, h.hotelService.DeleteRoom(c.Request.Context(), id), nil)
 }
 
 // CreateTimeSlot 创建时段价格
@@ -413,6 +335,10 @@ func (h *HotelHandler) DeleteRoom(c *gin.Context) {
 // @Success 200 {object} response.Response{data=models.RoomTimeSlot}
 // @Router /admin/time-slots [post]
 func (h *HotelHandler) CreateTimeSlot(c *gin.Context) {
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
 	var req adminService.CreateTimeSlotRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, "参数错误")
@@ -420,16 +346,7 @@ func (h *HotelHandler) CreateTimeSlot(c *gin.Context) {
 	}
 
 	slot, err := h.hotelService.CreateTimeSlot(c.Request.Context(), &req)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, slot)
+	handler.MustSucceed(c, err, slot)
 }
 
 // UpdateTimeSlotRequest 更新时段请求
@@ -453,9 +370,12 @@ type UpdateTimeSlotRequest struct {
 // @Success 200 {object} response.Response
 // @Router /admin/time-slots/{id} [put]
 func (h *HotelHandler) UpdateTimeSlot(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的时段ID")
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
+	id, ok := handler.ParseID(c, "时段")
+	if !ok {
 		return
 	}
 
@@ -485,16 +405,7 @@ func (h *HotelHandler) UpdateTimeSlot(c *gin.Context) {
 		fields["is_active"] = *req.IsActive
 	}
 
-	if err := h.hotelService.UpdateTimeSlot(c.Request.Context(), id, fields); err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, nil)
+	handler.MustSucceed(c, h.hotelService.UpdateTimeSlot(c.Request.Context(), id, fields), nil)
 }
 
 // DeleteTimeSlot 删除时段
@@ -506,22 +417,16 @@ func (h *HotelHandler) UpdateTimeSlot(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /admin/time-slots/{id} [delete]
 func (h *HotelHandler) DeleteTimeSlot(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的时段ID")
+	if _, ok := handler.RequireAdminID(c); !ok {
 		return
 	}
 
-	if err := h.hotelService.DeleteTimeSlot(c.Request.Context(), id); err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
+	id, ok := handler.ParseID(c, "时段")
+	if !ok {
 		return
 	}
 
-	response.Success(c, nil)
+	handler.MustSucceed(c, h.hotelService.DeleteTimeSlot(c.Request.Context(), id), nil)
 }
 
 // ListBookings 获取预订列表
@@ -539,15 +444,11 @@ func (h *HotelHandler) DeleteTimeSlot(c *gin.Context) {
 // @Success 200 {object} response.Response{data=response.PageData}
 // @Router /admin/bookings [get]
 func (h *HotelHandler) ListBookings(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
 
-	if page < 1 {
-		page = 1
-	}
-	if pageSize < 1 || pageSize > 100 {
-		pageSize = 20
-	}
+	p := handler.BindPaginationWithDefaults(c, 1, 20)
 
 	filters := make(map[string]interface{})
 	if hotelIDStr := c.Query("hotel_id"); hotelIDStr != "" {
@@ -572,17 +473,8 @@ func (h *HotelHandler) ListBookings(c *gin.Context) {
 		filters["booking_no"] = bookingNo
 	}
 
-	bookings, total, err := h.hotelService.GetBookingList(c.Request.Context(), page, pageSize, filters)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.SuccessWithPage(c, bookings, total, page, pageSize)
+	bookings, total, err := h.hotelService.GetBookingList(c.Request.Context(), p.Page, p.PageSize, filters)
+	handler.MustSucceedPage(c, err, bookings, total, p.Page, p.PageSize)
 }
 
 // GetBooking 获取预订详情
@@ -594,23 +486,17 @@ func (h *HotelHandler) ListBookings(c *gin.Context) {
 // @Success 200 {object} response.Response{data=models.Booking}
 // @Router /admin/bookings/{id} [get]
 func (h *HotelHandler) GetBooking(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的预订ID")
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
+	id, ok := handler.ParseID(c, "预订")
+	if !ok {
 		return
 	}
 
 	booking, err := h.hotelService.GetBookingByID(c.Request.Context(), id)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, booking)
+	handler.MustSucceed(c, err, booking)
 }
 
 // RegisterRoutes 注册路由

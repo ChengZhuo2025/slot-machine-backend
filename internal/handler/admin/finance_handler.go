@@ -7,8 +7,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/dumeirei/smart-locker-backend/internal/common/handler"
 	"github.com/dumeirei/smart-locker-backend/internal/common/response"
-	"github.com/dumeirei/smart-locker-backend/internal/middleware"
 	financeService "github.com/dumeirei/smart-locker-backend/internal/service/finance"
 )
 
@@ -43,13 +43,12 @@ func NewFinanceHandler(
 // @Success 200 {object} response.Response{data=models.FinanceOverview}
 // @Router /api/v1/admin/finance/overview [get]
 func (h *FinanceHandler) GetOverview(c *gin.Context) {
-	overview, err := h.statisticsService.GetFinanceOverview(c.Request.Context())
-	if err != nil {
-		response.InternalError(c, err.Error())
+	if _, ok := handler.RequireAdminID(c); !ok {
 		return
 	}
 
-	response.Success(c, overview)
+	overview, err := h.statisticsService.GetFinanceOverview(c.Request.Context())
+	handler.MustSucceed(c, err, overview)
 }
 
 // GetRevenueStatistics 获取收入统计
@@ -62,6 +61,10 @@ func (h *FinanceHandler) GetOverview(c *gin.Context) {
 // @Success 200 {object} response.Response{data=[]models.RevenueStatistics}
 // @Router /api/v1/admin/finance/revenue/statistics [get]
 func (h *FinanceHandler) GetRevenueStatistics(c *gin.Context) {
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
 	startDateStr := c.Query("start_date")
 	endDateStr := c.Query("end_date")
 
@@ -83,12 +86,7 @@ func (h *FinanceHandler) GetRevenueStatistics(c *gin.Context) {
 	endDate = endDate.Add(24*time.Hour - time.Second)
 
 	stats, err := h.statisticsService.GetRevenueStatistics(c.Request.Context(), startDate, endDate)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, stats)
+	handler.MustSucceed(c, err, stats)
 }
 
 // GetDailyRevenueReport 获取每日收入报表
@@ -101,6 +99,10 @@ func (h *FinanceHandler) GetRevenueStatistics(c *gin.Context) {
 // @Success 200 {object} response.Response{data=[]models.DailyRevenueReport}
 // @Router /api/v1/admin/finance/revenue/daily [get]
 func (h *FinanceHandler) GetDailyRevenueReport(c *gin.Context) {
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
 	startDateStr := c.Query("start_date")
 	endDateStr := c.Query("end_date")
 
@@ -122,12 +124,7 @@ func (h *FinanceHandler) GetDailyRevenueReport(c *gin.Context) {
 	endDate = endDate.Add(24*time.Hour - time.Second)
 
 	report, err := h.statisticsService.GetDailyRevenueReport(c.Request.Context(), startDate, endDate)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, report)
+	handler.MustSucceed(c, err, report)
 }
 
 // GetOrderRevenueByType 按订单类型获取收入统计
@@ -140,6 +137,10 @@ func (h *FinanceHandler) GetDailyRevenueReport(c *gin.Context) {
 // @Success 200 {object} response.Response{data=[]models.OrderRevenue}
 // @Router /api/v1/admin/finance/revenue/by-type [get]
 func (h *FinanceHandler) GetOrderRevenueByType(c *gin.Context) {
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
 	var startDate, endDate *time.Time
 
 	if s := c.Query("start_date"); s != "" {
@@ -161,12 +162,7 @@ func (h *FinanceHandler) GetOrderRevenueByType(c *gin.Context) {
 	}
 
 	result, err := h.statisticsService.GetOrderRevenueByType(c.Request.Context(), startDate, endDate)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, result)
+	handler.MustSucceed(c, err, result)
 }
 
 // ListSettlements 获取结算列表
@@ -184,6 +180,10 @@ func (h *FinanceHandler) GetOrderRevenueByType(c *gin.Context) {
 // @Success 200 {object} response.Response{data=response.PageData}
 // @Router /api/v1/admin/finance/settlements [get]
 func (h *FinanceHandler) ListSettlements(c *gin.Context) {
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
 
@@ -209,12 +209,7 @@ func (h *FinanceHandler) ListSettlements(c *gin.Context) {
 	}
 
 	settlements, total, err := h.settlementService.ListSettlements(c.Request.Context(), req)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.SuccessPage(c, settlements, total, page, pageSize)
+	handler.MustSucceedPage(c, err, settlements, total, page, pageSize)
 }
 
 // GetSettlement 获取结算详情
@@ -226,6 +221,10 @@ func (h *FinanceHandler) ListSettlements(c *gin.Context) {
 // @Success 200 {object} response.Response{data=models.SettlementDetail}
 // @Router /api/v1/admin/finance/settlements/{id} [get]
 func (h *FinanceHandler) GetSettlement(c *gin.Context) {
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		response.BadRequest(c, "无效的ID")
@@ -233,12 +232,7 @@ func (h *FinanceHandler) GetSettlement(c *gin.Context) {
 	}
 
 	detail, err := h.settlementService.GetSettlementDetail(c.Request.Context(), id)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, detail)
+	handler.MustSucceed(c, err, detail)
 }
 
 // CreateSettlementRequest 创建结算请求
@@ -259,6 +253,11 @@ type CreateSettlementRequest struct {
 // @Success 200 {object} response.Response{data=models.Settlement}
 // @Router /api/v1/admin/finance/settlements [post]
 func (h *FinanceHandler) CreateSettlement(c *gin.Context) {
+	operatorID, ok := handler.RequireAdminID(c)
+	if !ok {
+		return
+	}
+
 	var req CreateSettlementRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, "参数错误: "+err.Error())
@@ -275,8 +274,6 @@ func (h *FinanceHandler) CreateSettlement(c *gin.Context) {
 		response.BadRequest(c, "无效的周期结束日期")
 		return
 	}
-
-	operatorID := middleware.GetAdminID(c)
 
 	serviceReq := &financeService.CreateSettlementRequest{
 		Type:        req.Type,
@@ -303,13 +300,16 @@ func (h *FinanceHandler) CreateSettlement(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/v1/admin/finance/settlements/{id}/process [post]
 func (h *FinanceHandler) ProcessSettlement(c *gin.Context) {
+	operatorID, ok := handler.RequireAdminID(c)
+	if !ok {
+		return
+	}
+
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		response.BadRequest(c, "无效的ID")
 		return
 	}
-
-	operatorID := middleware.GetAdminID(c)
 
 	if err := h.settlementService.ProcessSettlement(c.Request.Context(), id, operatorID); err != nil {
 		response.InternalError(c, err.Error())
@@ -336,6 +336,11 @@ type GenerateSettlementsRequest struct {
 // @Success 200 {object} response.Response{data=[]models.Settlement}
 // @Router /api/v1/admin/finance/settlements/generate [post]
 func (h *FinanceHandler) GenerateSettlements(c *gin.Context) {
+	operatorID, ok := handler.RequireAdminID(c)
+	if !ok {
+		return
+	}
+
 	var req GenerateSettlementsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, "参数错误: "+err.Error())
@@ -353,8 +358,6 @@ func (h *FinanceHandler) GenerateSettlements(c *gin.Context) {
 		return
 	}
 
-	operatorID := middleware.GetAdminID(c)
-
 	var settlements interface{}
 	if req.Type == "merchant" {
 		settlements, err = h.settlementService.GenerateMerchantSettlements(c.Request.Context(), periodStart, periodEnd, operatorID)
@@ -362,12 +365,7 @@ func (h *FinanceHandler) GenerateSettlements(c *gin.Context) {
 		settlements, err = h.settlementService.GenerateDistributorSettlements(c.Request.Context(), periodStart, periodEnd, operatorID)
 	}
 
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, settlements)
+	handler.MustSucceed(c, err, settlements)
 }
 
 // GetSettlementSummary 获取结算汇总
@@ -381,6 +379,10 @@ func (h *FinanceHandler) GenerateSettlements(c *gin.Context) {
 // @Success 200 {object} response.Response{data=models.SettlementSummary}
 // @Router /api/v1/admin/finance/settlements/summary [get]
 func (h *FinanceHandler) GetSettlementSummary(c *gin.Context) {
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
 	settlementType := c.Query("type")
 
 	var startDate, endDate *time.Time
@@ -395,12 +397,7 @@ func (h *FinanceHandler) GetSettlementSummary(c *gin.Context) {
 	}
 
 	summary, err := h.statisticsService.GetSettlementSummary(c.Request.Context(), settlementType, startDate, endDate)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, summary)
+	handler.MustSucceed(c, err, summary)
 }
 
 // ListWithdrawals 获取提现列表
@@ -418,6 +415,10 @@ func (h *FinanceHandler) GetSettlementSummary(c *gin.Context) {
 // @Success 200 {object} response.Response{data=response.PageData}
 // @Router /api/v1/admin/finance/withdrawals [get]
 func (h *FinanceHandler) ListWithdrawals(c *gin.Context) {
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
 
@@ -443,12 +444,7 @@ func (h *FinanceHandler) ListWithdrawals(c *gin.Context) {
 	}
 
 	withdrawals, total, err := h.withdrawalService.ListWithdrawals(c.Request.Context(), req)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.SuccessPage(c, withdrawals, total, page, pageSize)
+	handler.MustSucceedPage(c, err, withdrawals, total, page, pageSize)
 }
 
 // GetWithdrawal 获取提现详情
@@ -460,6 +456,10 @@ func (h *FinanceHandler) ListWithdrawals(c *gin.Context) {
 // @Success 200 {object} response.Response{data=models.Withdrawal}
 // @Router /api/v1/admin/finance/withdrawals/{id} [get]
 func (h *FinanceHandler) GetWithdrawal(c *gin.Context) {
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		response.BadRequest(c, "无效的ID")
@@ -467,12 +467,7 @@ func (h *FinanceHandler) GetWithdrawal(c *gin.Context) {
 	}
 
 	withdrawal, err := h.withdrawalService.GetWithdrawal(c.Request.Context(), id)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, withdrawal)
+	handler.MustSucceed(c, err, withdrawal)
 }
 
 // WithdrawalActionRequest 提现操作请求
@@ -492,6 +487,11 @@ type WithdrawalActionRequest struct {
 // @Success 200 {object} response.Response
 // @Router /api/v1/admin/finance/withdrawals/{id}/handle [post]
 func (h *FinanceHandler) HandleWithdrawal(c *gin.Context) {
+	operatorID, ok := handler.RequireAdminID(c)
+	if !ok {
+		return
+	}
+
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
 		response.BadRequest(c, "无效的ID")
@@ -503,8 +503,6 @@ func (h *FinanceHandler) HandleWithdrawal(c *gin.Context) {
 		response.BadRequest(c, "参数错误")
 		return
 	}
-
-	operatorID := middleware.GetAdminID(c)
 
 	switch req.Action {
 	case "approve":
@@ -521,12 +519,7 @@ func (h *FinanceHandler) HandleWithdrawal(c *gin.Context) {
 		err = h.withdrawalService.CompleteWithdrawal(c.Request.Context(), id, operatorID)
 	}
 
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, nil)
+	handler.MustSucceed(c, err, nil)
 }
 
 // BatchWithdrawalRequest 批量提现操作请求
@@ -546,13 +539,16 @@ type BatchWithdrawalRequest struct {
 // @Success 200 {object} response.Response
 // @Router /api/v1/admin/finance/withdrawals/batch [post]
 func (h *FinanceHandler) BatchHandleWithdrawals(c *gin.Context) {
+	operatorID, ok := handler.RequireAdminID(c)
+	if !ok {
+		return
+	}
+
 	var req BatchWithdrawalRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, "参数错误")
 		return
 	}
-
-	operatorID := middleware.GetAdminID(c)
 
 	var err error
 	switch req.Action {
@@ -568,12 +564,7 @@ func (h *FinanceHandler) BatchHandleWithdrawals(c *gin.Context) {
 		err = h.withdrawalService.BatchComplete(c.Request.Context(), req.IDs, operatorID)
 	}
 
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, nil)
+	handler.MustSucceed(c, err, nil)
 }
 
 // GetWithdrawalSummary 获取提现汇总
@@ -586,6 +577,10 @@ func (h *FinanceHandler) BatchHandleWithdrawals(c *gin.Context) {
 // @Success 200 {object} response.Response{data=models.WithdrawalSummary}
 // @Router /api/v1/admin/finance/withdrawals/summary [get]
 func (h *FinanceHandler) GetWithdrawalSummary(c *gin.Context) {
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
 	var startDate, endDate *time.Time
 	if s := c.Query("start_date"); s != "" {
 		t, _ := time.Parse("2006-01-02", s)
@@ -598,12 +593,7 @@ func (h *FinanceHandler) GetWithdrawalSummary(c *gin.Context) {
 	}
 
 	summary, err := h.statisticsService.GetWithdrawalSummary(c.Request.Context(), startDate, endDate)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, summary)
+	handler.MustSucceed(c, err, summary)
 }
 
 // ExportSettlements 导出结算记录
@@ -619,6 +609,10 @@ func (h *FinanceHandler) GetWithdrawalSummary(c *gin.Context) {
 // @Success 200 {file} file "CSV文件"
 // @Router /api/v1/admin/finance/export/settlements [get]
 func (h *FinanceHandler) ExportSettlements(c *gin.Context) {
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
 	req := &financeService.ExportSettlementsRequest{
 		Type:   c.Query("type"),
 		Status: c.Query("status"),
@@ -638,8 +632,7 @@ func (h *FinanceHandler) ExportSettlements(c *gin.Context) {
 	}
 
 	data, filename, err := h.exportService.ExportSettlements(c.Request.Context(), req)
-	if err != nil {
-		response.InternalError(c, err.Error())
+	if handler.HandleError(c, err) {
 		return
 	}
 
@@ -661,6 +654,10 @@ func (h *FinanceHandler) ExportSettlements(c *gin.Context) {
 // @Success 200 {file} file "CSV文件"
 // @Router /api/v1/admin/finance/export/withdrawals [get]
 func (h *FinanceHandler) ExportWithdrawals(c *gin.Context) {
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
 	req := &financeService.ExportWithdrawalsRequest{
 		Type:      c.Query("type"),
 		Status:    c.Query("status"),
@@ -674,8 +671,7 @@ func (h *FinanceHandler) ExportWithdrawals(c *gin.Context) {
 	}
 
 	data, filename, err := h.exportService.ExportWithdrawals(c.Request.Context(), req)
-	if err != nil {
-		response.InternalError(c, err.Error())
+	if handler.HandleError(c, err) {
 		return
 	}
 
@@ -694,6 +690,10 @@ func (h *FinanceHandler) ExportWithdrawals(c *gin.Context) {
 // @Success 200 {file} file "CSV文件"
 // @Router /api/v1/admin/finance/export/daily-revenue [get]
 func (h *FinanceHandler) ExportDailyRevenue(c *gin.Context) {
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
 	startDateStr := c.Query("start_date")
 	endDateStr := c.Query("end_date")
 
@@ -714,8 +714,7 @@ func (h *FinanceHandler) ExportDailyRevenue(c *gin.Context) {
 	}
 
 	data, filename, err := h.exportService.ExportDailyRevenue(c.Request.Context(), startDate, endDate)
-	if err != nil {
-		response.InternalError(c, err.Error())
+	if handler.HandleError(c, err) {
 		return
 	}
 
@@ -734,6 +733,10 @@ func (h *FinanceHandler) ExportDailyRevenue(c *gin.Context) {
 // @Success 200 {file} file "CSV文件"
 // @Router /api/v1/admin/finance/export/merchant-settlement [get]
 func (h *FinanceHandler) ExportMerchantSettlement(c *gin.Context) {
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
 	var startDate, endDate *time.Time
 	if s := c.Query("start_date"); s != "" {
 		t, _ := time.Parse("2006-01-02", s)
@@ -745,8 +748,7 @@ func (h *FinanceHandler) ExportMerchantSettlement(c *gin.Context) {
 	}
 
 	data, filename, err := h.exportService.ExportMerchantSettlementReport(c.Request.Context(), startDate, endDate)
-	if err != nil {
-		response.InternalError(c, err.Error())
+	if handler.HandleError(c, err) {
 		return
 	}
 
@@ -765,6 +767,10 @@ func (h *FinanceHandler) ExportMerchantSettlement(c *gin.Context) {
 // @Success 200 {object} response.Response{data=models.TransactionStatistics}
 // @Router /api/v1/admin/finance/transactions/statistics [get]
 func (h *FinanceHandler) GetTransactionStatistics(c *gin.Context) {
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
 	var startDate, endDate *time.Time
 	if s := c.Query("start_date"); s != "" {
 		t, _ := time.Parse("2006-01-02", s)
@@ -777,12 +783,7 @@ func (h *FinanceHandler) GetTransactionStatistics(c *gin.Context) {
 	}
 
 	stats, err := h.statisticsService.GetTransactionStatistics(c.Request.Context(), startDate, endDate)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, stats)
+	handler.MustSucceed(c, err, stats)
 }
 
 // ExportTransactions 导出交易记录
@@ -797,6 +798,10 @@ func (h *FinanceHandler) GetTransactionStatistics(c *gin.Context) {
 // @Success 200 {file} file "CSV文件"
 // @Router /api/v1/admin/finance/export/transactions [get]
 func (h *FinanceHandler) ExportTransactions(c *gin.Context) {
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
 	req := &financeService.ExportTransactionsRequest{
 		Type: c.Query("type"),
 	}
@@ -816,8 +821,7 @@ func (h *FinanceHandler) ExportTransactions(c *gin.Context) {
 	}
 
 	data, filename, err := h.exportService.ExportTransactions(c.Request.Context(), req)
-	if err != nil {
-		response.InternalError(c, err.Error())
+	if handler.HandleError(c, err) {
 		return
 	}
 
@@ -836,6 +840,10 @@ func (h *FinanceHandler) ExportTransactions(c *gin.Context) {
 // @Success 200 {object} response.Response{data=[]models.MerchantSettlementReport}
 // @Router /api/v1/admin/finance/reports/merchant-settlement [get]
 func (h *FinanceHandler) GetMerchantSettlementReport(c *gin.Context) {
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
 	var startDate, endDate *time.Time
 	if s := c.Query("start_date"); s != "" {
 		t, _ := time.Parse("2006-01-02", s)
@@ -847,10 +855,5 @@ func (h *FinanceHandler) GetMerchantSettlementReport(c *gin.Context) {
 	}
 
 	report, err := h.statisticsService.GetMerchantSettlementReport(c.Request.Context(), startDate, endDate)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, report)
+	handler.MustSucceed(c, err, report)
 }

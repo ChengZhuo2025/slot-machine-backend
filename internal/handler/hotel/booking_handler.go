@@ -2,14 +2,10 @@
 package hotel
 
 import (
-	"strconv"
-	"time"
-
 	"github.com/gin-gonic/gin"
 
-	"github.com/dumeirei/smart-locker-backend/internal/common/errors"
+	"github.com/dumeirei/smart-locker-backend/internal/common/handler"
 	"github.com/dumeirei/smart-locker-backend/internal/common/response"
-	"github.com/dumeirei/smart-locker-backend/internal/middleware"
 	hotelService "github.com/dumeirei/smart-locker-backend/internal/service/hotel"
 )
 
@@ -42,9 +38,8 @@ type CreateBookingRequest struct {
 // @Success 200 {object} response.Response{data=hotelService.BookingInfo}
 // @Router /api/v1/bookings [post]
 func (h *BookingHandler) CreateBooking(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
@@ -55,7 +50,7 @@ func (h *BookingHandler) CreateBooking(c *gin.Context) {
 	}
 
 	// 解析入住时间
-	checkInTime, err := parseDateTime(req.CheckInTime)
+	checkInTime, err := handler.ParseDateTime(req.CheckInTime)
 	if err != nil {
 		response.BadRequest(c, "入住时间格式错误")
 		return
@@ -68,16 +63,7 @@ func (h *BookingHandler) CreateBooking(c *gin.Context) {
 	}
 
 	booking, err := h.bookingService.CreateBooking(c.Request.Context(), userID, serviceReq)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, booking)
+	handler.MustSucceed(c, err, booking)
 }
 
 // GetBookingDetail 获取预订详情
@@ -89,29 +75,13 @@ func (h *BookingHandler) CreateBooking(c *gin.Context) {
 // @Success 200 {object} response.Response{data=hotelService.BookingInfo}
 // @Router /api/v1/bookings/{id} [get]
 func (h *BookingHandler) GetBookingDetail(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
-		return
-	}
-
-	bookingID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的预订ID")
+	userID, bookingID, ok := handler.RequireUserAndParseID(c, "预订")
+	if !ok {
 		return
 	}
 
 	booking, err := h.bookingService.GetBookingByID(c.Request.Context(), bookingID, userID)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, booking)
+	handler.MustSucceed(c, err, booking)
 }
 
 // GetBookingByNo 根据预订号获取预订
@@ -123,9 +93,8 @@ func (h *BookingHandler) GetBookingDetail(c *gin.Context) {
 // @Success 200 {object} response.Response{data=hotelService.BookingInfo}
 // @Router /api/v1/bookings/no/{booking_no} [get]
 func (h *BookingHandler) GetBookingByNo(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
@@ -136,16 +105,7 @@ func (h *BookingHandler) GetBookingByNo(c *gin.Context) {
 	}
 
 	booking, err := h.bookingService.GetBookingByNo(c.Request.Context(), bookingNo, userID)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, booking)
+	handler.MustSucceed(c, err, booking)
 }
 
 // GetMyBookings 获取我的预订列表
@@ -159,14 +119,12 @@ func (h *BookingHandler) GetBookingByNo(c *gin.Context) {
 // @Success 200 {object} response.Response{data=[]hotelService.BookingInfo}
 // @Router /api/v1/bookings [get]
 func (h *BookingHandler) GetMyBookings(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+	p := handler.BindPagination(c)
 	status := c.Query("status")
 
 	var statusPtr *string
@@ -174,17 +132,8 @@ func (h *BookingHandler) GetMyBookings(c *gin.Context) {
 		statusPtr = &status
 	}
 
-	bookings, total, err := h.bookingService.GetUserBookings(c.Request.Context(), userID, page, pageSize, statusPtr)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.SuccessWithPage(c, bookings, total, page, pageSize)
+	bookings, total, err := h.bookingService.GetUserBookings(c.Request.Context(), userID, p.Page, p.PageSize, statusPtr)
+	handler.MustSucceedPage(c, err, bookings, total, p.Page, p.PageSize)
 }
 
 // CancelBooking 取消预订
@@ -196,28 +145,12 @@ func (h *BookingHandler) GetMyBookings(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/v1/bookings/{id}/cancel [post]
 func (h *BookingHandler) CancelBooking(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, bookingID, ok := handler.RequireUserAndParseID(c, "预订")
+	if !ok {
 		return
 	}
 
-	bookingID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的预订ID")
-		return
-	}
-
-	if err := h.bookingService.CancelBooking(c.Request.Context(), bookingID, userID); err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, nil)
+	handler.MustSucceed(c, h.bookingService.CancelBooking(c.Request.Context(), bookingID, userID), nil)
 }
 
 // UnlockByCode 使用开锁码开锁
@@ -230,9 +163,8 @@ func (h *BookingHandler) CancelBooking(c *gin.Context) {
 // @Success 200 {object} response.Response{data=hotelService.BookingInfo}
 // @Router /api/v1/bookings/unlock [post]
 func (h *BookingHandler) UnlockByCode(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	_, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
@@ -243,38 +175,11 @@ func (h *BookingHandler) UnlockByCode(c *gin.Context) {
 	}
 
 	booking, err := h.bookingService.UnlockByCode(c.Request.Context(), req.DeviceID, req.UnlockCode)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, booking)
+	handler.MustSucceed(c, err, booking)
 }
 
 // UnlockRequest 开锁请求
 type UnlockRequest struct {
 	DeviceID   int64  `json:"device_id" binding:"required"`
 	UnlockCode string `json:"unlock_code" binding:"required"`
-}
-
-// parseDateTime 解析日期时间字符串
-func parseDateTime(s string) (time.Time, error) {
-	formats := []string{
-		"2006-01-02T15:04:05Z07:00",
-		"2006-01-02 15:04:05",
-		"2006-01-02T15:04:05",
-		"2006-01-02 15:04",
-	}
-
-	for _, format := range formats {
-		if t, err := time.Parse(format, s); err == nil {
-			return t, nil
-		}
-	}
-
-	return time.Time{}, errors.ErrInvalidParams.WithMessage("时间格式错误")
 }

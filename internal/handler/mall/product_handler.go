@@ -2,11 +2,9 @@
 package mall
 
 import (
-	"strconv"
-
 	"github.com/gin-gonic/gin"
 
-	"github.com/dumeirei/smart-locker-backend/internal/common/errors"
+	"github.com/dumeirei/smart-locker-backend/internal/common/handler"
 	"github.com/dumeirei/smart-locker-backend/internal/common/response"
 	mallService "github.com/dumeirei/smart-locker-backend/internal/service/mall"
 )
@@ -33,16 +31,7 @@ func NewProductHandler(productSvc *mallService.ProductService, searchSvc *mallSe
 // @Router /api/v1/categories [get]
 func (h *ProductHandler) GetCategories(c *gin.Context) {
 	categories, err := h.productService.GetCategoryTree(c.Request.Context())
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, categories)
+	handler.MustSucceed(c, err, categories)
 }
 
 // GetProducts 获取商品列表
@@ -63,16 +52,7 @@ func (h *ProductHandler) GetProducts(c *gin.Context) {
 	}
 
 	result, err := h.productService.GetProductList(c.Request.Context(), &req)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, result)
+	handler.MustSucceed(c, err, result)
 }
 
 // GetProductDetail 获取商品详情
@@ -83,23 +63,13 @@ func (h *ProductHandler) GetProducts(c *gin.Context) {
 // @Success 200 {object} response.Response{data=mall.ProductInfo}
 // @Router /api/v1/products/{id} [get]
 func (h *ProductHandler) GetProductDetail(c *gin.Context) {
-	productID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的商品ID")
+	productID, ok := handler.ParseID(c, "商品")
+	if !ok {
 		return
 	}
 
 	product, err := h.productService.GetProductDetail(c.Request.Context(), productID)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, product)
+	handler.MustSucceed(c, err, product)
 }
 
 // SearchProducts 搜索商品
@@ -123,16 +93,7 @@ func (h *ProductHandler) SearchProducts(c *gin.Context) {
 	}
 
 	result, err := h.searchService.Search(c.Request.Context(), &req)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, result)
+	handler.MustSucceed(c, err, result)
 }
 
 // GetHotKeywords 获取热门搜索关键词
@@ -143,16 +104,7 @@ func (h *ProductHandler) SearchProducts(c *gin.Context) {
 // @Router /api/v1/search/hot-keywords [get]
 func (h *ProductHandler) GetHotKeywords(c *gin.Context) {
 	keywords, err := h.searchService.GetHotKeywords(c.Request.Context(), 10)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, keywords)
+	handler.MustSucceed(c, err, keywords)
 }
 
 // GetSearchSuggestions 获取搜索建议
@@ -170,14 +122,5 @@ func (h *ProductHandler) GetSearchSuggestions(c *gin.Context) {
 	}
 
 	suggestions, err := h.searchService.GetSuggestions(c.Request.Context(), prefix, 10)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, suggestions)
+	handler.MustSucceed(c, err, suggestions)
 }

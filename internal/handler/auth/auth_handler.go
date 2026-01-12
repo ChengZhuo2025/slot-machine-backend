@@ -4,9 +4,8 @@ package auth
 import (
 	"github.com/gin-gonic/gin"
 
-	"github.com/dumeirei/smart-locker-backend/internal/common/errors"
+	"github.com/dumeirei/smart-locker-backend/internal/common/handler"
 	"github.com/dumeirei/smart-locker-backend/internal/common/response"
-	"github.com/dumeirei/smart-locker-backend/internal/middleware"
 	authService "github.com/dumeirei/smart-locker-backend/internal/service/auth"
 )
 
@@ -45,12 +44,7 @@ func (h *Handler) SendSmsCode(c *gin.Context) {
 		return
 	}
 
-	if err := h.authService.SendSmsCode(c.Request.Context(), &req); err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
+	if handler.HandleError(c, h.authService.SendSmsCode(c.Request.Context(), &req)) {
 		return
 	}
 
@@ -75,16 +69,7 @@ func (h *Handler) SmsLogin(c *gin.Context) {
 	}
 
 	result, err := h.authService.SmsLogin(c.Request.Context(), &req)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, result)
+	handler.MustSucceed(c, err, result)
 }
 
 // WechatLogin 微信小程序登录
@@ -103,16 +88,7 @@ func (h *Handler) WechatLogin(c *gin.Context) {
 	}
 
 	result, err := h.wechatService.WechatLogin(c.Request.Context(), &req)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, result)
+	handler.MustSucceed(c, err, result)
 }
 
 // RefreshTokenRequest 刷新 Token 请求
@@ -136,16 +112,7 @@ func (h *Handler) RefreshToken(c *gin.Context) {
 	}
 
 	tokenPair, err := h.authService.RefreshToken(c.Request.Context(), req.RefreshToken)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.Unauthorized(c, "刷新令牌失败")
-		return
-	}
-
-	response.Success(c, tokenPair)
+	handler.MustSucceed(c, err, tokenPair)
 }
 
 // BindPhoneRequest 绑定手机号请求
@@ -164,9 +131,8 @@ type BindPhoneRequest struct {
 // @Success 200 {object} response.Response
 // @Router /auth/bind-phone [post]
 func (h *Handler) BindPhone(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
@@ -176,16 +142,7 @@ func (h *Handler) BindPhone(c *gin.Context) {
 		return
 	}
 
-	if err := h.wechatService.BindPhone(c.Request.Context(), userID, req.Phone, req.Code, h.codeService); err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, nil)
+	handler.MustSucceed(c, h.wechatService.BindPhone(c.Request.Context(), userID, req.Phone, req.Code, h.codeService), nil)
 }
 
 // GetCurrentUser 获取当前用户信息
@@ -196,19 +153,13 @@ func (h *Handler) BindPhone(c *gin.Context) {
 // @Success 200 {object} response.Response{data=authService.UserInfo}
 // @Router /auth/me [get]
 func (h *Handler) GetCurrentUser(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
 	user, err := h.authService.GetUserByID(c.Request.Context(), userID)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
+	if handler.HandleError(c, err) {
 		return
 	}
 

@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/dumeirei/smart-locker-backend/internal/common/handler"
 	"github.com/dumeirei/smart-locker-backend/internal/common/response"
 	adminService "github.com/dumeirei/smart-locker-backend/internal/service/admin"
 )
@@ -33,6 +34,11 @@ func NewVenueHandler(venueSvc *adminService.VenueAdminService) *VenueHandler {
 // @Success 200 {object} response.Response{data=models.Venue}
 // @Router /admin/venues [post]
 func (h *VenueHandler) Create(c *gin.Context) {
+	_, ok := handler.RequireAdminID(c)
+	if !ok {
+		return
+	}
+
 	var req adminService.CreateVenueRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, "参数错误")
@@ -63,10 +69,13 @@ func (h *VenueHandler) Create(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /admin/venues/{id} [put]
 func (h *VenueHandler) Update(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的场地ID")
+	_, ok := handler.RequireAdminID(c)
+	if !ok {
+		return
+	}
+
+	id, ok := handler.ParseID(c, "场地")
+	if !ok {
 		return
 	}
 
@@ -108,10 +117,13 @@ type VenueUpdateStatusRequest struct {
 // @Success 200 {object} response.Response
 // @Router /admin/venues/{id}/status [put]
 func (h *VenueHandler) UpdateStatus(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的场地ID")
+	_, ok := handler.RequireAdminID(c)
+	if !ok {
+		return
+	}
+
+	id, ok := handler.ParseID(c, "场地")
+	if !ok {
 		return
 	}
 
@@ -143,10 +155,13 @@ func (h *VenueHandler) UpdateStatus(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /admin/venues/{id} [delete]
 func (h *VenueHandler) Delete(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的场地ID")
+	_, ok := handler.RequireAdminID(c)
+	if !ok {
+		return
+	}
+
+	id, ok := handler.ParseID(c, "场地")
+	if !ok {
 		return
 	}
 
@@ -175,10 +190,13 @@ func (h *VenueHandler) Delete(c *gin.Context) {
 // @Success 200 {object} response.Response{data=adminService.VenueInfo}
 // @Router /admin/venues/{id} [get]
 func (h *VenueHandler) Get(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的场地ID")
+	_, ok := handler.RequireAdminID(c)
+	if !ok {
+		return
+	}
+
+	id, ok := handler.ParseID(c, "场地")
+	if !ok {
 		return
 	}
 
@@ -210,16 +228,12 @@ func (h *VenueHandler) Get(c *gin.Context) {
 // @Success 200 {object} response.Response{data=response.PageData}
 // @Router /admin/venues [get]
 func (h *VenueHandler) List(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	_, ok := handler.RequireAdminID(c)
+	if !ok {
+		return
+	}
 
-	if page < 1 {
-		page = 1
-	}
-	if pageSize < 1 || pageSize > 100 {
-		pageSize = 20
-	}
-	offset := (page - 1) * pageSize
+	p := handler.BindPaginationWithDefaults(c, 1, 20)
 
 	filters := make(map[string]interface{})
 	if merchantIDStr := c.Query("merchant_id"); merchantIDStr != "" {
@@ -242,13 +256,8 @@ func (h *VenueHandler) List(c *gin.Context) {
 		}
 	}
 
-	venues, total, err := h.venueService.ListVenues(c.Request.Context(), offset, pageSize, filters)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.SuccessWithPage(c, venues, total, page, pageSize)
+	venues, total, err := h.venueService.ListVenues(c.Request.Context(), p.GetOffset(), p.GetLimit(), filters)
+	handler.MustSucceedPage(c, err, venues, total, p.Page, p.PageSize)
 }
 
 // ListByMerchant 获取商户下的场地列表
@@ -260,20 +269,18 @@ func (h *VenueHandler) List(c *gin.Context) {
 // @Success 200 {object} response.Response{data=[]models.Venue}
 // @Router /admin/merchants/{merchant_id}/venues [get]
 func (h *VenueHandler) ListByMerchant(c *gin.Context) {
-	merchantIDStr := c.Param("merchant_id")
-	merchantID, err := strconv.ParseInt(merchantIDStr, 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的商户ID")
+	_, ok := handler.RequireAdminID(c)
+	if !ok {
+		return
+	}
+
+	merchantID, ok := handler.ParseParamID(c, "merchant_id", "商户")
+	if !ok {
 		return
 	}
 
 	venues, err := h.venueService.ListVenuesByMerchant(c.Request.Context(), merchantID)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, venues)
+	handler.MustSucceed(c, err, venues)
 }
 
 // RegisterRoutes 注册路由

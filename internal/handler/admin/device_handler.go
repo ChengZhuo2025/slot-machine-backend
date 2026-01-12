@@ -7,8 +7,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/dumeirei/smart-locker-backend/internal/common/handler"
 	"github.com/dumeirei/smart-locker-backend/internal/common/response"
-	"github.com/dumeirei/smart-locker-backend/internal/middleware"
 	adminService "github.com/dumeirei/smart-locker-backend/internal/service/admin"
 )
 
@@ -34,9 +34,8 @@ func NewDeviceHandler(deviceSvc *adminService.DeviceAdminService) *DeviceHandler
 // @Success 200 {object} response.Response{data=models.Device}
 // @Router /admin/devices [post]
 func (h *DeviceHandler) Create(c *gin.Context) {
-	adminID := middleware.GetUserID(c)
-	if adminID == 0 {
-		response.Unauthorized(c, "请先登录")
+	adminID, ok := handler.RequireAdminID(c)
+	if !ok {
 		return
 	}
 
@@ -73,10 +72,13 @@ func (h *DeviceHandler) Create(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /admin/devices/{id} [put]
 func (h *DeviceHandler) Update(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的设备ID")
+	_, ok := handler.RequireAdminID(c)
+	if !ok {
+		return
+	}
+
+	id, ok := handler.ParseID(c, "设备")
+	if !ok {
 		return
 	}
 
@@ -118,16 +120,13 @@ type DeviceUpdateStatusRequest struct {
 // @Success 200 {object} response.Response
 // @Router /admin/devices/{id}/status [put]
 func (h *DeviceHandler) UpdateStatus(c *gin.Context) {
-	adminID := middleware.GetUserID(c)
-	if adminID == 0 {
-		response.Unauthorized(c, "请先登录")
+	adminID, ok := handler.RequireAdminID(c)
+	if !ok {
 		return
 	}
 
-	idStr := c.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的设备ID")
+	id, ok := handler.ParseID(c, "设备")
+	if !ok {
 		return
 	}
 
@@ -162,10 +161,13 @@ func (h *DeviceHandler) UpdateStatus(c *gin.Context) {
 // @Success 200 {object} response.Response{data=adminService.DeviceInfo}
 // @Router /admin/devices/{id} [get]
 func (h *DeviceHandler) Get(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的设备ID")
+	_, ok := handler.RequireAdminID(c)
+	if !ok {
+		return
+	}
+
+	id, ok := handler.ParseID(c, "设备")
+	if !ok {
 		return
 	}
 
@@ -197,16 +199,12 @@ func (h *DeviceHandler) Get(c *gin.Context) {
 // @Success 200 {object} response.Response{data=response.PageData}
 // @Router /admin/devices [get]
 func (h *DeviceHandler) List(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	_, ok := handler.RequireAdminID(c)
+	if !ok {
+		return
+	}
 
-	if page < 1 {
-		page = 1
-	}
-	if pageSize < 1 || pageSize > 100 {
-		pageSize = 20
-	}
-	offset := (page - 1) * pageSize
+	p := handler.BindPaginationWithDefaults(c, 1, 20)
 
 	filters := make(map[string]interface{})
 	if venueIDStr := c.Query("venue_id"); venueIDStr != "" {
@@ -231,13 +229,8 @@ func (h *DeviceHandler) List(c *gin.Context) {
 		}
 	}
 
-	devices, total, err := h.deviceService.ListDevices(c.Request.Context(), offset, pageSize, filters)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.SuccessWithPage(c, devices, total, page, pageSize)
+	devices, total, err := h.deviceService.ListDevices(c.Request.Context(), p.GetOffset(), p.GetLimit(), filters)
+	handler.MustSucceedPage(c, err, devices, total, p.Page, p.PageSize)
 }
 
 // RemoteUnlock 远程开锁
@@ -249,20 +242,17 @@ func (h *DeviceHandler) List(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /admin/devices/{id}/unlock [post]
 func (h *DeviceHandler) RemoteUnlock(c *gin.Context) {
-	adminID := middleware.GetUserID(c)
-	if adminID == 0 {
-		response.Unauthorized(c, "请先登录")
+	adminID, ok := handler.RequireAdminID(c)
+	if !ok {
 		return
 	}
 
-	idStr := c.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的设备ID")
+	id, ok := handler.ParseID(c, "设备")
+	if !ok {
 		return
 	}
 
-	err = h.deviceService.RemoteUnlock(c.Request.Context(), id, adminID)
+	err := h.deviceService.RemoteUnlock(c.Request.Context(), id, adminID)
 	if err != nil {
 		switch {
 		case errors.Is(err, adminService.ErrDeviceNotFound):
@@ -287,20 +277,17 @@ func (h *DeviceHandler) RemoteUnlock(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /admin/devices/{id}/lock [post]
 func (h *DeviceHandler) RemoteLock(c *gin.Context) {
-	adminID := middleware.GetUserID(c)
-	if adminID == 0 {
-		response.Unauthorized(c, "请先登录")
+	adminID, ok := handler.RequireAdminID(c)
+	if !ok {
 		return
 	}
 
-	idStr := c.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的设备ID")
+	id, ok := handler.ParseID(c, "设备")
+	if !ok {
 		return
 	}
 
-	err = h.deviceService.RemoteLock(c.Request.Context(), id, adminID)
+	err := h.deviceService.RemoteLock(c.Request.Context(), id, adminID)
 	if err != nil {
 		switch {
 		case errors.Is(err, adminService.ErrDeviceNotFound):
@@ -328,36 +315,25 @@ func (h *DeviceHandler) RemoteLock(c *gin.Context) {
 // @Success 200 {object} response.Response{data=response.PageData}
 // @Router /admin/devices/{id}/logs [get]
 func (h *DeviceHandler) GetLogs(c *gin.Context) {
-	idStr := c.Param("id")
-	deviceID, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的设备ID")
+	_, ok := handler.RequireAdminID(c)
+	if !ok {
 		return
 	}
 
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	deviceID, ok := handler.ParseID(c, "设备")
+	if !ok {
+		return
+	}
 
-	if page < 1 {
-		page = 1
-	}
-	if pageSize < 1 || pageSize > 100 {
-		pageSize = 20
-	}
-	offset := (page - 1) * pageSize
+	p := handler.BindPaginationWithDefaults(c, 1, 20)
 
 	filters := make(map[string]interface{})
 	if logType := c.Query("type"); logType != "" {
 		filters["type"] = logType
 	}
 
-	logs, total, err := h.deviceService.GetDeviceLogs(c.Request.Context(), deviceID, offset, pageSize, filters)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.SuccessWithPage(c, logs, total, page, pageSize)
+	logs, total, err := h.deviceService.GetDeviceLogs(c.Request.Context(), deviceID, p.GetOffset(), p.GetLimit(), filters)
+	handler.MustSucceedPage(c, err, logs, total, p.Page, p.PageSize)
 }
 
 // CreateMaintenance 创建维护记录
@@ -370,9 +346,8 @@ func (h *DeviceHandler) GetLogs(c *gin.Context) {
 // @Success 200 {object} response.Response{data=models.DeviceMaintenance}
 // @Router /admin/devices/maintenance [post]
 func (h *DeviceHandler) CreateMaintenance(c *gin.Context) {
-	adminID := middleware.GetUserID(c)
-	if adminID == 0 {
-		response.Unauthorized(c, "请先登录")
+	adminID, ok := handler.RequireAdminID(c)
+	if !ok {
 		return
 	}
 
@@ -409,16 +384,13 @@ func (h *DeviceHandler) CreateMaintenance(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /admin/devices/maintenance/{id}/complete [post]
 func (h *DeviceHandler) CompleteMaintenance(c *gin.Context) {
-	adminID := middleware.GetUserID(c)
-	if adminID == 0 {
-		response.Unauthorized(c, "请先登录")
+	adminID, ok := handler.RequireAdminID(c)
+	if !ok {
 		return
 	}
 
-	idStr := c.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的维护记录ID")
+	id, ok := handler.ParseID(c, "维护记录")
+	if !ok {
 		return
 	}
 
@@ -457,16 +429,12 @@ func (h *DeviceHandler) CompleteMaintenance(c *gin.Context) {
 // @Success 200 {object} response.Response{data=response.PageData}
 // @Router /admin/devices/maintenance [get]
 func (h *DeviceHandler) ListMaintenance(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	_, ok := handler.RequireAdminID(c)
+	if !ok {
+		return
+	}
 
-	if page < 1 {
-		page = 1
-	}
-	if pageSize < 1 || pageSize > 100 {
-		pageSize = 20
-	}
-	offset := (page - 1) * pageSize
+	p := handler.BindPaginationWithDefaults(c, 1, 20)
 
 	filters := make(map[string]interface{})
 	if deviceIDStr := c.Query("device_id"); deviceIDStr != "" {
@@ -483,13 +451,8 @@ func (h *DeviceHandler) ListMaintenance(c *gin.Context) {
 		}
 	}
 
-	maintenances, total, err := h.deviceService.GetMaintenanceRecords(c.Request.Context(), offset, pageSize, filters)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.SuccessWithPage(c, maintenances, total, page, pageSize)
+	maintenances, total, err := h.deviceService.GetMaintenanceRecords(c.Request.Context(), p.GetOffset(), p.GetLimit(), filters)
+	handler.MustSucceedPage(c, err, maintenances, total, p.Page, p.PageSize)
 }
 
 // GetStatistics 获取设备统计
@@ -501,6 +464,11 @@ func (h *DeviceHandler) ListMaintenance(c *gin.Context) {
 // @Success 200 {object} response.Response{data=adminService.DeviceStatistics}
 // @Router /admin/devices/statistics [get]
 func (h *DeviceHandler) GetStatistics(c *gin.Context) {
+	_, ok := handler.RequireAdminID(c)
+	if !ok {
+		return
+	}
+
 	filters := make(map[string]interface{})
 	if venueIDStr := c.Query("venue_id"); venueIDStr != "" {
 		if venueID, err := strconv.ParseInt(venueIDStr, 10, 64); err == nil {
@@ -509,12 +477,7 @@ func (h *DeviceHandler) GetStatistics(c *gin.Context) {
 	}
 
 	stats, err := h.deviceService.GetDeviceStatistics(c.Request.Context(), filters)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, stats)
+	handler.MustSucceed(c, err, stats)
 }
 
 // RegisterRoutes 注册路由

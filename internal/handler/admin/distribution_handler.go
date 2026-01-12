@@ -6,8 +6,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/dumeirei/smart-locker-backend/internal/common/handler"
 	"github.com/dumeirei/smart-locker-backend/internal/common/response"
-	"github.com/dumeirei/smart-locker-backend/internal/middleware"
 	adminService "github.com/dumeirei/smart-locker-backend/internal/service/admin"
 )
 
@@ -29,22 +29,17 @@ func NewDistributionHandler(distributionSvc *adminService.DistributionAdminServi
 // @Produce json
 // @Security Bearer
 // @Param page query int false "页码" default(1)
-// @Param page_size query int false "每页数量" default(10)
+// @Param page_size query int false "每页数量" default(20)
 // @Param status query int false "状态: 0待审核 1已通过 2已拒绝"
 // @Param level query int false "层级: 1直推 2间推"
 // @Success 200 {object} response.Response{data=response.PageData}
 // @Router /api/v1/admin/distribution/distributors [get]
 func (h *DistributionHandler) ListDistributors(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
 
-	if page < 1 {
-		page = 1
-	}
-	if pageSize < 1 || pageSize > 100 {
-		pageSize = 10
-	}
-	offset := (page - 1) * pageSize
+	p := handler.BindPaginationWithDefaults(c, 1, 20)
 
 	filter := &adminService.DistributorListFilter{}
 	if statusStr := c.Query("status"); statusStr != "" {
@@ -56,13 +51,8 @@ func (h *DistributionHandler) ListDistributors(c *gin.Context) {
 		filter.Level = &level
 	}
 
-	distributors, total, err := h.distributionService.ListDistributors(c.Request.Context(), offset, pageSize, filter)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.SuccessPage(c, distributors, total, page, pageSize)
+	distributors, total, err := h.distributionService.ListDistributors(c.Request.Context(), p.GetOffset(), p.GetLimit(), filter)
+	handler.MustSucceedPage(c, err, distributors, total, p.Page, p.PageSize)
 }
 
 // GetDistributor 获取分销商详情
@@ -74,19 +64,17 @@ func (h *DistributionHandler) ListDistributors(c *gin.Context) {
 // @Success 200 {object} response.Response{data=models.Distributor}
 // @Router /api/v1/admin/distribution/distributors/{id} [get]
 func (h *DistributionHandler) GetDistributor(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的ID")
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
+	id, ok := handler.ParseID(c, "分销商")
+	if !ok {
 		return
 	}
 
 	distributor, err := h.distributionService.GetDistributor(c.Request.Context(), id)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, distributor)
+	handler.MustSucceed(c, err, distributor)
 }
 
 // GetPendingDistributors 获取待审核分销商列表
@@ -95,28 +83,18 @@ func (h *DistributionHandler) GetDistributor(c *gin.Context) {
 // @Produce json
 // @Security Bearer
 // @Param page query int false "页码" default(1)
-// @Param page_size query int false "每页数量" default(10)
+// @Param page_size query int false "每页数量" default(20)
 // @Success 200 {object} response.Response{data=response.PageData}
 // @Router /api/v1/admin/distribution/distributors/pending [get]
 func (h *DistributionHandler) GetPendingDistributors(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
-
-	if page < 1 {
-		page = 1
-	}
-	if pageSize < 1 || pageSize > 100 {
-		pageSize = 10
-	}
-	offset := (page - 1) * pageSize
-
-	distributors, total, err := h.distributionService.GetPendingDistributors(c.Request.Context(), offset, pageSize)
-	if err != nil {
-		response.InternalError(c, err.Error())
+	if _, ok := handler.RequireAdminID(c); !ok {
 		return
 	}
 
-	response.SuccessPage(c, distributors, total, page, pageSize)
+	p := handler.BindPaginationWithDefaults(c, 1, 20)
+
+	distributors, total, err := h.distributionService.GetPendingDistributors(c.Request.Context(), p.GetOffset(), p.GetLimit())
+	handler.MustSucceedPage(c, err, distributors, total, p.Page, p.PageSize)
 }
 
 // ApproveRequest 审核请求
@@ -136,9 +114,13 @@ type ApproveRequest struct {
 // @Success 200 {object} response.Response
 // @Router /api/v1/admin/distribution/distributors/{id}/approve [post]
 func (h *DistributionHandler) ApproveDistributor(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的ID")
+	operatorID, ok := handler.RequireAdminID(c)
+	if !ok {
+		return
+	}
+
+	id, ok := handler.ParseID(c, "分销商")
+	if !ok {
 		return
 	}
 
@@ -148,20 +130,14 @@ func (h *DistributionHandler) ApproveDistributor(c *gin.Context) {
 		return
 	}
 
-	operatorID := middleware.GetAdminID(c)
-
+	var err error
 	if req.Approved {
 		err = h.distributionService.ApproveDistributor(c.Request.Context(), id, operatorID)
 	} else {
 		err = h.distributionService.RejectDistributor(c.Request.Context(), id, operatorID, req.Reason)
 	}
 
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, nil)
+	handler.MustSucceed(c, err, nil)
 }
 
 // ListCommissions 获取佣金记录列表
@@ -170,23 +146,18 @@ func (h *DistributionHandler) ApproveDistributor(c *gin.Context) {
 // @Produce json
 // @Security Bearer
 // @Param page query int false "页码" default(1)
-// @Param page_size query int false "每页数量" default(10)
+// @Param page_size query int false "每页数量" default(20)
 // @Param distributor_id query int false "分销商ID"
 // @Param status query int false "状态: 0待结算 1已结算 2已取消"
 // @Param type query string false "类型: direct/indirect"
 // @Success 200 {object} response.Response{data=response.PageData}
 // @Router /api/v1/admin/distribution/commissions [get]
 func (h *DistributionHandler) ListCommissions(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
 
-	if page < 1 {
-		page = 1
-	}
-	if pageSize < 1 || pageSize > 100 {
-		pageSize = 10
-	}
-	offset := (page - 1) * pageSize
+	p := handler.BindPaginationWithDefaults(c, 1, 20)
 
 	filter := &adminService.CommissionListFilter{}
 	if distributorIDStr := c.Query("distributor_id"); distributorIDStr != "" {
@@ -201,13 +172,8 @@ func (h *DistributionHandler) ListCommissions(c *gin.Context) {
 		filter.Type = &typeStr
 	}
 
-	commissions, total, err := h.distributionService.ListCommissions(c.Request.Context(), offset, pageSize, filter)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.SuccessPage(c, commissions, total, page, pageSize)
+	commissions, total, err := h.distributionService.ListCommissions(c.Request.Context(), p.GetOffset(), p.GetLimit(), filter)
+	handler.MustSucceedPage(c, err, commissions, total, p.Page, p.PageSize)
 }
 
 // ListWithdrawals 获取提现记录列表
@@ -216,22 +182,17 @@ func (h *DistributionHandler) ListCommissions(c *gin.Context) {
 // @Produce json
 // @Security Bearer
 // @Param page query int false "页码" default(1)
-// @Param page_size query int false "每页数量" default(10)
+// @Param page_size query int false "每页数量" default(20)
 // @Param user_id query int false "用户ID"
 // @Param status query string false "状态: pending/approved/processing/success/rejected"
 // @Success 200 {object} response.Response{data=response.PageData}
 // @Router /api/v1/admin/distribution/withdrawals [get]
 func (h *DistributionHandler) ListWithdrawals(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
 
-	if page < 1 {
-		page = 1
-	}
-	if pageSize < 1 || pageSize > 100 {
-		pageSize = 10
-	}
-	offset := (page - 1) * pageSize
+	p := handler.BindPaginationWithDefaults(c, 1, 20)
 
 	filter := &adminService.WithdrawalListFilter{}
 	if userIDStr := c.Query("user_id"); userIDStr != "" {
@@ -242,13 +203,8 @@ func (h *DistributionHandler) ListWithdrawals(c *gin.Context) {
 		filter.Status = &status
 	}
 
-	withdrawals, total, err := h.distributionService.ListWithdrawals(c.Request.Context(), offset, pageSize, filter)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.SuccessPage(c, withdrawals, total, page, pageSize)
+	withdrawals, total, err := h.distributionService.ListWithdrawals(c.Request.Context(), p.GetOffset(), p.GetLimit(), filter)
+	handler.MustSucceedPage(c, err, withdrawals, total, p.Page, p.PageSize)
 }
 
 // GetWithdrawal 获取提现详情
@@ -260,19 +216,17 @@ func (h *DistributionHandler) ListWithdrawals(c *gin.Context) {
 // @Success 200 {object} response.Response{data=models.Withdrawal}
 // @Router /api/v1/admin/distribution/withdrawals/{id} [get]
 func (h *DistributionHandler) GetWithdrawal(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的ID")
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
+	id, ok := handler.ParseID(c, "提现")
+	if !ok {
 		return
 	}
 
 	withdrawal, err := h.distributionService.GetWithdrawal(c.Request.Context(), id)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, withdrawal)
+	handler.MustSucceed(c, err, withdrawal)
 }
 
 // GetPendingWithdrawals 获取待审核提现列表
@@ -281,28 +235,18 @@ func (h *DistributionHandler) GetWithdrawal(c *gin.Context) {
 // @Produce json
 // @Security Bearer
 // @Param page query int false "页码" default(1)
-// @Param page_size query int false "每页数量" default(10)
+// @Param page_size query int false "每页数量" default(20)
 // @Success 200 {object} response.Response{data=response.PageData}
 // @Router /api/v1/admin/distribution/withdrawals/pending [get]
 func (h *DistributionHandler) GetPendingWithdrawals(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
-
-	if page < 1 {
-		page = 1
-	}
-	if pageSize < 1 || pageSize > 100 {
-		pageSize = 10
-	}
-	offset := (page - 1) * pageSize
-
-	withdrawals, total, err := h.distributionService.GetPendingWithdrawals(c.Request.Context(), offset, pageSize)
-	if err != nil {
-		response.InternalError(c, err.Error())
+	if _, ok := handler.RequireAdminID(c); !ok {
 		return
 	}
 
-	response.SuccessPage(c, withdrawals, total, page, pageSize)
+	p := handler.BindPaginationWithDefaults(c, 1, 20)
+
+	withdrawals, total, err := h.distributionService.GetPendingWithdrawals(c.Request.Context(), p.GetOffset(), p.GetLimit())
+	handler.MustSucceedPage(c, err, withdrawals, total, p.Page, p.PageSize)
 }
 
 // WithdrawalApproveRequest 提现审核请求
@@ -322,9 +266,13 @@ type WithdrawalApproveRequest struct {
 // @Success 200 {object} response.Response
 // @Router /api/v1/admin/distribution/withdrawals/{id}/handle [post]
 func (h *DistributionHandler) HandleWithdrawal(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的ID")
+	operatorID, ok := handler.RequireAdminID(c)
+	if !ok {
+		return
+	}
+
+	id, ok := handler.ParseID(c, "提现")
+	if !ok {
 		return
 	}
 
@@ -334,8 +282,7 @@ func (h *DistributionHandler) HandleWithdrawal(c *gin.Context) {
 		return
 	}
 
-	operatorID := middleware.GetAdminID(c)
-
+	var err error
 	switch req.Action {
 	case "approve":
 		err = h.distributionService.ApproveWithdrawal(c.Request.Context(), id, operatorID)
@@ -354,12 +301,7 @@ func (h *DistributionHandler) HandleWithdrawal(c *gin.Context) {
 		return
 	}
 
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, nil)
+	handler.MustSucceed(c, err, nil)
 }
 
 // GetStats 获取分销统计
@@ -370,11 +312,10 @@ func (h *DistributionHandler) HandleWithdrawal(c *gin.Context) {
 // @Success 200 {object} response.Response{data=adminService.DistributionStats}
 // @Router /api/v1/admin/distribution/stats [get]
 func (h *DistributionHandler) GetStats(c *gin.Context) {
-	stats, err := h.distributionService.GetStats(c.Request.Context())
-	if err != nil {
-		response.InternalError(c, err.Error())
+	if _, ok := handler.RequireAdminID(c); !ok {
 		return
 	}
 
-	response.Success(c, stats)
+	stats, err := h.distributionService.GetStats(c.Request.Context())
+	handler.MustSucceed(c, err, stats)
 }

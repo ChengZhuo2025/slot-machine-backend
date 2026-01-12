@@ -3,10 +3,10 @@ package admin
 
 import (
 	"strconv"
-	"time"
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/dumeirei/smart-locker-backend/internal/common/handler"
 	"github.com/dumeirei/smart-locker-backend/internal/common/response"
 	contentService "github.com/dumeirei/smart-locker-backend/internal/service/content"
 	userService "github.com/dumeirei/smart-locker-backend/internal/service/user"
@@ -32,6 +32,10 @@ func NewBannerHandler(bannerService *contentService.BannerAdminService) *BannerH
 // @Success 200 {object} response.Response{data=models.Banner}
 // @Router /api/v1/admin/banners [post]
 func (h *BannerHandler) Create(c *gin.Context) {
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
 	var req contentService.CreateBannerRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, err.Error())
@@ -56,9 +60,12 @@ func (h *BannerHandler) Create(c *gin.Context) {
 // @Success 200 {object} response.Response{data=models.Banner}
 // @Router /api/v1/admin/banners/{id} [get]
 func (h *BannerHandler) GetByID(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的轮播图ID")
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
+	id, ok := handler.ParseID(c, "轮播图")
+	if !ok {
 		return
 	}
 
@@ -82,9 +89,12 @@ func (h *BannerHandler) GetByID(c *gin.Context) {
 // @Success 200 {object} response.Response{data=models.Banner}
 // @Router /api/v1/admin/banners/{id} [put]
 func (h *BannerHandler) Update(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的轮播图ID")
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
+	id, ok := handler.ParseID(c, "轮播图")
+	if !ok {
 		return
 	}
 
@@ -112,9 +122,12 @@ func (h *BannerHandler) Update(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/v1/admin/banners/{id} [delete]
 func (h *BannerHandler) Delete(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的轮播图ID")
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
+	id, ok := handler.ParseID(c, "轮播图")
+	if !ok {
 		return
 	}
 
@@ -139,8 +152,11 @@ func (h *BannerHandler) Delete(c *gin.Context) {
 // @Success 200 {object} response.Response{data=response.ListData}
 // @Router /api/v1/admin/banners [get]
 func (h *BannerHandler) List(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
+	p := handler.BindPaginationWithDefaults(c, 1, 20)
 	position := c.Query("position")
 	keyword := c.Query("keyword")
 
@@ -150,13 +166,8 @@ func (h *BannerHandler) List(c *gin.Context) {
 		isActive = &val
 	}
 
-	banners, total, err := h.bannerService.List(c.Request.Context(), page, pageSize, position, isActive, keyword)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.SuccessList(c, banners, total, page, pageSize)
+	banners, total, err := h.bannerService.List(c.Request.Context(), p.Page, p.PageSize, position, isActive, keyword)
+	handler.MustSucceedPage(c, err, banners, total, p.Page, p.PageSize)
 }
 
 // UpdateStatus 更新状态
@@ -169,9 +180,12 @@ func (h *BannerHandler) List(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/v1/admin/banners/{id}/status [put]
 func (h *BannerHandler) UpdateStatus(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的轮播图ID")
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
+	id, ok := handler.ParseID(c, "轮播图")
+	if !ok {
 		return
 	}
 
@@ -201,9 +215,12 @@ type UpdateSortRequest struct {
 // @Success 200 {object} response.Response
 // @Router /api/v1/admin/banners/{id}/sort [put]
 func (h *BannerHandler) UpdateSort(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的轮播图ID")
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
+	id, ok := handler.ParseID(c, "轮播图")
+	if !ok {
 		return
 	}
 
@@ -229,13 +246,12 @@ func (h *BannerHandler) UpdateSort(c *gin.Context) {
 // @Success 200 {object} response.Response{data=contentService.BannerStatistics}
 // @Router /api/v1/admin/banners/statistics [get]
 func (h *BannerHandler) GetStatistics(c *gin.Context) {
-	stats, err := h.bannerService.GetStatistics(c.Request.Context())
-	if err != nil {
-		response.InternalError(c, err.Error())
+	if _, ok := handler.RequireAdminID(c); !ok {
 		return
 	}
 
-	response.Success(c, stats)
+	stats, err := h.bannerService.GetStatistics(c.Request.Context())
+	handler.MustSucceed(c, err, stats)
 }
 
 // FeedbackHandler 反馈管理处理器
@@ -262,35 +278,28 @@ func NewFeedbackHandler(feedbackService *userService.FeedbackAdminService) *Feed
 // @Success 200 {object} response.Response{data=response.ListData}
 // @Router /api/v1/admin/feedbacks [get]
 func (h *FeedbackHandler) List(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
+	p := handler.BindPaginationWithDefaults(c, 1, 20)
 	feedbackType := c.Query("type")
 
 	var status *int8
 	if s := c.Query("status"); s != "" {
-		val, _ := strconv.ParseInt(s, 10, 8)
-		st := int8(val)
-		status = &st
+		if val, err := strconv.ParseInt(s, 10, 8); err == nil {
+			st := int8(val)
+			status = &st
+		}
 	}
 
-	var startDate, endDate *time.Time
-	if s := c.Query("start_date"); s != "" {
-		t, _ := time.Parse("2006-01-02", s)
-		startDate = &t
-	}
-	if s := c.Query("end_date"); s != "" {
-		t, _ := time.Parse("2006-01-02", s)
-		endOfDay := t.Add(24*time.Hour - time.Second)
-		endDate = &endOfDay
-	}
-
-	feedbacks, total, err := h.feedbackService.List(c.Request.Context(), page, pageSize, feedbackType, status, startDate, endDate)
-	if err != nil {
-		response.InternalError(c, err.Error())
+	startDate, endDate, ok := handler.ParseQueryDateRange(c)
+	if !ok {
 		return
 	}
 
-	response.SuccessList(c, feedbacks, total, page, pageSize)
+	feedbacks, total, err := h.feedbackService.List(c.Request.Context(), p.Page, p.PageSize, feedbackType, status, startDate, endDate)
+	handler.MustSucceedPage(c, err, feedbacks, total, p.Page, p.PageSize)
 }
 
 // GetByID 获取反馈详情
@@ -302,9 +311,12 @@ func (h *FeedbackHandler) List(c *gin.Context) {
 // @Success 200 {object} response.Response{data=models.UserFeedback}
 // @Router /api/v1/admin/feedbacks/{id} [get]
 func (h *FeedbackHandler) GetByID(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的反馈ID")
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
+	id, ok := handler.ParseID(c, "反馈")
+	if !ok {
 		return
 	}
 
@@ -333,9 +345,12 @@ type UpdateStatusRequest struct {
 // @Success 200 {object} response.Response
 // @Router /api/v1/admin/feedbacks/{id}/status [put]
 func (h *FeedbackHandler) UpdateStatus(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的反馈ID")
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
+	id, ok := handler.ParseID(c, "反馈")
+	if !ok {
 		return
 	}
 
@@ -369,15 +384,13 @@ type ReplyRequest struct {
 // @Success 200 {object} response.Response
 // @Router /api/v1/admin/feedbacks/{id}/reply [post]
 func (h *FeedbackHandler) Reply(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的反馈ID")
+	adminID, ok := handler.RequireAdminID(c)
+	if !ok {
 		return
 	}
 
-	adminID := c.GetInt64("admin_id")
-	if adminID == 0 {
-		response.Unauthorized(c, "请先登录")
+	id, ok := handler.ParseID(c, "反馈")
+	if !ok {
 		return
 	}
 
@@ -403,11 +416,10 @@ func (h *FeedbackHandler) Reply(c *gin.Context) {
 // @Success 200 {object} response.Response{data=userService.FeedbackStatistics}
 // @Router /api/v1/admin/feedbacks/statistics [get]
 func (h *FeedbackHandler) GetStatistics(c *gin.Context) {
-	stats, err := h.feedbackService.GetStatistics(c.Request.Context())
-	if err != nil {
-		response.InternalError(c, err.Error())
+	if _, ok := handler.RequireAdminID(c); !ok {
 		return
 	}
 
-	response.Success(c, stats)
+	stats, err := h.feedbackService.GetStatistics(c.Request.Context())
+	handler.MustSucceed(c, err, stats)
 }

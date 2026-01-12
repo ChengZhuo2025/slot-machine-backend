@@ -6,8 +6,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/dumeirei/smart-locker-backend/internal/common/handler"
 	"github.com/dumeirei/smart-locker-backend/internal/common/response"
-	"github.com/dumeirei/smart-locker-backend/internal/middleware"
 	adminService "github.com/dumeirei/smart-locker-backend/internal/service/admin"
 )
 
@@ -105,9 +105,8 @@ func (h *AuthHandler) RefreshToken(c *gin.Context) {
 // @Success 200 {object} response.Response{data=adminService.LoginResponse}
 // @Router /admin/auth/me [get]
 func (h *AuthHandler) GetCurrentAdmin(c *gin.Context) {
-	adminID := middleware.GetUserID(c)
-	if adminID == 0 {
-		response.Unauthorized(c, "请先登录")
+	adminID, ok := handler.RequireAdminID(c)
+	if !ok {
 		return
 	}
 
@@ -140,9 +139,8 @@ type ChangePasswordRequest struct {
 // @Success 200 {object} response.Response
 // @Router /admin/auth/password [put]
 func (h *AuthHandler) ChangePassword(c *gin.Context) {
-	adminID := middleware.GetUserID(c)
-	if adminID == 0 {
-		response.Unauthorized(c, "请先登录")
+	adminID, ok := handler.RequireAdminID(c)
+	if !ok {
 		return
 	}
 

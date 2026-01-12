@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/dumeirei/smart-locker-backend/internal/common/handler"
 	"github.com/dumeirei/smart-locker-backend/internal/common/response"
 	adminService "github.com/dumeirei/smart-locker-backend/internal/service/admin"
 )
@@ -32,6 +33,10 @@ func NewSystemHandler(configService *adminService.SystemConfigService) *SystemHa
 // @Success 200 {object} response.Response{data=models.SystemConfig}
 // @Router /api/v1/admin/system/configs [post]
 func (h *SystemHandler) CreateConfig(c *gin.Context) {
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
 	var req adminService.CreateConfigRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, err.Error())
@@ -39,12 +44,7 @@ func (h *SystemHandler) CreateConfig(c *gin.Context) {
 	}
 
 	config, err := h.configService.Create(c.Request.Context(), &req)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, config)
+	handler.MustSucceed(c, err, config)
 }
 
 // GetConfig 获取配置详情
@@ -56,9 +56,12 @@ func (h *SystemHandler) CreateConfig(c *gin.Context) {
 // @Success 200 {object} response.Response{data=models.SystemConfig}
 // @Router /api/v1/admin/system/configs/{id} [get]
 func (h *SystemHandler) GetConfig(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的配置ID")
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
+	id, ok := handler.ParseID(c, "配置")
+	if !ok {
 		return
 	}
 
@@ -82,9 +85,12 @@ func (h *SystemHandler) GetConfig(c *gin.Context) {
 // @Success 200 {object} response.Response{data=models.SystemConfig}
 // @Router /api/v1/admin/system/configs/{id} [put]
 func (h *SystemHandler) UpdateConfig(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的配置ID")
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
+	id, ok := handler.ParseID(c, "配置")
+	if !ok {
 		return
 	}
 
@@ -95,12 +101,7 @@ func (h *SystemHandler) UpdateConfig(c *gin.Context) {
 	}
 
 	config, err := h.configService.Update(c.Request.Context(), id, &req)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, config)
+	handler.MustSucceed(c, err, config)
 }
 
 // DeleteConfig 删除配置
@@ -112,9 +113,12 @@ func (h *SystemHandler) UpdateConfig(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/v1/admin/system/configs/{id} [delete]
 func (h *SystemHandler) DeleteConfig(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的配置ID")
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
+	id, ok := handler.ParseID(c, "配置")
+	if !ok {
 		return
 	}
 
@@ -139,8 +143,11 @@ func (h *SystemHandler) DeleteConfig(c *gin.Context) {
 // @Success 200 {object} response.Response{data=response.ListData}
 // @Router /api/v1/admin/system/configs [get]
 func (h *SystemHandler) ListConfigs(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
+	p := handler.BindPaginationWithDefaults(c, 1, 20)
 	group := c.Query("group")
 	keyword := c.Query("keyword")
 
@@ -150,13 +157,8 @@ func (h *SystemHandler) ListConfigs(c *gin.Context) {
 		isPublic = &val
 	}
 
-	configs, total, err := h.configService.List(c.Request.Context(), page, pageSize, group, keyword, isPublic)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.SuccessList(c, configs, total, page, pageSize)
+	configs, total, err := h.configService.List(c.Request.Context(), p.Page, p.PageSize, group, keyword, isPublic)
+	handler.MustSucceedPage(c, err, configs, total, p.Page, p.PageSize)
 }
 
 // GetConfigsByGroup 获取分组配置
@@ -168,6 +170,10 @@ func (h *SystemHandler) ListConfigs(c *gin.Context) {
 // @Success 200 {object} response.Response{data=[]models.SystemConfig}
 // @Router /api/v1/admin/system/configs/group/{group} [get]
 func (h *SystemHandler) GetConfigsByGroup(c *gin.Context) {
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
 	group := c.Param("group")
 	if group == "" {
 		response.BadRequest(c, "分组不能为空")
@@ -175,12 +181,7 @@ func (h *SystemHandler) GetConfigsByGroup(c *gin.Context) {
 	}
 
 	configs, err := h.configService.GetByGroup(c.Request.Context(), group)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, configs)
+	handler.MustSucceed(c, err, configs)
 }
 
 // GetAllGroups 获取所有配置分组
@@ -191,13 +192,12 @@ func (h *SystemHandler) GetConfigsByGroup(c *gin.Context) {
 // @Success 200 {object} response.Response{data=[]string}
 // @Router /api/v1/admin/system/configs/groups [get]
 func (h *SystemHandler) GetAllGroups(c *gin.Context) {
-	groups, err := h.configService.GetAllGroups(c.Request.Context())
-	if err != nil {
-		response.InternalError(c, err.Error())
+	if _, ok := handler.RequireAdminID(c); !ok {
 		return
 	}
 
-	response.Success(c, groups)
+	groups, err := h.configService.GetAllGroups(c.Request.Context())
+	handler.MustSucceed(c, err, groups)
 }
 
 // GetPublicConfigs 获取公开配置
@@ -208,12 +208,7 @@ func (h *SystemHandler) GetAllGroups(c *gin.Context) {
 // @Router /api/v1/system/configs/public [get]
 func (h *SystemHandler) GetPublicConfigs(c *gin.Context) {
 	configs, err := h.configService.GetPublicConfigs(c.Request.Context())
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, configs)
+	handler.MustSucceed(c, err, configs)
 }
 
 // BatchUpdateConfigs 批量更新配置
@@ -226,6 +221,10 @@ func (h *SystemHandler) GetPublicConfigs(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/v1/admin/system/configs/batch [put]
 func (h *SystemHandler) BatchUpdateConfigs(c *gin.Context) {
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
 	var req adminService.BatchUpdateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, err.Error())

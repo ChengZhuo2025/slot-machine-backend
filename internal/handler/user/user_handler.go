@@ -2,14 +2,10 @@
 package user
 
 import (
-	"strconv"
-
 	"github.com/gin-gonic/gin"
 
-	"github.com/dumeirei/smart-locker-backend/internal/common/errors"
+	"github.com/dumeirei/smart-locker-backend/internal/common/handler"
 	"github.com/dumeirei/smart-locker-backend/internal/common/response"
-	"github.com/dumeirei/smart-locker-backend/internal/common/utils"
-	"github.com/dumeirei/smart-locker-backend/internal/middleware"
 	userService "github.com/dumeirei/smart-locker-backend/internal/service/user"
 )
 
@@ -38,23 +34,13 @@ func NewHandler(
 // @Success 200 {object} response.Response{data=userService.UserProfile}
 // @Router /api/v1/user/profile [get]
 func (h *Handler) GetProfile(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
 	profile, err := h.userService.GetProfile(c.Request.Context(), userID)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, profile)
+	handler.MustSucceed(c, err, profile)
 }
 
 // UpdateProfile 更新用户信息
@@ -67,9 +53,8 @@ func (h *Handler) GetProfile(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/v1/user/profile [put]
 func (h *Handler) UpdateProfile(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
@@ -79,16 +64,7 @@ func (h *Handler) UpdateProfile(c *gin.Context) {
 		return
 	}
 
-	if err := h.userService.UpdateProfile(c.Request.Context(), userID, &req); err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, nil)
+	handler.MustSucceed(c, h.userService.UpdateProfile(c.Request.Context(), userID, &req), nil)
 }
 
 // GetWallet 获取钱包信息
@@ -99,23 +75,13 @@ func (h *Handler) UpdateProfile(c *gin.Context) {
 // @Success 200 {object} response.Response{data=userService.WalletInfo}
 // @Router /api/v1/user/wallet [get]
 func (h *Handler) GetWallet(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
 	wallet, err := h.walletService.GetWallet(c.Request.Context(), userID)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, wallet)
+	handler.MustSucceed(c, err, wallet)
 }
 
 // GetTransactions 获取交易记录
@@ -129,36 +95,23 @@ func (h *Handler) GetWallet(c *gin.Context) {
 // @Success 200 {object} response.Response{data=response.PageData}
 // @Router /api/v1/user/wallet/transactions [get]
 func (h *Handler) GetTransactions(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
-	var pagination utils.Pagination
-	pagination.Page, _ = strconv.Atoi(c.DefaultQuery("page", "1"))
-	pagination.PageSize, _ = strconv.Atoi(c.DefaultQuery("page_size", "10"))
-	pagination.Normalize()
+	p := handler.BindPagination(c)
 
 	txType := c.Query("type")
 
 	transactions, total, err := h.walletService.GetTransactions(
 		c.Request.Context(),
 		userID,
-		pagination.GetOffset(),
-		pagination.GetLimit(),
+		p.GetOffset(),
+		p.GetLimit(),
 		txType,
 	)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.SuccessPage(c, transactions, total, pagination.Page, pagination.PageSize)
+	handler.MustSucceedPage(c, err, transactions, total, p.Page, p.PageSize)
 }
 
 // GetMemberLevels 获取会员等级列表
@@ -169,16 +122,7 @@ func (h *Handler) GetTransactions(c *gin.Context) {
 // @Router /api/v1/user/member-levels [get]
 func (h *Handler) GetMemberLevels(c *gin.Context) {
 	levels, err := h.userService.GetMemberLevels(c.Request.Context())
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, levels)
+	handler.MustSucceed(c, err, levels)
 }
 
 // RealNameVerify 实名认证
@@ -191,9 +135,8 @@ func (h *Handler) GetMemberLevels(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/v1/user/real-name-verify [post]
 func (h *Handler) RealNameVerify(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
@@ -203,16 +146,7 @@ func (h *Handler) RealNameVerify(c *gin.Context) {
 		return
 	}
 
-	if err := h.userService.RealNameVerify(c.Request.Context(), userID, &req); err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, nil)
+	handler.MustSucceed(c, h.userService.RealNameVerify(c.Request.Context(), userID, &req), nil)
 }
 
 // GetPoints 获取用户积分
@@ -223,23 +157,13 @@ func (h *Handler) RealNameVerify(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/v1/user/points [get]
 func (h *Handler) GetPoints(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
 	points, err := h.userService.GetPoints(c.Request.Context(), userID)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, gin.H{"points": points})
+	handler.MustSucceed(c, err, gin.H{"points": points})
 }
 
 // RegisterRoutes 注册路由

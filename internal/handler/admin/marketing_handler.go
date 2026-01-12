@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/dumeirei/smart-locker-backend/internal/common/handler"
 	"github.com/dumeirei/smart-locker-backend/internal/common/response"
 	adminService "github.com/dumeirei/smart-locker-backend/internal/service/admin"
 )
@@ -36,19 +37,15 @@ func NewMarketingHandler(marketingSvc *adminService.MarketingAdminService) *Mark
 // @Success 200 {object} response.Response{data=admin.AdminCouponListResponse}
 // @Router /api/v1/admin/marketing/coupons [get]
 func (h *MarketingHandler) GetCouponList(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
 
-	if page < 1 {
-		page = 1
-	}
-	if pageSize < 1 || pageSize > 100 {
-		pageSize = 10
-	}
+	p := handler.BindPagination(c)
 
 	req := &adminService.AdminCouponListRequest{
-		Page:           page,
-		PageSize:       pageSize,
+		Page:           p.Page,
+		PageSize:       p.PageSize,
 		Type:           c.Query("type"),
 		ApplicableType: c.Query("applicable_type"),
 		Keyword:        c.Query("keyword"),
@@ -64,12 +61,7 @@ func (h *MarketingHandler) GetCouponList(c *gin.Context) {
 	}
 
 	result, err := h.marketingService.GetCouponList(c.Request.Context(), req)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.SuccessPage(c, result.List, result.Total, page, pageSize)
+	handler.MustSucceedPage(c, err, result.List, result.Total, p.Page, p.PageSize)
 }
 
 // GetCouponDetail 获取优惠券详情
@@ -81,19 +73,17 @@ func (h *MarketingHandler) GetCouponList(c *gin.Context) {
 // @Success 200 {object} response.Response{data=admin.AdminCouponItem}
 // @Router /api/v1/admin/marketing/coupons/{id} [get]
 func (h *MarketingHandler) GetCouponDetail(c *gin.Context) {
-	couponID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的优惠券ID")
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
+	couponID, ok := handler.ParseID(c, "优惠券")
+	if !ok {
 		return
 	}
 
 	coupon, err := h.marketingService.GetCouponDetail(c.Request.Context(), couponID)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, coupon)
+	handler.MustSucceed(c, err, coupon)
 }
 
 // CreateCoupon 创建优惠券
@@ -106,6 +96,10 @@ func (h *MarketingHandler) GetCouponDetail(c *gin.Context) {
 // @Success 200 {object} response.Response{data=models.Coupon}
 // @Router /api/v1/admin/marketing/coupons [post]
 func (h *MarketingHandler) CreateCoupon(c *gin.Context) {
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
 	var req adminService.CreateCouponRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, "参数错误: "+err.Error())
@@ -113,12 +107,7 @@ func (h *MarketingHandler) CreateCoupon(c *gin.Context) {
 	}
 
 	coupon, err := h.marketingService.CreateCoupon(c.Request.Context(), &req)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.SuccessWithMessage(c, "创建成功", coupon)
+	handler.MustSucceedWithMessage(c, err, "创建成功", coupon)
 }
 
 // UpdateCoupon 更新优惠券
@@ -132,9 +121,12 @@ func (h *MarketingHandler) CreateCoupon(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/v1/admin/marketing/coupons/{id} [put]
 func (h *MarketingHandler) UpdateCoupon(c *gin.Context) {
-	couponID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的优惠券ID")
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
+	couponID, ok := handler.ParseID(c, "优惠券")
+	if !ok {
 		return
 	}
 
@@ -144,12 +136,8 @@ func (h *MarketingHandler) UpdateCoupon(c *gin.Context) {
 		return
 	}
 
-	if err := h.marketingService.UpdateCoupon(c.Request.Context(), couponID, &req); err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.SuccessWithMessage(c, "更新成功", nil)
+	err := h.marketingService.UpdateCoupon(c.Request.Context(), couponID, &req)
+	handler.MustSucceedWithMessage(c, err, "更新成功", nil)
 }
 
 // UpdateCouponStatusRequest 更新优惠券状态请求
@@ -168,9 +156,12 @@ type UpdateCouponStatusRequest struct {
 // @Success 200 {object} response.Response
 // @Router /api/v1/admin/marketing/coupons/{id}/status [put]
 func (h *MarketingHandler) UpdateCouponStatus(c *gin.Context) {
-	couponID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的优惠券ID")
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
+	couponID, ok := handler.ParseID(c, "优惠券")
+	if !ok {
 		return
 	}
 
@@ -180,12 +171,8 @@ func (h *MarketingHandler) UpdateCouponStatus(c *gin.Context) {
 		return
 	}
 
-	if err := h.marketingService.UpdateCouponStatus(c.Request.Context(), couponID, req.Status); err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.SuccessWithMessage(c, "状态更新成功", nil)
+	err := h.marketingService.UpdateCouponStatus(c.Request.Context(), couponID, req.Status)
+	handler.MustSucceedWithMessage(c, err, "状态更新成功", nil)
 }
 
 // DeleteCoupon 删除优惠券
@@ -197,18 +184,17 @@ func (h *MarketingHandler) UpdateCouponStatus(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/v1/admin/marketing/coupons/{id} [delete]
 func (h *MarketingHandler) DeleteCoupon(c *gin.Context) {
-	couponID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的优惠券ID")
+	if _, ok := handler.RequireAdminID(c); !ok {
 		return
 	}
 
-	if err := h.marketingService.DeleteCoupon(c.Request.Context(), couponID); err != nil {
-		response.InternalError(c, err.Error())
+	couponID, ok := handler.ParseID(c, "优惠券")
+	if !ok {
 		return
 	}
 
-	response.SuccessWithMessage(c, "删除成功", nil)
+	err := h.marketingService.DeleteCoupon(c.Request.Context(), couponID)
+	handler.MustSucceedWithMessage(c, err, "删除成功", nil)
 }
 
 // GetCampaignList 获取活动列表
@@ -224,19 +210,15 @@ func (h *MarketingHandler) DeleteCoupon(c *gin.Context) {
 // @Success 200 {object} response.Response{data=admin.AdminCampaignListResponse}
 // @Router /api/v1/admin/marketing/campaigns [get]
 func (h *MarketingHandler) GetCampaignList(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
 
-	if page < 1 {
-		page = 1
-	}
-	if pageSize < 1 || pageSize > 100 {
-		pageSize = 10
-	}
+	p := handler.BindPagination(c)
 
 	req := &adminService.AdminCampaignListRequest{
-		Page:     page,
-		PageSize: pageSize,
+		Page:     p.Page,
+		PageSize: p.PageSize,
 		Type:     c.Query("type"),
 		Keyword:  c.Query("keyword"),
 	}
@@ -251,12 +233,7 @@ func (h *MarketingHandler) GetCampaignList(c *gin.Context) {
 	}
 
 	result, err := h.marketingService.GetCampaignList(c.Request.Context(), req)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.SuccessPage(c, result.List, result.Total, page, pageSize)
+	handler.MustSucceedPage(c, err, result.List, result.Total, p.Page, p.PageSize)
 }
 
 // GetCampaignDetail 获取活动详情
@@ -268,19 +245,17 @@ func (h *MarketingHandler) GetCampaignList(c *gin.Context) {
 // @Success 200 {object} response.Response{data=admin.AdminCampaignItem}
 // @Router /api/v1/admin/marketing/campaigns/{id} [get]
 func (h *MarketingHandler) GetCampaignDetail(c *gin.Context) {
-	campaignID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的活动ID")
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
+	campaignID, ok := handler.ParseID(c, "活动")
+	if !ok {
 		return
 	}
 
 	campaign, err := h.marketingService.GetCampaignDetail(c.Request.Context(), campaignID)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, campaign)
+	handler.MustSucceed(c, err, campaign)
 }
 
 // CreateCampaign 创建活动
@@ -293,6 +268,10 @@ func (h *MarketingHandler) GetCampaignDetail(c *gin.Context) {
 // @Success 200 {object} response.Response{data=models.Campaign}
 // @Router /api/v1/admin/marketing/campaigns [post]
 func (h *MarketingHandler) CreateCampaign(c *gin.Context) {
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
 	var req adminService.CreateCampaignRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, "参数错误: "+err.Error())
@@ -300,12 +279,7 @@ func (h *MarketingHandler) CreateCampaign(c *gin.Context) {
 	}
 
 	campaign, err := h.marketingService.CreateCampaign(c.Request.Context(), &req)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.SuccessWithMessage(c, "创建成功", campaign)
+	handler.MustSucceedWithMessage(c, err, "创建成功", campaign)
 }
 
 // UpdateCampaign 更新活动
@@ -319,9 +293,12 @@ func (h *MarketingHandler) CreateCampaign(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/v1/admin/marketing/campaigns/{id} [put]
 func (h *MarketingHandler) UpdateCampaign(c *gin.Context) {
-	campaignID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的活动ID")
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
+	campaignID, ok := handler.ParseID(c, "活动")
+	if !ok {
 		return
 	}
 
@@ -331,12 +308,8 @@ func (h *MarketingHandler) UpdateCampaign(c *gin.Context) {
 		return
 	}
 
-	if err := h.marketingService.UpdateCampaign(c.Request.Context(), campaignID, &req); err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.SuccessWithMessage(c, "更新成功", nil)
+	err := h.marketingService.UpdateCampaign(c.Request.Context(), campaignID, &req)
+	handler.MustSucceedWithMessage(c, err, "更新成功", nil)
 }
 
 // UpdateCampaignStatusRequest 更新活动状态请求
@@ -355,9 +328,12 @@ type UpdateCampaignStatusRequest struct {
 // @Success 200 {object} response.Response
 // @Router /api/v1/admin/marketing/campaigns/{id}/status [put]
 func (h *MarketingHandler) UpdateCampaignStatus(c *gin.Context) {
-	campaignID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的活动ID")
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
+	campaignID, ok := handler.ParseID(c, "活动")
+	if !ok {
 		return
 	}
 
@@ -367,12 +343,8 @@ func (h *MarketingHandler) UpdateCampaignStatus(c *gin.Context) {
 		return
 	}
 
-	if err := h.marketingService.UpdateCampaignStatus(c.Request.Context(), campaignID, req.Status); err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.SuccessWithMessage(c, "状态更新成功", nil)
+	err := h.marketingService.UpdateCampaignStatus(c.Request.Context(), campaignID, req.Status)
+	handler.MustSucceedWithMessage(c, err, "状态更新成功", nil)
 }
 
 // DeleteCampaign 删除活动
@@ -384,16 +356,15 @@ func (h *MarketingHandler) UpdateCampaignStatus(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/v1/admin/marketing/campaigns/{id} [delete]
 func (h *MarketingHandler) DeleteCampaign(c *gin.Context) {
-	campaignID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的活动ID")
+	if _, ok := handler.RequireAdminID(c); !ok {
 		return
 	}
 
-	if err := h.marketingService.DeleteCampaign(c.Request.Context(), campaignID); err != nil {
-		response.InternalError(c, err.Error())
+	campaignID, ok := handler.ParseID(c, "活动")
+	if !ok {
 		return
 	}
 
-	response.SuccessWithMessage(c, "删除成功", nil)
+	err := h.marketingService.DeleteCampaign(c.Request.Context(), campaignID)
+	handler.MustSucceedWithMessage(c, err, "删除成功", nil)
 }

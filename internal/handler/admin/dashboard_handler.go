@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/dumeirei/smart-locker-backend/internal/common/handler"
 	"github.com/dumeirei/smart-locker-backend/internal/common/response"
 	adminService "github.com/dumeirei/smart-locker-backend/internal/service/admin"
 	distributionService "github.com/dumeirei/smart-locker-backend/internal/service/distribution"
@@ -15,10 +16,10 @@ import (
 
 // DashboardHandler 仪表盘处理器
 type DashboardHandler struct {
-	dashboardService     *adminService.DashboardService
-	operationService     *adminService.OperationDashboardService
+	dashboardService      *adminService.DashboardService
+	operationService      *adminService.OperationDashboardService
 	distributionDashboard *distributionService.DashboardService
-	financeDashboard     *financeService.FinanceDashboardService
+	financeDashboard      *financeService.FinanceDashboardService
 }
 
 // NewDashboardHandler 创建仪表盘处理器
@@ -47,11 +48,7 @@ func NewDashboardHandler(
 // @Router /api/v1/admin/dashboard/platform/overview [get]
 func (h *DashboardHandler) GetPlatformOverview(c *gin.Context) {
 	overview, err := h.dashboardService.GetPlatformOverview(c.Request.Context())
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-	response.Success(c, overview)
+	handler.MustSucceed(c, err, overview)
 }
 
 // GetOrderTrend 获取订单趋势
@@ -66,11 +63,7 @@ func (h *DashboardHandler) GetOrderTrend(c *gin.Context) {
 	days, _ := strconv.Atoi(c.DefaultQuery("days", "7"))
 
 	trends, err := h.dashboardService.GetOrderTrend(c.Request.Context(), days)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-	response.Success(c, trends)
+	handler.MustSucceed(c, err, trends)
 }
 
 // GetDeviceStatusSummary 获取设备状态汇总
@@ -82,11 +75,7 @@ func (h *DashboardHandler) GetOrderTrend(c *gin.Context) {
 // @Router /api/v1/admin/dashboard/platform/device-status [get]
 func (h *DashboardHandler) GetDeviceStatusSummary(c *gin.Context) {
 	summary, err := h.dashboardService.GetDeviceStatusSummary(c.Request.Context())
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-	response.Success(c, summary)
+	handler.MustSucceed(c, err, summary)
 }
 
 // GetOrderTypeSummary 获取订单类型汇总
@@ -111,11 +100,7 @@ func (h *DashboardHandler) GetOrderTypeSummary(c *gin.Context) {
 	}
 
 	summary, err := h.dashboardService.GetOrderTypeSummary(c.Request.Context(), startDate, endDate)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-	response.Success(c, summary)
+	handler.MustSucceed(c, err, summary)
 }
 
 // GetTopVenues 获取热门场地
@@ -143,11 +128,7 @@ func (h *DashboardHandler) GetTopVenues(c *gin.Context) {
 	}
 
 	venues, err := h.dashboardService.GetTopVenues(c.Request.Context(), limit, startDate, endDate)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-	response.Success(c, venues)
+	handler.MustSucceed(c, err, venues)
 }
 
 // GetRecentOrders 获取最近订单
@@ -162,11 +143,7 @@ func (h *DashboardHandler) GetRecentOrders(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 
 	orders, err := h.dashboardService.GetRecentOrders(c.Request.Context(), limit)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-	response.Success(c, orders)
+	handler.MustSucceed(c, err, orders)
 }
 
 // GetAlerts 获取告警信息
@@ -181,11 +158,7 @@ func (h *DashboardHandler) GetAlerts(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 
 	alerts, err := h.dashboardService.GetAlerts(c.Request.Context(), limit)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-	response.Success(c, alerts)
+	handler.MustSucceed(c, err, alerts)
 }
 
 // ==================== 运营仪表盘 ====================
@@ -199,11 +172,7 @@ func (h *DashboardHandler) GetAlerts(c *gin.Context) {
 // @Router /api/v1/admin/dashboard/operation/overview [get]
 func (h *DashboardHandler) GetOperationOverview(c *gin.Context) {
 	overview, err := h.operationService.GetOperationOverview(c.Request.Context())
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-	response.Success(c, overview)
+	handler.MustSucceed(c, err, overview)
 }
 
 // GetUserGrowthTrend 获取用户增长趋势
@@ -218,11 +187,7 @@ func (h *DashboardHandler) GetUserGrowthTrend(c *gin.Context) {
 	days, _ := strconv.Atoi(c.DefaultQuery("days", "7"))
 
 	trends, err := h.operationService.GetUserGrowthTrend(c.Request.Context(), days)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-	response.Success(c, trends)
+	handler.MustSucceed(c, err, trends)
 }
 
 // GetCouponUsageStats 获取优惠券使用统计
@@ -237,11 +202,7 @@ func (h *DashboardHandler) GetCouponUsageStats(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 
 	stats, err := h.operationService.GetCouponUsageStats(c.Request.Context(), limit)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-	response.Success(c, stats)
+	handler.MustSucceed(c, err, stats)
 }
 
 // GetMemberLevelDistribution 获取会员等级分布
@@ -253,11 +214,7 @@ func (h *DashboardHandler) GetCouponUsageStats(c *gin.Context) {
 // @Router /api/v1/admin/dashboard/operation/member-distribution [get]
 func (h *DashboardHandler) GetMemberLevelDistribution(c *gin.Context) {
 	distribution, err := h.operationService.GetMemberLevelDistribution(c.Request.Context())
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-	response.Success(c, distribution)
+	handler.MustSucceed(c, err, distribution)
 }
 
 // GetDistributorRank 获取分销商排行
@@ -272,11 +229,7 @@ func (h *DashboardHandler) GetDistributorRank(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 
 	rank, err := h.operationService.GetDistributorRank(c.Request.Context(), limit)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-	response.Success(c, rank)
+	handler.MustSucceed(c, err, rank)
 }
 
 // GetActiveCampaigns 获取进行中的活动
@@ -291,11 +244,7 @@ func (h *DashboardHandler) GetActiveCampaigns(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 
 	campaigns, err := h.operationService.GetActiveCampaigns(c.Request.Context(), limit)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-	response.Success(c, campaigns)
+	handler.MustSucceed(c, err, campaigns)
 }
 
 // GetUserFeedbackStats 获取用户反馈统计
@@ -307,11 +256,7 @@ func (h *DashboardHandler) GetActiveCampaigns(c *gin.Context) {
 // @Router /api/v1/admin/dashboard/operation/feedback-stats [get]
 func (h *DashboardHandler) GetUserFeedbackStats(c *gin.Context) {
 	stats, err := h.operationService.GetUserFeedbackStats(c.Request.Context())
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-	response.Success(c, stats)
+	handler.MustSucceed(c, err, stats)
 }
 
 // ==================== 财务仪表盘 ====================
@@ -325,11 +270,7 @@ func (h *DashboardHandler) GetUserFeedbackStats(c *gin.Context) {
 // @Router /api/v1/admin/dashboard/finance/overview [get]
 func (h *DashboardHandler) GetFinanceDashboardOverview(c *gin.Context) {
 	overview, err := h.financeDashboard.GetFinanceOverviewData(c.Request.Context())
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-	response.Success(c, overview)
+	handler.MustSucceed(c, err, overview)
 }
 
 // GetRevenueTrend 获取收入趋势
@@ -344,11 +285,7 @@ func (h *DashboardHandler) GetRevenueTrend(c *gin.Context) {
 	days, _ := strconv.Atoi(c.DefaultQuery("days", "7"))
 
 	trends, err := h.financeDashboard.GetRevenueTrend(c.Request.Context(), days)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-	response.Success(c, trends)
+	handler.MustSucceed(c, err, trends)
 }
 
 // GetPaymentChannelSummary 获取支付渠道汇总
@@ -373,11 +310,7 @@ func (h *DashboardHandler) GetPaymentChannelSummary(c *gin.Context) {
 	}
 
 	summary, err := h.financeDashboard.GetPaymentChannelSummary(c.Request.Context(), startDate, endDate)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-	response.Success(c, summary)
+	handler.MustSucceed(c, err, summary)
 }
 
 // GetSettlementStats 获取结算统计
@@ -389,11 +322,7 @@ func (h *DashboardHandler) GetPaymentChannelSummary(c *gin.Context) {
 // @Router /api/v1/admin/dashboard/finance/settlement-stats [get]
 func (h *DashboardHandler) GetSettlementStats(c *gin.Context) {
 	stats, err := h.financeDashboard.GetSettlementStats(c.Request.Context())
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-	response.Success(c, stats)
+	handler.MustSucceed(c, err, stats)
 }
 
 // GetPendingWithdrawals 获取待处理提现
@@ -408,11 +337,7 @@ func (h *DashboardHandler) GetPendingWithdrawals(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 
 	withdrawals, err := h.financeDashboard.GetPendingWithdrawals(c.Request.Context(), limit)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-	response.Success(c, withdrawals)
+	handler.MustSucceed(c, err, withdrawals)
 }
 
 // GetRefundStats 获取退款统计
@@ -437,11 +362,7 @@ func (h *DashboardHandler) GetRefundStats(c *gin.Context) {
 	}
 
 	stats, err := h.financeDashboard.GetRefundStats(c.Request.Context(), startDate, endDate)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-	response.Success(c, stats)
+	handler.MustSucceed(c, err, stats)
 }
 
 // ==================== 分销商仪表盘 ====================
@@ -462,11 +383,7 @@ func (h *DashboardHandler) GetDistributorOverview(c *gin.Context) {
 	}
 
 	overview, err := h.distributionDashboard.GetDistributorOverview(c.Request.Context(), distributorID)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-	response.Success(c, overview)
+	handler.MustSucceed(c, err, overview)
 }
 
 // GetDistributorCommissionTrend 获取分销商佣金趋势
@@ -488,11 +405,7 @@ func (h *DashboardHandler) GetDistributorCommissionTrend(c *gin.Context) {
 	days, _ := strconv.Atoi(c.DefaultQuery("days", "7"))
 
 	trends, err := h.distributionDashboard.GetCommissionTrend(c.Request.Context(), distributorID, days)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-	response.Success(c, trends)
+	handler.MustSucceed(c, err, trends)
 }
 
 // GetDistributorTeamRank 获取分销商团队排行
@@ -527,11 +440,7 @@ func (h *DashboardHandler) GetDistributorTeamRank(c *gin.Context) {
 	}
 
 	rank, err := h.distributionDashboard.GetTeamRank(c.Request.Context(), distributorID, limit, startDate, endDate)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-	response.Success(c, rank)
+	handler.MustSucceed(c, err, rank)
 }
 
 // GetDistributorRecentCommissions 获取分销商最近佣金记录
@@ -553,11 +462,7 @@ func (h *DashboardHandler) GetDistributorRecentCommissions(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 
 	records, err := h.distributionDashboard.GetRecentCommissions(c.Request.Context(), distributorID, limit)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-	response.Success(c, records)
+	handler.MustSucceed(c, err, records)
 }
 
 // GetDistributorCommissionTypeSummary 获取分销商佣金类型汇总
@@ -589,9 +494,5 @@ func (h *DashboardHandler) GetDistributorCommissionTypeSummary(c *gin.Context) {
 	}
 
 	summary, err := h.distributionDashboard.GetCommissionTypeSummary(c.Request.Context(), distributorID, startDate, endDate)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-	response.Success(c, summary)
+	handler.MustSucceed(c, err, summary)
 }

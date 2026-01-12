@@ -2,14 +2,10 @@
 package rental
 
 import (
-	"strconv"
-
 	"github.com/gin-gonic/gin"
 
-	"github.com/dumeirei/smart-locker-backend/internal/common/errors"
+	"github.com/dumeirei/smart-locker-backend/internal/common/handler"
 	"github.com/dumeirei/smart-locker-backend/internal/common/response"
-	"github.com/dumeirei/smart-locker-backend/internal/common/utils"
-	"github.com/dumeirei/smart-locker-backend/internal/middleware"
 	rentalService "github.com/dumeirei/smart-locker-backend/internal/service/rental"
 )
 
@@ -35,9 +31,8 @@ func NewHandler(rentalSvc *rentalService.RentalService) *Handler {
 // @Success 200 {object} response.Response{data=rentalService.RentalInfo}
 // @Router /api/v1/rental [post]
 func (h *Handler) CreateRental(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
@@ -48,16 +43,7 @@ func (h *Handler) CreateRental(c *gin.Context) {
 	}
 
 	rental, err := h.rentalService.CreateRental(c.Request.Context(), userID, &req)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, rental)
+	handler.MustSucceed(c, err, rental)
 }
 
 // PayRental 支付租借订单
@@ -69,28 +55,12 @@ func (h *Handler) CreateRental(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/v1/rental/{id}/pay [post]
 func (h *Handler) PayRental(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, rentalID, ok := handler.RequireUserAndParseID(c, "租借")
+	if !ok {
 		return
 	}
 
-	rentalID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的租借ID")
-		return
-	}
-
-	if err := h.rentalService.PayRental(c.Request.Context(), userID, rentalID); err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, nil)
+	handler.MustSucceed(c, h.rentalService.PayRental(c.Request.Context(), userID, rentalID), nil)
 }
 
 // StartRental 开始租借（取货）
@@ -102,28 +72,12 @@ func (h *Handler) PayRental(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/v1/rental/{id}/start [post]
 func (h *Handler) StartRental(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, rentalID, ok := handler.RequireUserAndParseID(c, "租借")
+	if !ok {
 		return
 	}
 
-	rentalID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的租借ID")
-		return
-	}
-
-	if err := h.rentalService.StartRental(c.Request.Context(), userID, rentalID); err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, nil)
+	handler.MustSucceed(c, h.rentalService.StartRental(c.Request.Context(), userID, rentalID), nil)
 }
 
 // ReturnRental 归还租借
@@ -135,28 +89,12 @@ func (h *Handler) StartRental(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/v1/rental/{id}/return [post]
 func (h *Handler) ReturnRental(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, rentalID, ok := handler.RequireUserAndParseID(c, "租借")
+	if !ok {
 		return
 	}
 
-	rentalID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的租借ID")
-		return
-	}
-
-	if err := h.rentalService.ReturnRental(c.Request.Context(), userID, rentalID); err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, nil)
+	handler.MustSucceed(c, h.rentalService.ReturnRental(c.Request.Context(), userID, rentalID), nil)
 }
 
 // CancelRental 取消租借
@@ -168,28 +106,12 @@ func (h *Handler) ReturnRental(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/v1/rental/{id}/cancel [post]
 func (h *Handler) CancelRental(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, rentalID, ok := handler.RequireUserAndParseID(c, "租借")
+	if !ok {
 		return
 	}
 
-	rentalID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的租借ID")
-		return
-	}
-
-	if err := h.rentalService.CancelRental(c.Request.Context(), userID, rentalID); err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, nil)
+	handler.MustSucceed(c, h.rentalService.CancelRental(c.Request.Context(), userID, rentalID), nil)
 }
 
 // GetRental 获取租借详情
@@ -201,29 +123,13 @@ func (h *Handler) CancelRental(c *gin.Context) {
 // @Success 200 {object} response.Response{data=rentalService.RentalInfo}
 // @Router /api/v1/rental/{id} [get]
 func (h *Handler) GetRental(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
-		return
-	}
-
-	rentalID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的租借ID")
+	userID, rentalID, ok := handler.RequireUserAndParseID(c, "租借")
+	if !ok {
 		return
 	}
 
 	rental, err := h.rentalService.GetRental(c.Request.Context(), userID, rentalID)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, rental)
+	handler.MustSucceed(c, err, rental)
 }
 
 // ListRentals 获取租借列表
@@ -237,16 +143,12 @@ func (h *Handler) GetRental(c *gin.Context) {
 // @Success 200 {object} response.Response{data=response.PageData}
 // @Router /api/v1/rental [get]
 func (h *Handler) ListRentals(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
-	var pagination utils.Pagination
-	pagination.Page, _ = strconv.Atoi(c.DefaultQuery("page", "1"))
-	pagination.PageSize, _ = strconv.Atoi(c.DefaultQuery("page_size", "10"))
-	pagination.Normalize()
+	p := handler.BindPagination(c)
 
 	var status *string
 	if statusStr := c.Query("status"); statusStr != "" {
@@ -256,20 +158,11 @@ func (h *Handler) ListRentals(c *gin.Context) {
 	rentals, total, err := h.rentalService.ListRentals(
 		c.Request.Context(),
 		userID,
-		pagination.GetOffset(),
-		pagination.GetLimit(),
+		p.GetOffset(),
+		p.GetLimit(),
 		status,
 	)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.SuccessPage(c, rentals, total, pagination.Page, pagination.PageSize)
+	handler.MustSucceedPage(c, err, rentals, total, p.Page, p.PageSize)
 }
 
 // RegisterRoutes 注册路由

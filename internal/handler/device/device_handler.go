@@ -6,9 +6,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/dumeirei/smart-locker-backend/internal/common/errors"
+	"github.com/dumeirei/smart-locker-backend/internal/common/handler"
 	"github.com/dumeirei/smart-locker-backend/internal/common/response"
-	"github.com/dumeirei/smart-locker-backend/internal/common/utils"
 	deviceService "github.com/dumeirei/smart-locker-backend/internal/service/device"
 )
 
@@ -44,16 +43,7 @@ func (h *Handler) GetDeviceByQRCode(c *gin.Context) {
 	}
 
 	device, err := h.deviceService.GetDeviceByQRCode(c.Request.Context(), qrCode)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, device)
+	handler.MustSucceed(c, err, device)
 }
 
 // GetDeviceByID 根据 ID 获取设备信息
@@ -64,23 +54,13 @@ func (h *Handler) GetDeviceByQRCode(c *gin.Context) {
 // @Success 200 {object} response.Response{data=deviceService.DeviceInfo}
 // @Router /api/v1/device/{id} [get]
 func (h *Handler) GetDeviceByID(c *gin.Context) {
-	deviceID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的设备ID")
+	deviceID, ok := handler.ParseID(c, "设备")
+	if !ok {
 		return
 	}
 
 	device, err := h.deviceService.GetDeviceByID(c.Request.Context(), deviceID)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, device)
+	handler.MustSucceed(c, err, device)
 }
 
 // GetDevicePricings 获取设备定价列表
@@ -91,23 +71,13 @@ func (h *Handler) GetDeviceByID(c *gin.Context) {
 // @Success 200 {object} response.Response{data=[]deviceService.PricingInfo}
 // @Router /api/v1/device/{id}/pricings [get]
 func (h *Handler) GetDevicePricings(c *gin.Context) {
-	deviceID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的设备ID")
+	deviceID, ok := handler.ParseID(c, "设备")
+	if !ok {
 		return
 	}
 
 	pricings, err := h.deviceService.GetDevicePricings(c.Request.Context(), deviceID)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, pricings)
+	handler.MustSucceed(c, err, pricings)
 }
 
 // GetVenueByID 获取场地详情
@@ -118,23 +88,13 @@ func (h *Handler) GetDevicePricings(c *gin.Context) {
 // @Success 200 {object} response.Response{data=deviceService.VenueDetail}
 // @Router /api/v1/venue/{id} [get]
 func (h *Handler) GetVenueByID(c *gin.Context) {
-	venueID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的场地ID")
+	venueID, ok := handler.ParseID(c, "场地")
+	if !ok {
 		return
 	}
 
 	venue, err := h.venueService.GetVenueByID(c.Request.Context(), venueID)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, venue)
+	handler.MustSucceed(c, err, venue)
 }
 
 // GetVenueDevices 获取场地下的设备列表
@@ -145,23 +105,13 @@ func (h *Handler) GetVenueByID(c *gin.Context) {
 // @Success 200 {object} response.Response{data=[]deviceService.DeviceInfo}
 // @Router /api/v1/venue/{id}/devices [get]
 func (h *Handler) GetVenueDevices(c *gin.Context) {
-	venueID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的场地ID")
+	venueID, ok := handler.ParseID(c, "场地")
+	if !ok {
 		return
 	}
 
 	devices, err := h.deviceService.ListVenueDevices(c.Request.Context(), venueID)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, devices)
+	handler.MustSucceed(c, err, devices)
 }
 
 // ListNearbyVenues 获取附近场地列表
@@ -202,16 +152,7 @@ func (h *Handler) ListNearbyVenues(c *gin.Context) {
 	}
 
 	venues, err := h.venueService.ListNearbyVenues(c.Request.Context(), longitude, latitude, radiusKm, limit)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, venues)
+	handler.MustSucceed(c, err, venues)
 }
 
 // ListVenuesByCity 获取城市场地列表
@@ -230,22 +171,10 @@ func (h *Handler) ListVenuesByCity(c *gin.Context) {
 		return
 	}
 
-	var pagination utils.Pagination
-	pagination.Page, _ = strconv.Atoi(c.DefaultQuery("page", "1"))
-	pagination.PageSize, _ = strconv.Atoi(c.DefaultQuery("page_size", "10"))
-	pagination.Normalize()
+	p := handler.BindPagination(c)
 
-	venues, total, err := h.venueService.ListVenuesByCity(c.Request.Context(), city, pagination.GetOffset(), pagination.GetLimit())
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.SuccessPage(c, venues, total, pagination.Page, pagination.PageSize)
+	venues, total, err := h.venueService.ListVenuesByCity(c.Request.Context(), city, p.GetOffset(), p.GetLimit())
+	handler.MustSucceedPage(c, err, venues, total, p.Page, p.PageSize)
 }
 
 // SearchVenues 搜索场地
@@ -262,22 +191,10 @@ func (h *Handler) SearchVenues(c *gin.Context) {
 	keyword := c.Query("keyword")
 	city := c.Query("city")
 
-	var pagination utils.Pagination
-	pagination.Page, _ = strconv.Atoi(c.DefaultQuery("page", "1"))
-	pagination.PageSize, _ = strconv.Atoi(c.DefaultQuery("page_size", "10"))
-	pagination.Normalize()
+	p := handler.BindPagination(c)
 
-	venues, total, err := h.venueService.SearchVenues(c.Request.Context(), keyword, city, pagination.GetOffset(), pagination.GetLimit())
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.SuccessPage(c, venues, total, pagination.Page, pagination.PageSize)
+	venues, total, err := h.venueService.SearchVenues(c.Request.Context(), keyword, city, p.GetOffset(), p.GetLimit())
+	handler.MustSucceedPage(c, err, venues, total, p.Page, p.PageSize)
 }
 
 // GetCities 获取城市列表
@@ -288,16 +205,7 @@ func (h *Handler) SearchVenues(c *gin.Context) {
 // @Router /api/v1/venue/cities [get]
 func (h *Handler) GetCities(c *gin.Context) {
 	cities, err := h.venueService.GetCities(c.Request.Context())
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, cities)
+	handler.MustSucceed(c, err, cities)
 }
 
 // RegisterRoutes 注册路由

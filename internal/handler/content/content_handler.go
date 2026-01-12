@@ -6,9 +6,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/dumeirei/smart-locker-backend/internal/common/errors"
+	"github.com/dumeirei/smart-locker-backend/internal/common/handler"
 	"github.com/dumeirei/smart-locker-backend/internal/common/response"
-	"github.com/dumeirei/smart-locker-backend/internal/middleware"
 	contentService "github.com/dumeirei/smart-locker-backend/internal/service/content"
 )
 
@@ -48,16 +47,7 @@ func (h *Handler) CreateArticle(c *gin.Context) {
 	}
 
 	article, err := h.contentService.CreateArticle(c.Request.Context(), &req)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, article)
+	handler.MustSucceed(c, err, article)
 }
 
 // UpdateArticle 更新文章
@@ -71,9 +61,8 @@ func (h *Handler) CreateArticle(c *gin.Context) {
 // @Success 200 {object} response.Response{data=models.Article}
 // @Router /api/v1/admin/articles/{id} [put]
 func (h *Handler) UpdateArticle(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的文章ID")
+	id, ok := handler.ParseID(c, "文章")
+	if !ok {
 		return
 	}
 
@@ -84,16 +73,7 @@ func (h *Handler) UpdateArticle(c *gin.Context) {
 	}
 
 	article, err := h.contentService.UpdateArticle(c.Request.Context(), id, &req)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, article)
+	handler.MustSucceed(c, err, article)
 }
 
 // GetArticle 获取文章详情（管理端）
@@ -105,23 +85,13 @@ func (h *Handler) UpdateArticle(c *gin.Context) {
 // @Success 200 {object} response.Response{data=models.Article}
 // @Router /api/v1/admin/articles/{id} [get]
 func (h *Handler) GetArticle(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的文章ID")
+	id, ok := handler.ParseID(c, "文章")
+	if !ok {
 		return
 	}
 
 	article, err := h.contentService.GetArticle(c.Request.Context(), id)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, article)
+	handler.MustSucceed(c, err, article)
 }
 
 // DeleteArticle 删除文章
@@ -133,22 +103,12 @@ func (h *Handler) GetArticle(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/v1/admin/articles/{id} [delete]
 func (h *Handler) DeleteArticle(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的文章ID")
+	id, ok := handler.ParseID(c, "文章")
+	if !ok {
 		return
 	}
 
-	if err := h.contentService.DeleteArticle(c.Request.Context(), id); err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, nil)
+	handler.MustSucceed(c, h.contentService.DeleteArticle(c.Request.Context(), id), nil)
 }
 
 // ListArticles 获取文章列表（管理端）
@@ -171,12 +131,7 @@ func (h *Handler) ListArticles(c *gin.Context) {
 	}
 
 	articles, total, err := h.contentService.ListArticles(c.Request.Context(), &req)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
+	if handler.HandleError(c, err) {
 		return
 	}
 
@@ -192,22 +147,12 @@ func (h *Handler) ListArticles(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/v1/admin/articles/{id}/publish [post]
 func (h *Handler) PublishArticle(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的文章ID")
+	id, ok := handler.ParseID(c, "文章")
+	if !ok {
 		return
 	}
 
-	if err := h.contentService.PublishArticle(c.Request.Context(), id); err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, nil)
+	handler.MustSucceed(c, h.contentService.PublishArticle(c.Request.Context(), id), nil)
 }
 
 // UnpublishArticle 取消发布文章
@@ -219,22 +164,12 @@ func (h *Handler) PublishArticle(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/v1/admin/articles/{id}/unpublish [post]
 func (h *Handler) UnpublishArticle(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的文章ID")
+	id, ok := handler.ParseID(c, "文章")
+	if !ok {
 		return
 	}
 
-	if err := h.contentService.UnpublishArticle(c.Request.Context(), id); err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, nil)
+	handler.MustSucceed(c, h.contentService.UnpublishArticle(c.Request.Context(), id), nil)
 }
 
 // GetCategoryCounts 获取分类统计
@@ -246,16 +181,7 @@ func (h *Handler) UnpublishArticle(c *gin.Context) {
 // @Router /api/v1/admin/articles/category-counts [get]
 func (h *Handler) GetCategoryCounts(c *gin.Context) {
 	counts, err := h.contentService.GetCategoryCounts(c.Request.Context())
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, counts)
+	handler.MustSucceed(c, err, counts)
 }
 
 // ==================== 文章查询（用户端）====================
@@ -268,23 +194,13 @@ func (h *Handler) GetCategoryCounts(c *gin.Context) {
 // @Success 200 {object} response.Response{data=models.Article}
 // @Router /api/v1/articles/{id} [get]
 func (h *Handler) GetPublishedArticle(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的文章ID")
+	id, ok := handler.ParseID(c, "文章")
+	if !ok {
 		return
 	}
 
 	article, err := h.contentService.GetArticleWithViewCount(c.Request.Context(), id)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, article)
+	handler.MustSucceed(c, err, article)
 }
 
 // ListPublishedArticles 获取已发布文章列表
@@ -298,16 +214,10 @@ func (h *Handler) GetPublishedArticle(c *gin.Context) {
 // @Router /api/v1/articles [get]
 func (h *Handler) ListPublishedArticles(c *gin.Context) {
 	category := c.Query("category")
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	p := handler.BindPaginationWithDefaults(c, 1, 20)
 
-	articles, total, err := h.contentService.ListPublishedArticles(c.Request.Context(), category, page, pageSize)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
+	articles, total, err := h.contentService.ListPublishedArticles(c.Request.Context(), category, p.Page, p.PageSize)
+	if handler.HandleError(c, err) {
 		return
 	}
 
@@ -327,16 +237,7 @@ func (h *Handler) GetArticlesByCategory(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 
 	articles, err := h.contentService.GetArticlesByCategory(c.Request.Context(), category, limit)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, articles)
+	handler.MustSucceed(c, err, articles)
 }
 
 // ==================== 通知管理（管理端）====================
@@ -358,16 +259,7 @@ func (h *Handler) CreateNotification(c *gin.Context) {
 	}
 
 	notification, err := h.notificationService.CreateNotification(c.Request.Context(), &req)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, notification)
+	handler.MustSucceed(c, err, notification)
 }
 
 // CreateSystemNotification 创建系统通知
@@ -386,16 +278,7 @@ func (h *Handler) CreateSystemNotification(c *gin.Context) {
 		return
 	}
 
-	if err := h.notificationService.CreateSystemNotification(c.Request.Context(), req.Title, req.Content); err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, nil)
+	handler.MustSucceed(c, h.notificationService.CreateSystemNotification(c.Request.Context(), req.Title, req.Content), nil)
 }
 
 // SystemNotificationRequest 系统通知请求
@@ -420,16 +303,7 @@ func (h *Handler) BatchCreateNotifications(c *gin.Context) {
 		return
 	}
 
-	if err := h.notificationService.BatchCreateNotifications(c.Request.Context(), &req); err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, nil)
+	handler.MustSucceed(c, h.notificationService.BatchCreateNotifications(c.Request.Context(), &req), nil)
 }
 
 // DeleteNotification 删除通知（管理端）
@@ -441,22 +315,12 @@ func (h *Handler) BatchCreateNotifications(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/v1/admin/notifications/{id} [delete]
 func (h *Handler) DeleteNotification(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的通知ID")
+	id, ok := handler.ParseID(c, "通知")
+	if !ok {
 		return
 	}
 
-	if err := h.notificationService.DeleteNotification(c.Request.Context(), id); err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, nil)
+	handler.MustSucceed(c, h.notificationService.DeleteNotification(c.Request.Context(), id), nil)
 }
 
 // ==================== 通知管理（用户端）====================
@@ -473,9 +337,8 @@ func (h *Handler) DeleteNotification(c *gin.Context) {
 // @Success 200 {object} response.Response{data=response.ListData{list=[]models.Notification}}
 // @Router /api/v1/notifications [get]
 func (h *Handler) GetUserNotifications(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
@@ -486,12 +349,7 @@ func (h *Handler) GetUserNotifications(c *gin.Context) {
 	}
 
 	notifications, total, err := h.notificationService.ListNotifications(c.Request.Context(), userID, &req)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
+	if handler.HandleError(c, err) {
 		return
 	}
 
@@ -507,29 +365,13 @@ func (h *Handler) GetUserNotifications(c *gin.Context) {
 // @Success 200 {object} response.Response{data=models.Notification}
 // @Router /api/v1/notifications/{id} [get]
 func (h *Handler) GetNotification(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, notificationID, ok := handler.RequireUserAndParseID(c, "通知")
+	if !ok {
 		return
 	}
 
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的通知ID")
-		return
-	}
-
-	notification, err := h.notificationService.GetNotification(c.Request.Context(), id, userID)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, notification)
+	notification, err := h.notificationService.GetNotification(c.Request.Context(), notificationID, userID)
+	handler.MustSucceed(c, err, notification)
 }
 
 // MarkNotificationAsRead 标记通知为已读
@@ -541,28 +383,12 @@ func (h *Handler) GetNotification(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/v1/notifications/{id}/read [post]
 func (h *Handler) MarkNotificationAsRead(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, notificationID, ok := handler.RequireUserAndParseID(c, "通知")
+	if !ok {
 		return
 	}
 
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的通知ID")
-		return
-	}
-
-	if err := h.notificationService.MarkAsRead(c.Request.Context(), id, userID); err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, nil)
+	handler.MustSucceed(c, h.notificationService.MarkAsRead(c.Request.Context(), notificationID, userID), nil)
 }
 
 // MarkAllNotificationsAsRead 标记所有通知为已读
@@ -573,22 +399,12 @@ func (h *Handler) MarkNotificationAsRead(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/v1/notifications/read-all [post]
 func (h *Handler) MarkAllNotificationsAsRead(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
-	if err := h.notificationService.MarkAllAsRead(c.Request.Context(), userID); err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, nil)
+	handler.MustSucceed(c, h.notificationService.MarkAllAsRead(c.Request.Context(), userID), nil)
 }
 
 // GetUnreadCount 获取未读通知数量
@@ -599,23 +415,13 @@ func (h *Handler) MarkAllNotificationsAsRead(c *gin.Context) {
 // @Success 200 {object} response.Response{data=UnreadCountResponse}
 // @Router /api/v1/notifications/unread-count [get]
 func (h *Handler) GetUnreadCount(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
 	count, err := h.notificationService.GetUnreadCount(c.Request.Context(), userID)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, UnreadCountResponse{Count: count})
+	handler.MustSucceed(c, err, UnreadCountResponse{Count: count})
 }
 
 // UnreadCountResponse 未读数量响应
@@ -631,23 +437,13 @@ type UnreadCountResponse struct {
 // @Success 200 {object} response.Response{data=contentService.NotificationSummary}
 // @Router /api/v1/notifications/summary [get]
 func (h *Handler) GetNotificationSummary(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
 	summary, err := h.notificationService.GetNotificationSummary(c.Request.Context(), userID)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, summary)
+	handler.MustSucceed(c, err, summary)
 }
 
 // DeleteReadNotifications 删除已读通知
@@ -658,20 +454,10 @@ func (h *Handler) GetNotificationSummary(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/v1/notifications/read [delete]
 func (h *Handler) DeleteReadNotifications(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
-	if err := h.notificationService.DeleteReadNotifications(c.Request.Context(), userID); err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, nil)
+	handler.MustSucceed(c, h.notificationService.DeleteReadNotifications(c.Request.Context(), userID), nil)
 }

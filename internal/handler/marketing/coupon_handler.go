@@ -6,8 +6,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/dumeirei/smart-locker-backend/internal/common/handler"
 	"github.com/dumeirei/smart-locker-backend/internal/common/response"
-	"github.com/dumeirei/smart-locker-backend/internal/middleware"
 	marketingService "github.com/dumeirei/smart-locker-backend/internal/service/marketing"
 )
 
@@ -35,34 +35,24 @@ func NewCouponHandler(couponSvc *marketingService.CouponService, userCouponSvc *
 // @Success 200 {object} response.Response{data=marketing.CouponListResponse}
 // @Router /api/v1/marketing/coupons [get]
 func (h *CouponHandler) GetCouponList(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
-
-	if page < 1 {
-		page = 1
-	}
-	if pageSize < 1 || pageSize > 50 {
-		pageSize = 10
-	}
+	p := handler.BindPagination(c)
 
 	req := &marketingService.CouponListRequest{
-		Page:     page,
-		PageSize: pageSize,
+		Page:     p.Page,
+		PageSize: p.PageSize,
 	}
 
 	result, err := h.couponService.GetCouponList(c.Request.Context(), req, userID)
-	if err != nil {
-		response.InternalError(c, err.Error())
+	if handler.HandleError(c, err) {
 		return
 	}
 
-	response.SuccessPage(c, result.List, result.Total, page, pageSize)
+	response.SuccessPage(c, result.List, result.Total, p.Page, p.PageSize)
 }
 
 // GetCouponDetail 获取优惠券详情
@@ -74,25 +64,18 @@ func (h *CouponHandler) GetCouponList(c *gin.Context) {
 // @Success 200 {object} response.Response{data=marketing.CouponItem}
 // @Router /api/v1/marketing/coupons/{id} [get]
 func (h *CouponHandler) GetCouponDetail(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
-	couponID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的优惠券ID")
+	couponID, ok := handler.ParseID(c, "优惠券")
+	if !ok {
 		return
 	}
 
 	coupon, err := h.couponService.GetCouponDetail(c.Request.Context(), couponID, userID)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, coupon)
+	handler.MustSucceed(c, err, coupon)
 }
 
 // ReceiveCoupon 领取优惠券
@@ -105,15 +88,13 @@ func (h *CouponHandler) GetCouponDetail(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/v1/marketing/coupons/{id}/receive [post]
 func (h *CouponHandler) ReceiveCoupon(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
-	couponID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的优惠券ID")
+	couponID, ok := handler.ParseID(c, "优惠券")
+	if !ok {
 		return
 	}
 
@@ -140,25 +121,16 @@ func (h *CouponHandler) ReceiveCoupon(c *gin.Context) {
 // @Success 200 {object} response.Response{data=marketing.UserCouponListResponse}
 // @Router /api/v1/marketing/user-coupons [get]
 func (h *CouponHandler) GetUserCoupons(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
-
-	if page < 1 {
-		page = 1
-	}
-	if pageSize < 1 || pageSize > 50 {
-		pageSize = 10
-	}
+	p := handler.BindPagination(c)
 
 	req := &marketingService.UserCouponListRequest{
-		Page:     page,
-		PageSize: pageSize,
+		Page:     p.Page,
+		PageSize: p.PageSize,
 	}
 
 	// 处理状态筛选
@@ -171,12 +143,11 @@ func (h *CouponHandler) GetUserCoupons(c *gin.Context) {
 	}
 
 	result, err := h.userCouponService.GetUserCoupons(c.Request.Context(), userID, req)
-	if err != nil {
-		response.InternalError(c, err.Error())
+	if handler.HandleError(c, err) {
 		return
 	}
 
-	response.SuccessPage(c, result.List, result.Total, page, pageSize)
+	response.SuccessPage(c, result.List, result.Total, p.Page, p.PageSize)
 }
 
 // GetUserCouponDetail 获取用户优惠券详情
@@ -188,15 +159,13 @@ func (h *CouponHandler) GetUserCoupons(c *gin.Context) {
 // @Success 200 {object} response.Response{data=marketing.UserCouponItem}
 // @Router /api/v1/marketing/user-coupons/{id} [get]
 func (h *CouponHandler) GetUserCouponDetail(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
-	userCouponID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的用户优惠券ID")
+	userCouponID, ok := handler.ParseID(c, "用户优惠券")
+	if !ok {
 		return
 	}
 
@@ -223,29 +192,19 @@ func (h *CouponHandler) GetUserCouponDetail(c *gin.Context) {
 // @Success 200 {object} response.Response{data=marketing.UserCouponListResponse}
 // @Router /api/v1/marketing/user-coupons/available [get]
 func (h *CouponHandler) GetAvailableCoupons(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+	p := handler.BindPagination(c)
 
-	if page < 1 {
-		page = 1
-	}
-	if pageSize < 1 || pageSize > 50 {
-		pageSize = 10
-	}
-
-	result, err := h.userCouponService.GetAvailableCoupons(c.Request.Context(), userID, page, pageSize)
-	if err != nil {
-		response.InternalError(c, err.Error())
+	result, err := h.userCouponService.GetAvailableCoupons(c.Request.Context(), userID, p.Page, p.PageSize)
+	if handler.HandleError(c, err) {
 		return
 	}
 
-	response.SuccessPage(c, result.List, result.Total, page, pageSize)
+	response.SuccessPage(c, result.List, result.Total, p.Page, p.PageSize)
 }
 
 // GetAvailableCouponsForOrderRequest 订单可用优惠券请求
@@ -264,9 +223,8 @@ type GetAvailableCouponsForOrderRequest struct {
 // @Success 200 {object} response.Response{data=[]marketing.UserCouponItem}
 // @Router /api/v1/marketing/user-coupons/for-order [get]
 func (h *CouponHandler) GetAvailableCouponsForOrder(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
@@ -277,12 +235,7 @@ func (h *CouponHandler) GetAvailableCouponsForOrder(c *gin.Context) {
 	}
 
 	coupons, err := h.userCouponService.GetAvailableCouponsForOrder(c.Request.Context(), userID, req.OrderType, req.OrderAmount)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, coupons)
+	handler.MustSucceed(c, err, coupons)
 }
 
 // GetCouponCountByStatus 获取各状态优惠券数量
@@ -293,17 +246,11 @@ func (h *CouponHandler) GetAvailableCouponsForOrder(c *gin.Context) {
 // @Success 200 {object} response.Response{data=map[string]int64}
 // @Router /api/v1/marketing/user-coupons/count [get]
 func (h *CouponHandler) GetCouponCountByStatus(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
 	counts, err := h.userCouponService.GetCouponCountByStatus(c.Request.Context(), userID)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, counts)
+	handler.MustSucceed(c, err, counts)
 }

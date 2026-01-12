@@ -2,13 +2,10 @@
 package mall
 
 import (
-	"strconv"
-
 	"github.com/gin-gonic/gin"
 
-	"github.com/dumeirei/smart-locker-backend/internal/common/errors"
+	"github.com/dumeirei/smart-locker-backend/internal/common/handler"
 	"github.com/dumeirei/smart-locker-backend/internal/common/response"
-	"github.com/dumeirei/smart-locker-backend/internal/middleware"
 	mallService "github.com/dumeirei/smart-locker-backend/internal/service/mall"
 )
 
@@ -32,23 +29,13 @@ func NewCartHandler(cartSvc *mallService.CartService) *CartHandler {
 // @Success 200 {object} response.Response{data=mall.CartInfo}
 // @Router /api/v1/cart [get]
 func (h *CartHandler) GetCart(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
 	cart, err := h.cartService.GetCart(c.Request.Context(), userID)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, cart)
+	handler.MustSucceed(c, err, cart)
 }
 
 // AddItem 添加商品到购物车
@@ -61,9 +48,8 @@ func (h *CartHandler) GetCart(c *gin.Context) {
 // @Success 200 {object} response.Response{data=mall.CartItemInfo}
 // @Router /api/v1/cart [post]
 func (h *CartHandler) AddItem(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
@@ -74,16 +60,7 @@ func (h *CartHandler) AddItem(c *gin.Context) {
 	}
 
 	item, err := h.cartService.AddItem(c.Request.Context(), userID, &req)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, item)
+	handler.MustSucceed(c, err, item)
 }
 
 // UpdateItem 更新购物车项
@@ -97,15 +74,8 @@ func (h *CartHandler) AddItem(c *gin.Context) {
 // @Success 200 {object} response.Response{data=mall.CartItemInfo}
 // @Router /api/v1/cart/{id} [put]
 func (h *CartHandler) UpdateItem(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
-		return
-	}
-
-	itemID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的购物车项ID")
+	userID, itemID, ok := handler.RequireUserAndParseID(c, "购物车项")
+	if !ok {
 		return
 	}
 
@@ -116,16 +86,7 @@ func (h *CartHandler) UpdateItem(c *gin.Context) {
 	}
 
 	item, err := h.cartService.UpdateItem(c.Request.Context(), userID, itemID, &req)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, item)
+	handler.MustSucceed(c, err, item)
 }
 
 // RemoveItem 移除购物车项
@@ -137,28 +98,12 @@ func (h *CartHandler) UpdateItem(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/v1/cart/{id} [delete]
 func (h *CartHandler) RemoveItem(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, itemID, ok := handler.RequireUserAndParseID(c, "购物车项")
+	if !ok {
 		return
 	}
 
-	itemID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的购物车项ID")
-		return
-	}
-
-	if err := h.cartService.RemoveItem(c.Request.Context(), userID, itemID); err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, nil)
+	handler.MustSucceed(c, h.cartService.RemoveItem(c.Request.Context(), userID, itemID), nil)
 }
 
 // ClearCart 清空购物车
@@ -169,22 +114,12 @@ func (h *CartHandler) RemoveItem(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/v1/cart [delete]
 func (h *CartHandler) ClearCart(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
-	if err := h.cartService.ClearCart(c.Request.Context(), userID); err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, nil)
+	handler.MustSucceed(c, h.cartService.ClearCart(c.Request.Context(), userID), nil)
 }
 
 // SelectAll 全选/取消全选
@@ -197,24 +132,14 @@ func (h *CartHandler) ClearCart(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/v1/cart/select-all [put]
 func (h *CartHandler) SelectAll(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
 	selected := c.Query("selected") == "true"
 
-	if err := h.cartService.SelectAll(c.Request.Context(), userID, selected); err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, nil)
+	handler.MustSucceed(c, h.cartService.SelectAll(c.Request.Context(), userID, selected), nil)
 }
 
 // GetCartCount 获取购物车商品数量
@@ -225,21 +150,11 @@ func (h *CartHandler) SelectAll(c *gin.Context) {
 // @Success 200 {object} response.Response{data=int}
 // @Router /api/v1/cart/count [get]
 func (h *CartHandler) GetCartCount(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
 	count, err := h.cartService.GetCartCount(c.Request.Context(), userID)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, gin.H{"count": count})
+	handler.MustSucceed(c, err, gin.H{"count": count})
 }

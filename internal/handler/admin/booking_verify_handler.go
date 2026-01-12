@@ -2,13 +2,10 @@
 package admin
 
 import (
-	"strconv"
-
 	"github.com/gin-gonic/gin"
 
-	"github.com/dumeirei/smart-locker-backend/internal/common/errors"
+	"github.com/dumeirei/smart-locker-backend/internal/common/handler"
 	"github.com/dumeirei/smart-locker-backend/internal/common/response"
-	"github.com/dumeirei/smart-locker-backend/internal/middleware"
 	hotelService "github.com/dumeirei/smart-locker-backend/internal/service/hotel"
 )
 
@@ -40,9 +37,8 @@ type VerifyByCodeRequest struct {
 // @Success 200 {object} response.Response{data=hotelService.BookingInfo}
 // @Router /admin/bookings/verify [post]
 func (h *BookingVerifyHandler) VerifyByCode(c *gin.Context) {
-	adminID := middleware.GetUserID(c)
-	if adminID == 0 {
-		response.Unauthorized(c, "请先登录")
+	adminID, ok := handler.RequireAdminID(c)
+	if !ok {
 		return
 	}
 
@@ -53,16 +49,7 @@ func (h *BookingVerifyHandler) VerifyByCode(c *gin.Context) {
 	}
 
 	booking, err := h.bookingService.VerifyBooking(c.Request.Context(), req.VerificationCode, adminID)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, booking)
+	handler.MustSucceed(c, err, booking)
 }
 
 // VerifyByQRCode 通过二维码核销
@@ -76,9 +63,8 @@ func (h *BookingVerifyHandler) VerifyByCode(c *gin.Context) {
 // @Success 200 {object} response.Response{data=hotelService.BookingInfo}
 // @Router /admin/hotel/verify/{booking_no} [get]
 func (h *BookingVerifyHandler) VerifyByQRCode(c *gin.Context) {
-	adminID := middleware.GetUserID(c)
-	if adminID == 0 {
-		response.Unauthorized(c, "请先登录")
+	adminID, ok := handler.RequireAdminID(c)
+	if !ok {
 		return
 	}
 
@@ -91,12 +77,7 @@ func (h *BookingVerifyHandler) VerifyByQRCode(c *gin.Context) {
 	}
 
 	booking, err := h.bookingService.VerifyBooking(c.Request.Context(), verificationCode, adminID)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
+	if handler.HandleError(c, err) {
 		return
 	}
 
@@ -125,28 +106,17 @@ type CompleteBookingRequest struct {
 // @Success 200 {object} response.Response
 // @Router /admin/bookings/{id}/complete [post]
 func (h *BookingVerifyHandler) CompleteBooking(c *gin.Context) {
-	adminID := middleware.GetUserID(c)
-	if adminID == 0 {
-		response.Unauthorized(c, "请先登录")
+	_, ok := handler.RequireAdminID(c)
+	if !ok {
 		return
 	}
 
-	bookingID, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的预订ID")
+	bookingID, ok := handler.ParseID(c, "预订")
+	if !ok {
 		return
 	}
 
-	if err := h.bookingService.CompleteBooking(c.Request.Context(), bookingID); err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, nil)
+	handler.MustSucceed(c, h.bookingService.CompleteBooking(c.Request.Context(), bookingID), nil)
 }
 
 // RegisterRoutes 注册路由

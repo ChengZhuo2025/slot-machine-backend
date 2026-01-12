@@ -3,10 +3,10 @@ package admin
 
 import (
 	"strconv"
-	"time"
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/dumeirei/smart-locker-backend/internal/common/handler"
 	"github.com/dumeirei/smart-locker-backend/internal/common/response"
 	adminService "github.com/dumeirei/smart-locker-backend/internal/service/admin"
 )
@@ -37,8 +37,12 @@ func NewUserHandler(userService *adminService.UserAdminService) *UserHandler {
 // @Success 200 {object} response.Response{data=response.ListData}
 // @Router /api/v1/admin/users [get]
 func (h *UserHandler) List(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	_, ok := handler.RequireAdminID(c)
+	if !ok {
+		return
+	}
+
+	p := handler.BindPaginationWithDefaults(c, 1, 20)
 
 	filters := &adminService.UserListFilters{
 		Phone:    c.Query("phone"),
@@ -46,30 +50,26 @@ func (h *UserHandler) List(c *gin.Context) {
 	}
 
 	if s := c.Query("status"); s != "" {
-		status, _ := strconv.ParseInt(s, 10, 8)
-		val := int8(status)
-		filters.Status = &val
+		if status, err := strconv.ParseInt(s, 10, 8); err == nil {
+			val := int8(status)
+			filters.Status = &val
+		}
 	}
 	if s := c.Query("member_level_id"); s != "" {
-		filters.MemberLevelID, _ = strconv.ParseInt(s, 10, 64)
-	}
-	if s := c.Query("start_date"); s != "" {
-		t, _ := time.Parse("2006-01-02", s)
-		filters.StartDate = &t
-	}
-	if s := c.Query("end_date"); s != "" {
-		t, _ := time.Parse("2006-01-02", s)
-		endOfDay := t.Add(24*time.Hour - time.Second)
-		filters.EndDate = &endOfDay
+		if memberLevelID, err := strconv.ParseInt(s, 10, 64); err == nil {
+			filters.MemberLevelID = memberLevelID
+		}
 	}
 
-	users, total, err := h.userService.List(c.Request.Context(), page, pageSize, filters)
-	if err != nil {
-		response.InternalError(c, err.Error())
+	startDate, endDate, ok := handler.ParseQueryDateRange(c)
+	if !ok {
 		return
 	}
+	filters.StartDate = startDate
+	filters.EndDate = endDate
 
-	response.SuccessList(c, users, total, page, pageSize)
+	users, total, err := h.userService.List(c.Request.Context(), p.Page, p.PageSize, filters)
+	handler.MustSucceedPage(c, err, users, total, p.Page, p.PageSize)
 }
 
 // GetByID 获取用户详情
@@ -81,9 +81,13 @@ func (h *UserHandler) List(c *gin.Context) {
 // @Success 200 {object} response.Response{data=models.User}
 // @Router /api/v1/admin/users/{id} [get]
 func (h *UserHandler) GetByID(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的用户ID")
+	_, ok := handler.RequireAdminID(c)
+	if !ok {
+		return
+	}
+
+	id, ok := handler.ParseID(c, "用户")
+	if !ok {
 		return
 	}
 
@@ -107,9 +111,13 @@ func (h *UserHandler) GetByID(c *gin.Context) {
 // @Success 200 {object} response.Response{data=models.User}
 // @Router /api/v1/admin/users/{id} [put]
 func (h *UserHandler) Update(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的用户ID")
+	_, ok := handler.RequireAdminID(c)
+	if !ok {
+		return
+	}
+
+	id, ok := handler.ParseID(c, "用户")
+	if !ok {
 		return
 	}
 
@@ -120,12 +128,7 @@ func (h *UserHandler) Update(c *gin.Context) {
 	}
 
 	user, err := h.userService.Update(c.Request.Context(), id, &req)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, user)
+	handler.MustSucceed(c, err, user)
 }
 
 // Enable 启用用户
@@ -137,18 +140,17 @@ func (h *UserHandler) Update(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/v1/admin/users/{id}/enable [post]
 func (h *UserHandler) Enable(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的用户ID")
+	_, ok := handler.RequireAdminID(c)
+	if !ok {
 		return
 	}
 
-	if err := h.userService.Enable(c.Request.Context(), id); err != nil {
-		response.InternalError(c, err.Error())
+	id, ok := handler.ParseID(c, "用户")
+	if !ok {
 		return
 	}
 
-	response.Success(c, nil)
+	handler.MustSucceed(c, h.userService.Enable(c.Request.Context(), id), nil)
 }
 
 // Disable 禁用用户
@@ -160,18 +162,17 @@ func (h *UserHandler) Enable(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/v1/admin/users/{id}/disable [post]
 func (h *UserHandler) Disable(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的用户ID")
+	_, ok := handler.RequireAdminID(c)
+	if !ok {
 		return
 	}
 
-	if err := h.userService.Disable(c.Request.Context(), id); err != nil {
-		response.InternalError(c, err.Error())
+	id, ok := handler.ParseID(c, "用户")
+	if !ok {
 		return
 	}
 
-	response.Success(c, nil)
+	handler.MustSucceed(c, h.userService.Disable(c.Request.Context(), id), nil)
 }
 
 // AdjustPointsRequest 调整积分请求
@@ -191,9 +192,13 @@ type AdjustPointsRequest struct {
 // @Success 200 {object} response.Response
 // @Router /api/v1/admin/users/{id}/adjust-points [post]
 func (h *UserHandler) AdjustPoints(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的用户ID")
+	_, ok := handler.RequireAdminID(c)
+	if !ok {
+		return
+	}
+
+	id, ok := handler.ParseID(c, "用户")
+	if !ok {
 		return
 	}
 
@@ -203,12 +208,7 @@ func (h *UserHandler) AdjustPoints(c *gin.Context) {
 		return
 	}
 
-	if err := h.userService.AdjustPoints(c.Request.Context(), id, req.Points, req.Remark); err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, nil)
+	handler.MustSucceed(c, h.userService.AdjustPoints(c.Request.Context(), id, req.Points, req.Remark), nil)
 }
 
 // GetStatistics 获取用户统计
@@ -219,11 +219,11 @@ func (h *UserHandler) AdjustPoints(c *gin.Context) {
 // @Success 200 {object} response.Response{data=adminService.UserStatistics}
 // @Router /api/v1/admin/users/statistics [get]
 func (h *UserHandler) GetStatistics(c *gin.Context) {
-	stats, err := h.userService.GetStatistics(c.Request.Context())
-	if err != nil {
-		response.InternalError(c, err.Error())
+	_, ok := handler.RequireAdminID(c)
+	if !ok {
 		return
 	}
 
-	response.Success(c, stats)
+	stats, err := h.userService.GetStatistics(c.Request.Context())
+	handler.MustSucceed(c, err, stats)
 }

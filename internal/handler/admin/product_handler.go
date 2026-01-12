@@ -6,7 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/dumeirei/smart-locker-backend/internal/common/errors"
+	"github.com/dumeirei/smart-locker-backend/internal/common/handler"
 	"github.com/dumeirei/smart-locker-backend/internal/common/response"
 	adminService "github.com/dumeirei/smart-locker-backend/internal/service/admin"
 )
@@ -31,17 +31,13 @@ func NewProductHandler(productAdminSvc *adminService.ProductAdminService) *Produ
 // @Success 200 {object} response.Response{data=[]adminService.CategoryAdminInfo}
 // @Router /api/v1/admin/categories [get]
 func (h *ProductHandler) GetCategories(c *gin.Context) {
-	categories, err := h.productAdminService.GetAllCategories(c.Request.Context())
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
+	_, ok := handler.RequireAdminID(c)
+	if !ok {
 		return
 	}
 
-	response.Success(c, categories)
+	categories, err := h.productAdminService.GetAllCategories(c.Request.Context())
+	handler.MustSucceed(c, err, categories)
 }
 
 // CreateCategory 创建分类
@@ -54,6 +50,11 @@ func (h *ProductHandler) GetCategories(c *gin.Context) {
 // @Success 200 {object} response.Response{data=adminService.CategoryAdminInfo}
 // @Router /api/v1/admin/categories [post]
 func (h *ProductHandler) CreateCategory(c *gin.Context) {
+	_, ok := handler.RequireAdminID(c)
+	if !ok {
+		return
+	}
+
 	var req adminService.CreateCategoryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, "参数错误")
@@ -61,16 +62,7 @@ func (h *ProductHandler) CreateCategory(c *gin.Context) {
 	}
 
 	category, err := h.productAdminService.CreateCategory(c.Request.Context(), &req)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, category)
+	handler.MustSucceed(c, err, category)
 }
 
 // UpdateCategory 更新分类
@@ -84,9 +76,13 @@ func (h *ProductHandler) CreateCategory(c *gin.Context) {
 // @Success 200 {object} response.Response{data=adminService.CategoryAdminInfo}
 // @Router /api/v1/admin/categories/{id} [put]
 func (h *ProductHandler) UpdateCategory(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的分类ID")
+	_, ok := handler.RequireAdminID(c)
+	if !ok {
+		return
+	}
+
+	id, ok := handler.ParseID(c, "分类")
+	if !ok {
 		return
 	}
 
@@ -97,16 +93,7 @@ func (h *ProductHandler) UpdateCategory(c *gin.Context) {
 	}
 
 	category, err := h.productAdminService.UpdateCategory(c.Request.Context(), id, &req)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, category)
+	handler.MustSucceed(c, err, category)
 }
 
 // DeleteCategory 删除分类
@@ -118,22 +105,17 @@ func (h *ProductHandler) UpdateCategory(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/v1/admin/categories/{id} [delete]
 func (h *ProductHandler) DeleteCategory(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的分类ID")
+	_, ok := handler.RequireAdminID(c)
+	if !ok {
 		return
 	}
 
-	if err := h.productAdminService.DeleteCategory(c.Request.Context(), id); err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
+	id, ok := handler.ParseID(c, "分类")
+	if !ok {
 		return
 	}
 
-	response.Success(c, nil)
+	handler.MustSucceed(c, h.productAdminService.DeleteCategory(c.Request.Context(), id), nil)
 }
 
 // GetProducts 获取商品列表
@@ -149,28 +131,28 @@ func (h *ProductHandler) DeleteCategory(c *gin.Context) {
 // @Success 200 {object} response.Response{data=[]adminService.ProductAdminInfo}
 // @Router /api/v1/admin/products [get]
 func (h *ProductHandler) GetProducts(c *gin.Context) {
+	_, ok := handler.RequireAdminID(c)
+	if !ok {
+		return
+	}
+
+	p := handler.BindPaginationWithDefaults(c, 1, 20)
+
 	var params adminService.ProductListParams
 	if err := c.ShouldBindQuery(&params); err != nil {
 		response.BadRequest(c, "参数错误")
 		return
 	}
 
-	products, total, err := h.productAdminService.GetProducts(c.Request.Context(), &params)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
+	if params.Page == 0 {
+		params.Page = p.Page
+	}
+	if params.PageSize == 0 {
+		params.PageSize = p.PageSize
 	}
 
-	response.Success(c, gin.H{
-		"list":      products,
-		"total":     total,
-		"page":      params.Page,
-		"page_size": params.PageSize,
-	})
+	products, total, err := h.productAdminService.GetProducts(c.Request.Context(), &params)
+	handler.MustSucceedPage(c, err, products, total, params.Page, params.PageSize)
 }
 
 // GetProductDetail 获取商品详情
@@ -182,23 +164,18 @@ func (h *ProductHandler) GetProducts(c *gin.Context) {
 // @Success 200 {object} response.Response{data=adminService.ProductAdminInfo}
 // @Router /api/v1/admin/products/{id} [get]
 func (h *ProductHandler) GetProductDetail(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的商品ID")
+	_, ok := handler.RequireAdminID(c)
+	if !ok {
+		return
+	}
+
+	id, ok := handler.ParseID(c, "商品")
+	if !ok {
 		return
 	}
 
 	product, err := h.productAdminService.GetProductDetail(c.Request.Context(), id)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, product)
+	handler.MustSucceed(c, err, product)
 }
 
 // CreateProduct 创建商品
@@ -211,6 +188,11 @@ func (h *ProductHandler) GetProductDetail(c *gin.Context) {
 // @Success 200 {object} response.Response{data=adminService.ProductAdminInfo}
 // @Router /api/v1/admin/products [post]
 func (h *ProductHandler) CreateProduct(c *gin.Context) {
+	_, ok := handler.RequireAdminID(c)
+	if !ok {
+		return
+	}
+
 	var req adminService.CreateProductRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, "参数错误")
@@ -218,16 +200,7 @@ func (h *ProductHandler) CreateProduct(c *gin.Context) {
 	}
 
 	product, err := h.productAdminService.CreateProduct(c.Request.Context(), &req)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, product)
+	handler.MustSucceed(c, err, product)
 }
 
 // UpdateProduct 更新商品
@@ -241,9 +214,13 @@ func (h *ProductHandler) CreateProduct(c *gin.Context) {
 // @Success 200 {object} response.Response{data=adminService.ProductAdminInfo}
 // @Router /api/v1/admin/products/{id} [put]
 func (h *ProductHandler) UpdateProduct(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的商品ID")
+	_, ok := handler.RequireAdminID(c)
+	if !ok {
+		return
+	}
+
+	id, ok := handler.ParseID(c, "商品")
+	if !ok {
 		return
 	}
 
@@ -254,16 +231,7 @@ func (h *ProductHandler) UpdateProduct(c *gin.Context) {
 	}
 
 	product, err := h.productAdminService.UpdateProduct(c.Request.Context(), id, &req)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, product)
+	handler.MustSucceed(c, err, product)
 }
 
 // DeleteProduct 删除商品
@@ -275,22 +243,17 @@ func (h *ProductHandler) UpdateProduct(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/v1/admin/products/{id} [delete]
 func (h *ProductHandler) DeleteProduct(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的商品ID")
+	_, ok := handler.RequireAdminID(c)
+	if !ok {
 		return
 	}
 
-	if err := h.productAdminService.DeleteProduct(c.Request.Context(), id); err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
+	id, ok := handler.ParseID(c, "商品")
+	if !ok {
 		return
 	}
 
-	response.Success(c, nil)
+	handler.MustSucceed(c, h.productAdminService.DeleteProduct(c.Request.Context(), id), nil)
 }
 
 // UpdateProductStatus 更新商品上架状态
@@ -304,22 +267,17 @@ func (h *ProductHandler) DeleteProduct(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/v1/admin/products/{id}/status [put]
 func (h *ProductHandler) UpdateProductStatus(c *gin.Context) {
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的商品ID")
+	_, ok := handler.RequireAdminID(c)
+	if !ok {
+		return
+	}
+
+	id, ok := handler.ParseID(c, "商品")
+	if !ok {
 		return
 	}
 
 	isOnSale := c.Query("is_on_sale") == "true"
 
-	if err := h.productAdminService.UpdateProductStatus(c.Request.Context(), id, isOnSale); err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, nil)
+	handler.MustSucceed(c, h.productAdminService.UpdateProductStatus(c.Request.Context(), id, isOnSale), nil)
 }

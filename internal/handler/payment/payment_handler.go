@@ -6,9 +6,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/dumeirei/smart-locker-backend/internal/common/errors"
+	"github.com/dumeirei/smart-locker-backend/internal/common/handler"
 	"github.com/dumeirei/smart-locker-backend/internal/common/response"
-	"github.com/dumeirei/smart-locker-backend/internal/middleware"
 	paymentService "github.com/dumeirei/smart-locker-backend/internal/service/payment"
 )
 
@@ -34,9 +33,8 @@ func NewHandler(paymentSvc *paymentService.PaymentService) *Handler {
 // @Success 200 {object} response.Response{data=paymentService.CreatePaymentResponse}
 // @Router /api/v1/payment [post]
 func (h *Handler) CreatePayment(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
@@ -47,16 +45,7 @@ func (h *Handler) CreatePayment(c *gin.Context) {
 	}
 
 	result, err := h.paymentService.CreatePayment(c.Request.Context(), userID, &req)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, result)
+	handler.MustSucceed(c, err, result)
 }
 
 // QueryPayment 查询支付状态
@@ -68,9 +57,8 @@ func (h *Handler) CreatePayment(c *gin.Context) {
 // @Success 200 {object} response.Response{data=paymentService.PaymentInfo}
 // @Router /api/v1/payment/{payment_no} [get]
 func (h *Handler) QueryPayment(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	_, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
@@ -81,16 +69,7 @@ func (h *Handler) QueryPayment(c *gin.Context) {
 	}
 
 	result, err := h.paymentService.QueryPayment(c.Request.Context(), paymentNo)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, result)
+	handler.MustSucceed(c, err, result)
 }
 
 // CreateRefund 创建退款
@@ -103,9 +82,8 @@ func (h *Handler) QueryPayment(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/v1/payment/refund [post]
 func (h *Handler) CreateRefund(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
@@ -115,16 +93,7 @@ func (h *Handler) CreateRefund(c *gin.Context) {
 		return
 	}
 
-	if err := h.paymentService.CreateRefund(c.Request.Context(), userID, &req); err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, nil)
+	handler.MustSucceed(c, h.paymentService.CreateRefund(c.Request.Context(), userID, &req), nil)
 }
 
 // WechatPayCallback 微信支付回调

@@ -6,8 +6,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/dumeirei/smart-locker-backend/internal/common/handler"
 	"github.com/dumeirei/smart-locker-backend/internal/common/response"
-	"github.com/dumeirei/smart-locker-backend/internal/middleware"
 	"github.com/dumeirei/smart-locker-backend/internal/service/distribution"
 )
 
@@ -49,9 +49,8 @@ type ApplyRequest struct {
 // @Success 200 {object} response.Response{data=distribution.ApplyResponse}
 // @Router /api/v1/distribution/apply [post]
 func (h *Handler) Apply(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
@@ -69,12 +68,7 @@ func (h *Handler) Apply(c *gin.Context) {
 	}
 
 	result, err := h.distributorService.Apply(c.Request.Context(), applyReq)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, result)
+	handler.MustSucceed(c, err, result)
 }
 
 // GetInfo 获取分销商信息
@@ -85,19 +79,13 @@ func (h *Handler) Apply(c *gin.Context) {
 // @Success 200 {object} response.Response{data=models.Distributor}
 // @Router /api/v1/distribution/info [get]
 func (h *Handler) GetInfo(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
 	distributor, err := h.distributorService.GetByUserID(c.Request.Context(), userID)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, distributor)
+	handler.MustSucceed(c, err, distributor)
 }
 
 // GetDashboard 获取分销商仪表盘数据
@@ -108,26 +96,19 @@ func (h *Handler) GetInfo(c *gin.Context) {
 // @Success 200 {object} response.Response{data=distribution.DashboardData}
 // @Router /api/v1/distribution/dashboard [get]
 func (h *Handler) GetDashboard(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
 	// 获取分销商信息
 	distributor, err := h.distributorService.GetByUserID(c.Request.Context(), userID)
-	if err != nil {
-		response.InternalError(c, err.Error())
+	if handler.HandleError(c, err) {
 		return
 	}
 
 	dashboard, err := h.distributorService.GetDashboard(c.Request.Context(), distributor.ID)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, dashboard)
+	handler.MustSucceed(c, err, dashboard)
 }
 
 // GetTeamStats 获取团队统计
@@ -138,25 +119,18 @@ func (h *Handler) GetDashboard(c *gin.Context) {
 // @Success 200 {object} response.Response{data=distribution.TeamStats}
 // @Router /api/v1/distribution/team/stats [get]
 func (h *Handler) GetTeamStats(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
 	distributor, err := h.distributorService.GetByUserID(c.Request.Context(), userID)
-	if err != nil {
-		response.InternalError(c, err.Error())
+	if handler.HandleError(c, err) {
 		return
 	}
 
 	stats, err := h.distributorService.GetTeamStats(c.Request.Context(), distributor.ID)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, stats)
+	handler.MustSucceed(c, err, stats)
 }
 
 // GetTeamMembers 获取团队成员列表
@@ -170,37 +144,21 @@ func (h *Handler) GetTeamStats(c *gin.Context) {
 // @Success 200 {object} response.Response{data=response.PageData}
 // @Router /api/v1/distribution/team/members [get]
 func (h *Handler) GetTeamMembers(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+	p := handler.BindPagination(c)
 	memberType := c.DefaultQuery("type", "direct")
 
-	if page < 1 {
-		page = 1
-	}
-	if pageSize < 1 || pageSize > 100 {
-		pageSize = 10
-	}
-	offset := (page - 1) * pageSize
-
 	distributor, err := h.distributorService.GetByUserID(c.Request.Context(), userID)
-	if err != nil {
-		response.InternalError(c, err.Error())
+	if handler.HandleError(c, err) {
 		return
 	}
 
-	members, total, err := h.distributorService.GetTeamMembers(c.Request.Context(), distributor.ID, offset, pageSize, memberType)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.SuccessPage(c, members, total, page, pageSize)
+	members, total, err := h.distributorService.GetTeamMembers(c.Request.Context(), distributor.ID, p.GetOffset(), p.GetLimit(), memberType)
+	handler.MustSucceedPage(c, err, members, total, p.Page, p.PageSize)
 }
 
 // GetInviteInfo 获取邀请信息
@@ -211,25 +169,18 @@ func (h *Handler) GetTeamMembers(c *gin.Context) {
 // @Success 200 {object} response.Response{data=distribution.InviteInfo}
 // @Router /api/v1/distribution/invite [get]
 func (h *Handler) GetInviteInfo(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
 	distributor, err := h.distributorService.GetByUserID(c.Request.Context(), userID)
-	if err != nil {
-		response.InternalError(c, err.Error())
+	if handler.HandleError(c, err) {
 		return
 	}
 
 	inviteInfo, err := h.inviteService.GenerateInviteInfo(c.Request.Context(), distributor.ID)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, inviteInfo)
+	handler.MustSucceed(c, err, inviteInfo)
 }
 
 // GetShareContent 获取分享内容
@@ -240,25 +191,18 @@ func (h *Handler) GetInviteInfo(c *gin.Context) {
 // @Success 200 {object} response.Response{data=distribution.ShareContent}
 // @Router /api/v1/distribution/share [get]
 func (h *Handler) GetShareContent(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
 	distributor, err := h.distributorService.GetByUserID(c.Request.Context(), userID)
-	if err != nil {
-		response.InternalError(c, err.Error())
+	if handler.HandleError(c, err) {
 		return
 	}
 
 	shareContent, err := h.inviteService.GenerateShareContent(c.Request.Context(), distributor.ID)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, shareContent)
+	handler.MustSucceed(c, err, shareContent)
 }
 
 // ValidateInviteCode 验证邀请码
@@ -294,36 +238,20 @@ func (h *Handler) ValidateInviteCode(c *gin.Context) {
 // @Success 200 {object} response.Response{data=response.PageData}
 // @Router /api/v1/distribution/commissions [get]
 func (h *Handler) GetCommissions(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
-
-	if page < 1 {
-		page = 1
-	}
-	if pageSize < 1 || pageSize > 100 {
-		pageSize = 10
-	}
-	offset := (page - 1) * pageSize
+	p := handler.BindPagination(c)
 
 	distributor, err := h.distributorService.GetByUserID(c.Request.Context(), userID)
-	if err != nil {
-		response.InternalError(c, err.Error())
+	if handler.HandleError(c, err) {
 		return
 	}
 
-	commissions, total, err := h.commissionService.GetByDistributorID(c.Request.Context(), distributor.ID, offset, pageSize)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.SuccessPage(c, commissions, total, page, pageSize)
+	commissions, total, err := h.commissionService.GetByDistributorID(c.Request.Context(), distributor.ID, p.GetOffset(), p.GetLimit())
+	handler.MustSucceedPage(c, err, commissions, total, p.Page, p.PageSize)
 }
 
 // GetCommissionStats 获取佣金统计
@@ -334,31 +262,24 @@ func (h *Handler) GetCommissions(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/v1/distribution/commissions/stats [get]
 func (h *Handler) GetCommissionStats(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
 	distributor, err := h.distributorService.GetByUserID(c.Request.Context(), userID)
-	if err != nil {
-		response.InternalError(c, err.Error())
+	if handler.HandleError(c, err) {
 		return
 	}
 
 	stats, err := h.commissionService.GetStats(c.Request.Context(), distributor.ID)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, stats)
+	handler.MustSucceed(c, err, stats)
 }
 
 // WithdrawRequest 提现请求
 type WithdrawRequest struct {
-	Amount      float64 `json:"amount" binding:"required,gt=0"` // 提现金额
-	WithdrawTo  string  `json:"withdraw_to" binding:"required"` // 提现方式: wechat/alipay/bank
+	Amount      float64 `json:"amount" binding:"required,gt=0"`  // 提现金额
+	WithdrawTo  string  `json:"withdraw_to" binding:"required"`  // 提现方式: wechat/alipay/bank
 	AccountInfo string  `json:"account_info" binding:"required"` // 账户信息（JSON格式）
 }
 
@@ -372,9 +293,8 @@ type WithdrawRequest struct {
 // @Success 200 {object} response.Response{data=distribution.WithdrawResponse}
 // @Router /api/v1/distribution/withdraw [post]
 func (h *Handler) ApplyWithdraw(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
@@ -393,12 +313,7 @@ func (h *Handler) ApplyWithdraw(c *gin.Context) {
 	}
 
 	result, err := h.withdrawService.Apply(c.Request.Context(), withdrawReq)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, result)
+	handler.MustSucceed(c, err, result)
 }
 
 // GetWithdrawals 获取提现记录
@@ -411,30 +326,15 @@ func (h *Handler) ApplyWithdraw(c *gin.Context) {
 // @Success 200 {object} response.Response{data=response.PageData}
 // @Router /api/v1/distribution/withdrawals [get]
 func (h *Handler) GetWithdrawals(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+	p := handler.BindPagination(c)
 
-	if page < 1 {
-		page = 1
-	}
-	if pageSize < 1 || pageSize > 100 {
-		pageSize = 10
-	}
-	offset := (page - 1) * pageSize
-
-	withdrawals, total, err := h.withdrawService.GetByUserID(c.Request.Context(), userID, offset, pageSize)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.SuccessPage(c, withdrawals, total, page, pageSize)
+	withdrawals, total, err := h.withdrawService.GetByUserID(c.Request.Context(), userID, p.GetOffset(), p.GetLimit())
+	handler.MustSucceedPage(c, err, withdrawals, total, p.Page, p.PageSize)
 }
 
 // GetWithdrawConfig 获取提现配置
@@ -463,12 +363,7 @@ func (h *Handler) GetRanking(c *gin.Context) {
 	}
 
 	distributors, err := h.distributorService.GetTopDistributors(c.Request.Context(), limit)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, distributors)
+	handler.MustSucceed(c, err, distributors)
 }
 
 // CheckStatus 检查是否是分销商
@@ -479,15 +374,13 @@ func (h *Handler) GetRanking(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/v1/distribution/check [get]
 func (h *Handler) CheckStatus(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
 	isDistributor, err := h.distributorService.CheckIsDistributor(c.Request.Context(), userID)
-	if err != nil {
-		response.InternalError(c, err.Error())
+	if handler.HandleError(c, err) {
 		return
 	}
 

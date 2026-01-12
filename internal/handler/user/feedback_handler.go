@@ -2,10 +2,9 @@
 package user
 
 import (
-	"strconv"
-
 	"github.com/gin-gonic/gin"
 
+	"github.com/dumeirei/smart-locker-backend/internal/common/handler"
 	"github.com/dumeirei/smart-locker-backend/internal/common/response"
 	userService "github.com/dumeirei/smart-locker-backend/internal/service/user"
 )
@@ -30,9 +29,8 @@ func NewFeedbackHandler(feedbackService *userService.FeedbackService) *FeedbackH
 // @Success 200 {object} response.Response{data=models.UserFeedback}
 // @Router /api/v1/user/feedbacks [post]
 func (h *FeedbackHandler) Create(c *gin.Context) {
-	userID := c.GetInt64("user_id")
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
@@ -43,12 +41,7 @@ func (h *FeedbackHandler) Create(c *gin.Context) {
 	}
 
 	feedback, err := h.feedbackService.Create(c.Request.Context(), userID, &req)
-	if err != nil {
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, feedback)
+	handler.MustSucceed(c, err, feedback)
 }
 
 // List 获取我的反馈列表
@@ -61,22 +54,19 @@ func (h *FeedbackHandler) Create(c *gin.Context) {
 // @Success 200 {object} response.Response{data=response.ListData}
 // @Router /api/v1/user/feedbacks [get]
 func (h *FeedbackHandler) List(c *gin.Context) {
-	userID := c.GetInt64("user_id")
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
+	userID, ok := handler.RequireUserID(c)
+	if !ok {
 		return
 	}
 
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "20"))
+	p := handler.BindPaginationWithDefaults(c, 1, 20)
 
-	feedbacks, total, err := h.feedbackService.ListByUser(c.Request.Context(), userID, page, pageSize)
-	if err != nil {
-		response.InternalError(c, err.Error())
+	feedbacks, total, err := h.feedbackService.ListByUser(c.Request.Context(), userID, p.Page, p.PageSize)
+	if handler.HandleError(c, err) {
 		return
 	}
 
-	response.SuccessList(c, feedbacks, total, page, pageSize)
+	response.SuccessList(c, feedbacks, total, p.Page, p.PageSize)
 }
 
 // GetByID 获取反馈详情
@@ -88,15 +78,8 @@ func (h *FeedbackHandler) List(c *gin.Context) {
 // @Success 200 {object} response.Response{data=models.UserFeedback}
 // @Router /api/v1/user/feedbacks/{id} [get]
 func (h *FeedbackHandler) GetByID(c *gin.Context) {
-	userID := c.GetInt64("user_id")
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
-		return
-	}
-
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的反馈ID")
+	userID, id, ok := handler.RequireUserAndParseID(c, "反馈")
+	if !ok {
 		return
 	}
 
@@ -124,15 +107,8 @@ func (h *FeedbackHandler) GetByID(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/v1/user/feedbacks/{id} [delete]
 func (h *FeedbackHandler) Delete(c *gin.Context) {
-	userID := c.GetInt64("user_id")
-	if userID == 0 {
-		response.Unauthorized(c, "请先登录")
-		return
-	}
-
-	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的反馈ID")
+	userID, id, ok := handler.RequireUserAndParseID(c, "反馈")
+	if !ok {
 		return
 	}
 

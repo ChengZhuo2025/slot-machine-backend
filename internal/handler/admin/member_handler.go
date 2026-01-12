@@ -6,7 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/dumeirei/smart-locker-backend/internal/common/errors"
+	"github.com/dumeirei/smart-locker-backend/internal/common/handler"
 	"github.com/dumeirei/smart-locker-backend/internal/common/response"
 	adminService "github.com/dumeirei/smart-locker-backend/internal/service/admin"
 )
@@ -34,17 +34,12 @@ func NewMemberHandler(memberSvc *adminService.MemberAdminService) *MemberHandler
 // @Success 200 {object} response.Response{data=[]admin.AdminMemberLevelItem}
 // @Router /api/admin/member/levels [get]
 func (h *MemberHandler) GetMemberLevelList(c *gin.Context) {
-	levels, err := h.memberService.GetMemberLevelList(c.Request.Context())
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
+	if _, ok := handler.RequireAdminID(c); !ok {
 		return
 	}
 
-	response.Success(c, levels)
+	levels, err := h.memberService.GetMemberLevelList(c.Request.Context())
+	handler.MustSucceed(c, err, levels)
 }
 
 // GetMemberLevelDetail 获取会员等级详情
@@ -56,24 +51,17 @@ func (h *MemberHandler) GetMemberLevelList(c *gin.Context) {
 // @Success 200 {object} response.Response{data=admin.AdminMemberLevelItem}
 // @Router /api/admin/member/levels/{id} [get]
 func (h *MemberHandler) GetMemberLevelDetail(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的会员等级ID")
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
+	id, ok := handler.ParseID(c, "会员等级")
+	if !ok {
 		return
 	}
 
 	level, err := h.memberService.GetMemberLevelDetail(c.Request.Context(), id)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, level)
+	handler.MustSucceed(c, err, level)
 }
 
 // CreateMemberLevel 创建会员等级
@@ -86,6 +74,10 @@ func (h *MemberHandler) GetMemberLevelDetail(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/admin/member/levels [post]
 func (h *MemberHandler) CreateMemberLevel(c *gin.Context) {
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
 	var req adminService.CreateMemberLevelRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, "参数错误")
@@ -93,16 +85,7 @@ func (h *MemberHandler) CreateMemberLevel(c *gin.Context) {
 	}
 
 	level, err := h.memberService.CreateMemberLevel(c.Request.Context(), &req)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, level)
+	handler.MustSucceed(c, err, level)
 }
 
 // UpdateMemberLevel 更新会员等级
@@ -116,10 +99,12 @@ func (h *MemberHandler) CreateMemberLevel(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/admin/member/levels/{id} [put]
 func (h *MemberHandler) UpdateMemberLevel(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的会员等级ID")
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
+	id, ok := handler.ParseID(c, "会员等级")
+	if !ok {
 		return
 	}
 
@@ -129,16 +114,7 @@ func (h *MemberHandler) UpdateMemberLevel(c *gin.Context) {
 		return
 	}
 
-	if err := h.memberService.UpdateMemberLevel(c.Request.Context(), id, &req); err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, nil)
+	handler.MustSucceed(c, h.memberService.UpdateMemberLevel(c.Request.Context(), id, &req), nil)
 }
 
 // DeleteMemberLevel 删除会员等级
@@ -150,23 +126,16 @@ func (h *MemberHandler) UpdateMemberLevel(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/admin/member/levels/{id} [delete]
 func (h *MemberHandler) DeleteMemberLevel(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的会员等级ID")
+	if _, ok := handler.RequireAdminID(c); !ok {
 		return
 	}
 
-	if err := h.memberService.DeleteMemberLevel(c.Request.Context(), id); err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
+	id, ok := handler.ParseID(c, "会员等级")
+	if !ok {
 		return
 	}
 
-	response.Success(c, nil)
+	handler.MustSucceed(c, h.memberService.DeleteMemberLevel(c.Request.Context(), id), nil)
 }
 
 // ===================== 会员套餐管理 =====================
@@ -184,19 +153,15 @@ func (h *MemberHandler) DeleteMemberLevel(c *gin.Context) {
 // @Success 200 {object} response.Response{data=admin.AdminPackageListResponse}
 // @Router /api/admin/member/packages [get]
 func (h *MemberHandler) GetMemberPackageList(c *gin.Context) {
-	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
 
-	if page < 1 {
-		page = 1
-	}
-	if pageSize < 1 || pageSize > 100 {
-		pageSize = 10
-	}
+	p := handler.BindPagination(c)
 
 	req := &adminService.AdminPackageListRequest{
-		Page:     page,
-		PageSize: pageSize,
+		Page:     p.Page,
+		PageSize: p.PageSize,
 	}
 
 	// 处理状态筛选
@@ -223,16 +188,7 @@ func (h *MemberHandler) GetMemberPackageList(c *gin.Context) {
 	}
 
 	result, err := h.memberService.GetMemberPackageList(c.Request.Context(), req)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.SuccessPage(c, result.List, result.Total, page, pageSize)
+	handler.MustSucceedPage(c, err, result.List, result.Total, p.Page, p.PageSize)
 }
 
 // GetMemberPackageDetail 获取会员套餐详情
@@ -244,24 +200,17 @@ func (h *MemberHandler) GetMemberPackageList(c *gin.Context) {
 // @Success 200 {object} response.Response{data=admin.AdminMemberPackageItem}
 // @Router /api/admin/member/packages/{id} [get]
 func (h *MemberHandler) GetMemberPackageDetail(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的套餐ID")
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
+	id, ok := handler.ParseID(c, "套餐")
+	if !ok {
 		return
 	}
 
 	pkg, err := h.memberService.GetMemberPackageDetail(c.Request.Context(), id)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, pkg)
+	handler.MustSucceed(c, err, pkg)
 }
 
 // CreateMemberPackage 创建会员套餐
@@ -274,6 +223,10 @@ func (h *MemberHandler) GetMemberPackageDetail(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/admin/member/packages [post]
 func (h *MemberHandler) CreateMemberPackage(c *gin.Context) {
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
 	var req adminService.CreateMemberPackageRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		response.BadRequest(c, "参数错误")
@@ -281,16 +234,7 @@ func (h *MemberHandler) CreateMemberPackage(c *gin.Context) {
 	}
 
 	pkg, err := h.memberService.CreateMemberPackage(c.Request.Context(), &req)
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, pkg)
+	handler.MustSucceed(c, err, pkg)
 }
 
 // UpdateMemberPackage 更新会员套餐
@@ -304,10 +248,12 @@ func (h *MemberHandler) CreateMemberPackage(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/admin/member/packages/{id} [put]
 func (h *MemberHandler) UpdateMemberPackage(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的套餐ID")
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
+	id, ok := handler.ParseID(c, "套餐")
+	if !ok {
 		return
 	}
 
@@ -317,16 +263,7 @@ func (h *MemberHandler) UpdateMemberPackage(c *gin.Context) {
 		return
 	}
 
-	if err := h.memberService.UpdateMemberPackage(c.Request.Context(), id, &req); err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, nil)
+	handler.MustSucceed(c, h.memberService.UpdateMemberPackage(c.Request.Context(), id, &req), nil)
 }
 
 // UpdateMemberPackageStatus 更新套餐状态
@@ -340,10 +277,12 @@ func (h *MemberHandler) UpdateMemberPackage(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/admin/member/packages/{id}/status [put]
 func (h *MemberHandler) UpdateMemberPackageStatus(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的套餐ID")
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
+	id, ok := handler.ParseID(c, "套餐")
+	if !ok {
 		return
 	}
 
@@ -355,16 +294,7 @@ func (h *MemberHandler) UpdateMemberPackageStatus(c *gin.Context) {
 		return
 	}
 
-	if err := h.memberService.UpdateMemberPackageStatus(c.Request.Context(), id, req.Status); err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
-		return
-	}
-
-	response.Success(c, nil)
+	handler.MustSucceed(c, h.memberService.UpdateMemberPackageStatus(c.Request.Context(), id, req.Status), nil)
 }
 
 // DeleteMemberPackage 删除会员套餐
@@ -376,23 +306,16 @@ func (h *MemberHandler) UpdateMemberPackageStatus(c *gin.Context) {
 // @Success 200 {object} response.Response
 // @Router /api/admin/member/packages/{id} [delete]
 func (h *MemberHandler) DeleteMemberPackage(c *gin.Context) {
-	idStr := c.Param("id")
-	id, err := strconv.ParseInt(idStr, 10, 64)
-	if err != nil {
-		response.BadRequest(c, "无效的套餐ID")
+	if _, ok := handler.RequireAdminID(c); !ok {
 		return
 	}
 
-	if err := h.memberService.DeleteMemberPackage(c.Request.Context(), id); err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
+	id, ok := handler.ParseID(c, "套餐")
+	if !ok {
 		return
 	}
 
-	response.Success(c, nil)
+	handler.MustSucceed(c, h.memberService.DeleteMemberPackage(c.Request.Context(), id), nil)
 }
 
 // ===================== 会员统计 =====================
@@ -406,17 +329,12 @@ func (h *MemberHandler) DeleteMemberPackage(c *gin.Context) {
 // @Success 200 {object} response.Response{data=admin.MemberStats}
 // @Router /api/admin/member/stats [get]
 func (h *MemberHandler) GetMemberStats(c *gin.Context) {
-	stats, err := h.memberService.GetMemberStats(c.Request.Context())
-	if err != nil {
-		if appErr, ok := err.(*errors.AppError); ok {
-			response.Error(c, appErr.Code, appErr.Message)
-			return
-		}
-		response.InternalError(c, err.Error())
+	if _, ok := handler.RequireAdminID(c); !ok {
 		return
 	}
 
-	response.Success(c, stats)
+	stats, err := h.memberService.GetMemberStats(c.Request.Context())
+	handler.MustSucceed(c, err, stats)
 }
 
 // RegisterRoutes 注册会员管理路由

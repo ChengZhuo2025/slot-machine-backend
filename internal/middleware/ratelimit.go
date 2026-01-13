@@ -58,7 +58,10 @@ func RateLimit(config *RateLimitConfig) gin.HandlerFunc {
 
 		// 首次请求设置过期时间
 		if count == 1 {
-			config.RedisClient.Expire(ctx, key, config.Window)
+			if err := config.RedisClient.Expire(ctx, key, config.Window).Err(); err != nil {
+				// Expire 失败时删除 key，防止永久限流
+				config.RedisClient.Del(ctx, key)
+			}
 		}
 
 		// 超过限制
@@ -135,17 +138,24 @@ func APIRateLimit(redisClient *redis.Client, limit int, window time.Duration) gi
 
 // SmsRateLimit 短信发送限流（支持 JSON 和 Form 请求）
 // 限制规则：每分钟1条，每天10条
+// 如果无法获取手机号，使用 IP 进行限流
 func SmsRateLimit(redisClient *redis.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		ctx := context.Background()
+
 		// 尝试从 JSON 或 Form 获取手机号
 		phone := extractPhoneFromRequest(c)
-		if phone == "" {
-			c.Next()
-			return
-		}
 
-		ctx := context.Background()
-		key := fmt.Sprintf("ratelimit:sms:%s", phone)
+		var key, dayKey string
+		if phone == "" {
+			// 无法获取手机号时，使用 IP 限流
+			ip := c.ClientIP()
+			key = fmt.Sprintf("ratelimit:sms:ip:%s", ip)
+			dayKey = fmt.Sprintf("ratelimit:sms:day:ip:%s", ip)
+		} else {
+			key = fmt.Sprintf("ratelimit:sms:%s", phone)
+			dayKey = fmt.Sprintf("ratelimit:sms:day:%s", phone)
+		}
 
 		// 每分钟最多发送 1 条
 		count, err := redisClient.Incr(ctx, key).Result()
@@ -155,7 +165,9 @@ func SmsRateLimit(redisClient *redis.Client) gin.HandlerFunc {
 		}
 
 		if count == 1 {
-			redisClient.Expire(ctx, key, time.Minute)
+			if err := redisClient.Expire(ctx, key, time.Minute).Err(); err != nil {
+				redisClient.Del(ctx, key)
+			}
 		}
 
 		if count > 1 {
@@ -165,13 +177,14 @@ func SmsRateLimit(redisClient *redis.Client) gin.HandlerFunc {
 		}
 
 		// 每天最多发送 10 条
-		dayKey := fmt.Sprintf("ratelimit:sms:day:%s", phone)
 		dayCount, _ := redisClient.Incr(ctx, dayKey).Result()
 		if dayCount == 1 {
 			// 设置到当天结束的过期时间
 			now := time.Now()
 			endOfDay := time.Date(now.Year(), now.Month(), now.Day(), 23, 59, 59, 0, now.Location())
-			redisClient.ExpireAt(ctx, dayKey, endOfDay)
+			if err := redisClient.ExpireAt(ctx, dayKey, endOfDay).Err(); err != nil {
+				redisClient.Del(ctx, dayKey)
+			}
 		}
 
 		if dayCount > 10 {
@@ -240,7 +253,9 @@ func LoginRateLimit(redisClient *redis.Client) gin.HandlerFunc {
 		hourKey := fmt.Sprintf("ratelimit:login:hour:%s", ip)
 		hourCount, _ := redisClient.Incr(ctx, hourKey).Result()
 		if hourCount == 1 {
-			redisClient.Expire(ctx, hourKey, time.Hour)
+			if err := redisClient.Expire(ctx, hourKey, time.Hour).Err(); err != nil {
+				redisClient.Del(ctx, hourKey)
+			}
 		}
 
 		if hourCount > 30 {
@@ -254,17 +269,19 @@ func LoginRateLimit(redisClient *redis.Client) gin.HandlerFunc {
 }
 
 // PaymentRateLimit 支付限流中间件
-// 限制规则：每用户每分钟最多 5 次支付请求
+// 限制规则：每用户每分钟最多 5 次支付请求，未登录用户使用 IP 限流
 func PaymentRateLimit(redisClient *redis.Client) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		ctx := context.Background()
+		var key string
+
 		userID := GetUserID(c)
 		if userID == 0 {
 			// 未登录用户使用 IP 限流
-			return
+			key = fmt.Sprintf("ratelimit:payment:ip:%s", c.ClientIP())
+		} else {
+			key = fmt.Sprintf("ratelimit:payment:%d", userID)
 		}
-
-		ctx := context.Background()
-		key := fmt.Sprintf("ratelimit:payment:%d", userID)
 
 		count, err := redisClient.Incr(ctx, key).Result()
 		if err != nil {
@@ -273,7 +290,9 @@ func PaymentRateLimit(redisClient *redis.Client) gin.HandlerFunc {
 		}
 
 		if count == 1 {
-			redisClient.Expire(ctx, key, time.Minute)
+			if err := redisClient.Expire(ctx, key, time.Minute).Err(); err != nil {
+				redisClient.Del(ctx, key)
+			}
 		}
 
 		if count > 5 {
@@ -315,7 +334,9 @@ func AdminLoginRateLimit(redisClient *redis.Client) gin.HandlerFunc {
 		hourKey := fmt.Sprintf("ratelimit:admin:login:hour:%s", ip)
 		hourCount, _ := redisClient.Incr(ctx, hourKey).Result()
 		if hourCount == 1 {
-			redisClient.Expire(ctx, hourKey, time.Hour)
+			if err := redisClient.Expire(ctx, hourKey, time.Hour).Err(); err != nil {
+				redisClient.Del(ctx, hourKey)
+			}
 		}
 
 		if hourCount > 20 {

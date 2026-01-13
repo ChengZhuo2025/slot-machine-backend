@@ -133,8 +133,8 @@ open http://localhost:8000/swagger/index.html
 
 ```
 backend/
-├── cmd/                          # 服务入口
-│   ├── api-gateway/              # API 网关（主入口）
+├── cmd/                          # 服务入口 (模块化单体架构，为未来微服务拆分预留)
+│   ├── api-gateway/              # API 网关 (当前主入口)
 │   ├── user-service/             # 用户服务
 │   ├── device-service/           # 设备服务
 │   ├── order-service/            # 订单服务
@@ -151,42 +151,116 @@ backend/
 │
 ├── internal/                     # 内部包（不对外暴露）
 │   ├── common/                   # 公共组件
-│   │   ├── config/               # 配置管理
-│   │   ├── database/             # 数据库连接
 │   │   ├── cache/                # Redis 缓存
+│   │   ├── config/               # 配置管理
+│   │   ├── crypto/               # 加密解密
+│   │   ├── database/             # 数据库连接
+│   │   ├── errors/               # 错误定义
+│   │   ├── handler/              # 通用 handler 辅助函数
+│   │   ├── jwt/                  # JWT 工具
+│   │   ├── logger/               # 日志组件
+│   │   ├── metrics/              # 监控指标
+│   │   ├── middleware/           # 公共中间件
 │   │   ├── mq/                   # 消息队列
 │   │   ├── mqtt/                 # MQTT 客户端
-│   │   ├── logger/               # 日志组件
-│   │   └── middleware/           # 中间件
+│   │   ├── qrcode/               # 二维码生成
+│   │   ├── response/             # 统一响应格式
+│   │   ├── tracing/              # 分布式追踪
+│   │   └── utils/                # 工具函数
 │   │
 │   ├── models/                   # 数据模型
+│   │   └── ...
+│   │
 │   ├── repository/               # 数据访问层
+│   │   └── ...
+│   │
+│   ├── middleware/               # 业务中间件
+│   │   └── ...
+│   │
+│   ├── scheduler/                # 定时任务调度
+│   │   └── ...
+│   │
 │   ├── service/                  # 业务逻辑层
+│   │   ├── admin/                # 管理后台服务
+│   │   ├── auth/                 # 认证服务
+│   │   ├── content/              # 内容服务
+│   │   ├── device/               # 设备服务
+│   │   ├── distribution/         # 分销服务
+│   │   ├── finance/              # 财务服务
+│   │   ├── hotel/                # 酒店服务
+│   │   ├── mall/                 # 商城服务
+│   │   ├── marketing/            # 营销服务
+│   │   ├── order/                # 订单服务
+│   │   ├── payment/              # 支付服务
+│   │   ├── rental/               # 租借服务
+│   │   └── user/                 # 用户服务
+│   │
 │   └── handler/                  # HTTP 处理器
+│       ├── admin/                # 管理后台 API
+│       ├── auth/                 # 认证 API
+│       ├── content/              # 内容 API
+│       ├── device/               # 设备 API
+│       ├── distribution/         # 分销 API
+│       ├── health/               # 健康检查
+│       ├── hotel/                # 酒店 API
+│       ├── mall/                 # 商城 API
+│       ├── marketing/            # 营销 API
+│       ├── order/                # 订单 API
+│       ├── payment/              # 支付 API
+│       ├── rental/               # 租借 API
+│       └── user/                 # 用户 API
 │
 ├── pkg/                          # 可复用公共包
 │   ├── auth/                     # JWT 认证
 │   ├── crypto/                   # 加密解密
-│   ├── payment/                  # 支付集成
-│   │   ├── wechat/               # 微信支付
-│   │   └── alipay/               # 支付宝
-│   ├── sms/                      # 短信服务
+│   ├── mqtt/                     # MQTT 客户端封装
 │   ├── oss/                      # 对象存储
+│   ├── payment/                  # 支付集成
+│   │   ├── wechat/
+│   │   └── alipay/
 │   ├── qrcode/                   # 二维码生成
-│   └── response/                 # 统一响应格式
+│   ├── response/                 # 统一响应格式
+│   ├── sms/                      # 短信服务
+│   └── wechatpay/                # 微信支付 SDK
 │
-├── docs/                         # Swagger 文档（swag 生成，供 /swagger 使用）
+├── api/                          # API 定义
+│   └── openapi/                  # OpenAPI 规范 (Swagger 自动生成)
+│       ├── docs.go               # Swag 生成的 Go 文档代码
+│       ├── swagger.json          # OpenAPI JSON 格式
+│       └── swagger.yaml          # OpenAPI YAML 格式
+│
 ├── migrations/                   # 数据库迁移
+│   └── ...
+│
 ├── seeds/                        # 种子数据
+│   └── ...
+│
 ├── configs/                      # 配置文件
+│   └── ...
+│
+├── docs/                         # 项目文档 (非 API 文档)
+│   ├── api-improvement-plan.md   # API 改进计划
+│   └── ...                       # 其他开发文档
+│
 ├── deployments/                  # 部署配置
-│   ├── docker/                   # Docker 配置
-│   └── k8s/                      # Kubernetes 配置
+│   ├── docker/
+│   │   └── init-db/              # 数据库初始化脚本
+│   ├── k8s/
+│   └── kubernetes/
+│
 ├── scripts/                      # 脚本
-└── tests/                        # 测试文件
+│   └── ...
+│
+├── build/                        # 构建输出
+│   └── ...
+│
+└── tests/                        # 测试
+    ├── api/                      # API 测试
     ├── unit/                     # 单元测试
     ├── integration/              # 集成测试
-    └── e2e/                      # 端到端测试
+    ├── e2e/                      # 端到端测试
+    ├── helpers/                  # 测试辅助工具
+    └── output/                   # 测试输出
 ```
 
 ## API 文档

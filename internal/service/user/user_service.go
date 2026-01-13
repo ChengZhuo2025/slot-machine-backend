@@ -3,6 +3,7 @@ package user
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"gorm.io/gorm"
@@ -11,6 +12,48 @@ import (
 	"github.com/dumeirei/smart-locker-backend/internal/models"
 	"github.com/dumeirei/smart-locker-backend/internal/repository"
 )
+
+// NullableTime 可空时间类型，支持空字符串解析
+type NullableTime struct {
+	Time  *time.Time
+	Valid bool
+}
+
+// UnmarshalJSON 自定义 JSON 解析，处理空字符串
+func (nt *NullableTime) UnmarshalJSON(data []byte) error {
+	if string(data) == "null" {
+		nt.Time = nil
+		nt.Valid = false
+		return nil
+	}
+
+	var s string
+	if err := json.Unmarshal(data, &s); err == nil {
+		if s == "" {
+			nt.Time = nil
+			nt.Valid = false
+			return nil
+		}
+		t, err := time.Parse(time.RFC3339, s)
+		if err != nil {
+			t, err = time.Parse("2006-01-02", s)
+			if err != nil {
+				return err
+			}
+		}
+		nt.Time = &t
+		nt.Valid = true
+		return nil
+	}
+
+	var t time.Time
+	if err := json.Unmarshal(data, &t); err != nil {
+		return err
+	}
+	nt.Time = &t
+	nt.Valid = true
+	return nil
+}
 
 // UserService 用户服务
 type UserService struct {
@@ -52,10 +95,10 @@ type MemberLevelInfo struct {
 
 // UpdateProfileRequest 更新用户信息请求
 type UpdateProfileRequest struct {
-	Nickname *string    `json:"nickname,omitempty"`
-	Avatar   *string    `json:"avatar,omitempty"`
-	Gender   *int8      `json:"gender,omitempty"`
-	Birthday *time.Time `json:"birthday,omitempty"`
+	Nickname *string      `json:"nickname,omitempty"`
+	Avatar   *string      `json:"avatar,omitempty"`
+	Gender   *int8        `json:"gender,omitempty"`
+	Birthday NullableTime `json:"birthday,omitempty"`
 }
 
 // GetProfile 获取用户详情
@@ -107,8 +150,8 @@ func (s *UserService) UpdateProfile(ctx context.Context, userID int64, req *Upda
 	if req.Gender != nil {
 		updates["gender"] = *req.Gender
 	}
-	if req.Birthday != nil {
-		updates["birthday"] = *req.Birthday
+	if req.Birthday.Valid && req.Birthday.Time != nil {
+		updates["birthday"] = *req.Birthday.Time
 	}
 
 	if len(updates) == 0 {

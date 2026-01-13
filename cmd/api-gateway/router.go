@@ -102,6 +102,7 @@ func setupRouter(
 	codeService := authService.NewCodeService(redisClient, smsClient, &authService.CodeServiceConfig{
 		CodeLength: 6,
 		ExpireIn:   5 * time.Minute,
+		DebugMode:  cfg.IsDebug(),
 	})
 	authSvc := authService.NewAuthService(db, userRepo, jwtManager, codeService)
 	wechatSvc := authService.NewWechatService(&authService.WechatConfig{}, db, userRepo, jwtManager)

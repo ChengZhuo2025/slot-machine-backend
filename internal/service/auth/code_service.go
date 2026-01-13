@@ -18,6 +18,7 @@ type CodeService struct {
 	smsSender sms.Sender
 	codeLen   int
 	expireIn  time.Duration
+	debugMode bool
 }
 
 type redisCmdable interface {
@@ -43,6 +44,7 @@ const (
 type CodeServiceConfig struct {
 	CodeLength int
 	ExpireIn   time.Duration
+	DebugMode  bool
 }
 
 // DefaultCodeServiceConfig 默认配置
@@ -63,6 +65,7 @@ func NewCodeService(store redisCmdable, smsSender sms.Sender, cfg *CodeServiceCo
 		smsSender: smsSender,
 		codeLen:   cfg.CodeLength,
 		expireIn:  cfg.ExpireIn,
+		debugMode: cfg.DebugMode,
 	}
 }
 
@@ -134,6 +137,11 @@ func (s *CodeService) SendCode(ctx context.Context, phone string, codeType CodeT
 
 // VerifyCode 验证验证码
 func (s *CodeService) VerifyCode(ctx context.Context, phone string, code string, codeType CodeType) (bool, error) {
+	// 开发/测试环境允许使用固定测试验证码
+	if s.debugMode && code == "123456" {
+		return true, nil
+	}
+
 	codeKey := s.codeKey(phone, codeType)
 
 	storedCode, err := s.redis.Get(ctx, codeKey).Result()

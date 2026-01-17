@@ -492,3 +492,43 @@ func stringSliceToJSON(slice []string) models.JSON {
 	}
 	return result
 }
+
+// SetHotelRecommendedRequest 设置酒店推荐请求
+type SetHotelRecommendedRequest struct {
+	IsRecommended bool `json:"is_recommended"`
+	Score         int  `json:"score"`
+}
+
+// SetHotelRecommended 设置酒店推荐状态
+func (s *HotelAdminService) SetHotelRecommended(ctx context.Context, id int64, req *SetHotelRecommendedRequest) error {
+	// 验证酒店存在
+	_, err := s.hotelRepo.GetByID(ctx, id)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return errors.ErrHotelNotFound
+		}
+		return errors.ErrDatabaseError.WithError(err)
+	}
+
+	return s.hotelRepo.SetRecommended(ctx, id, req.IsRecommended, req.Score)
+}
+
+// SetRoomHotRequest 设置房间热门请求
+type SetRoomHotRequest struct {
+	IsHot bool `json:"is_hot"`
+	Rank  int  `json:"rank"`
+}
+
+// SetRoomHot 设置房间热门状态
+func (s *HotelAdminService) SetRoomHot(ctx context.Context, id int64, req *SetRoomHotRequest) error {
+	// 验证房间存在
+	_, err := s.roomRepo.GetByID(ctx, id)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return errors.ErrRoomNotFound
+		}
+		return errors.ErrDatabaseError.WithError(err)
+	}
+
+	return s.roomRepo.SetHotStatus(ctx, id, req.IsHot, req.Rank)
+}

@@ -3,6 +3,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"gorm.io/gorm"
 
@@ -209,4 +210,31 @@ func (r *HotelRepository) Search(ctx context.Context, keyword string, offset, li
 	}
 
 	return hotels, total, nil
+}
+
+// ListRecommended 获取推荐酒店列表
+func (r *HotelRepository) ListRecommended(ctx context.Context, limit int) ([]*models.Hotel, error) {
+	var hotels []*models.Hotel
+	err := r.db.WithContext(ctx).
+		Where("is_recommended = ?", true).
+		Where("status = ?", models.HotelStatusActive).
+		Order("recommend_score DESC, id DESC").
+		Limit(limit).
+		Find(&hotels).Error
+	return hotels, err
+}
+
+// SetRecommended 设置酒店推荐状态
+func (r *HotelRepository) SetRecommended(ctx context.Context, id int64, isRecommended bool, score int) error {
+	fields := map[string]interface{}{
+		"is_recommended":  isRecommended,
+		"recommend_score": score,
+	}
+	if isRecommended {
+		now := time.Now()
+		fields["recommended_at"] = &now
+	} else {
+		fields["recommended_at"] = nil
+	}
+	return r.db.WithContext(ctx).Model(&models.Hotel{}).Where("id = ?", id).Updates(fields).Error
 }

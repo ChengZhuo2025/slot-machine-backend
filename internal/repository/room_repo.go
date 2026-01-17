@@ -293,3 +293,65 @@ func (r *RoomTimeSlotRepository) Delete(ctx context.Context, id int64) error {
 func (r *RoomTimeSlotRepository) DeleteByRoom(ctx context.Context, roomID int64) error {
 	return r.db.WithContext(ctx).Where("room_id = ?", roomID).Delete(&models.RoomTimeSlot{}).Error
 }
+
+// ListHotRooms 获取全站热门房型
+func (r *RoomRepository) ListHotRooms(ctx context.Context, limit int) ([]*models.Room, error) {
+	var rooms []*models.Room
+	err := r.db.WithContext(ctx).
+		Where("is_hot = ?", true).
+		Where("status = ?", models.RoomStatusActive).
+		Preload("Hotel").
+		Order("hot_score DESC, booking_count DESC, id DESC").
+		Limit(limit).
+		Find(&rooms).Error
+	return rooms, err
+}
+
+// ListHotRoomsByHotel 获取酒店内热门房型
+func (r *RoomRepository) ListHotRoomsByHotel(ctx context.Context, hotelID int64, limit int) ([]*models.Room, error) {
+	var rooms []*models.Room
+	err := r.db.WithContext(ctx).
+		Where("hotel_id = ?", hotelID).
+		Where("is_hot = ?", true).
+		Where("status = ?", models.RoomStatusActive).
+		Preload("TimeSlots", func(db *gorm.DB) *gorm.DB {
+			return db.Where("is_active = ?", true).Order("sort ASC, duration_hours ASC")
+		}).
+		Order("hot_score DESC, booking_count DESC, id DESC").
+		Limit(limit).
+		Find(&rooms).Error
+	return rooms, err
+}
+
+// IncrementBookingCount 增加预订次数（使用 gorm.Expr 避免并发问题）
+func (r *RoomRepository) IncrementBookingCount(ctx context.Context, roomID int64) error {
+	return r.db.WithContext(ctx).Model(&models.Room{}).
+		Where("id = ?", roomID).
+		UpdateColumn("booking_count", gorm.Expr("booking_count + 1")).Error
+}
+
+// SetHotStatus 设置热门状态
+func (r *RoomRepository) SetHotStatus(ctx context.Context, roomID int64, isHot bool, rank int) error {
+	fields := map[string]interface{}{
+		"is_hot":   isHot,
+		"hot_rank": rank,
+	}
+	return r.db.WithContext(ctx).Model(&models.Room{}).Where("id = ?", roomID).Updates(fields).Error
+}
+
+// RecalculateHotScore 重新计算热门分数
+// 分数计算公式：booking_count * 10 + average_rating * 20 + review_count * 5
+func (r *RoomRepository) RecalculateHotScore(ctx context.Context, roomID int64) error {
+	return r.db.WithContext(ctx).Model(&models.Room{}).
+		Where("id = ?", roomID).
+		UpdateColumn("hot_score", gorm.Expr("booking_count * 10 + average_rating * 20 + review_count * 5")).Error
+}
+
+// UpdateRating 更新评分信息
+func (r *RoomRepository) UpdateRating(ctx context.Context, roomID int64, avgRating float64, reviewCount int) error {
+	fields := map[string]interface{}{
+		"average_rating": avgRating,
+		"review_count":   reviewCount,
+	}
+	return r.db.WithContext(ctx).Model(&models.Room{}).Where("id = ?", roomID).Updates(fields).Error
+}

@@ -21,10 +21,13 @@ type Hotel struct {
 	Description    *string   `gorm:"column:description;type:text" json:"description,omitempty"`
 	CheckInTime    string    `gorm:"column:check_in_time;type:time;not null;default:'14:00'" json:"check_in_time"`
 	CheckOutTime   string    `gorm:"column:check_out_time;type:time;not null;default:'12:00'" json:"check_out_time"`
-	CommissionRate float64   `gorm:"column:commission_rate;type:decimal(5,4);not null;default:0.1500" json:"commission_rate"`
-	Status         int8      `gorm:"column:status;type:smallint;not null;default:1" json:"status"`
-	CreatedAt      time.Time `gorm:"column:created_at;autoCreateTime" json:"created_at"`
-	UpdatedAt      time.Time `gorm:"column:updated_at;autoUpdateTime" json:"updated_at"`
+	CommissionRate float64    `gorm:"column:commission_rate;type:decimal(5,4);not null;default:0.1500" json:"commission_rate"`
+	Status         int8       `gorm:"column:status;type:smallint;not null;default:1" json:"status"`
+	IsRecommended  bool       `gorm:"column:is_recommended;not null;default:false" json:"is_recommended"`
+	RecommendScore int        `gorm:"column:recommend_score;not null;default:0" json:"recommend_score"`
+	RecommendedAt  *time.Time `gorm:"column:recommended_at" json:"recommended_at,omitempty"`
+	CreatedAt      time.Time  `gorm:"column:created_at;autoCreateTime" json:"created_at"`
+	UpdatedAt      time.Time  `gorm:"column:updated_at;autoUpdateTime" json:"updated_at"`
 
 	// 关联
 	Rooms []Room `gorm:"foreignKey:HotelID" json:"rooms,omitempty"`
@@ -52,12 +55,18 @@ type Room struct {
 	Facilities  JSON      `gorm:"column:facilities;type:jsonb" json:"facilities,omitempty"`
 	Area        *int      `gorm:"column:area" json:"area,omitempty"`
 	BedType     *string   `gorm:"column:bed_type;type:varchar(50)" json:"bed_type,omitempty"`
-	MaxGuests   int       `gorm:"column:max_guests;not null;default:2" json:"max_guests"`
-	HourlyPrice float64   `gorm:"column:hourly_price;type:decimal(10,2);not null" json:"hourly_price"`
-	DailyPrice  float64   `gorm:"column:daily_price;type:decimal(10,2);not null" json:"daily_price"`
-	Status      int8      `gorm:"column:status;type:smallint;not null;default:1" json:"status"`
-	CreatedAt   time.Time `gorm:"column:created_at;autoCreateTime" json:"created_at"`
-	UpdatedAt   time.Time `gorm:"column:updated_at;autoUpdateTime" json:"updated_at"`
+	MaxGuests      int       `gorm:"column:max_guests;not null;default:2" json:"max_guests"`
+	HourlyPrice    float64   `gorm:"column:hourly_price;type:decimal(10,2);not null" json:"hourly_price"`
+	DailyPrice     float64   `gorm:"column:daily_price;type:decimal(10,2);not null" json:"daily_price"`
+	Status         int8      `gorm:"column:status;type:smallint;not null;default:1" json:"status"`
+	BookingCount   int       `gorm:"column:booking_count;not null;default:0" json:"booking_count"`
+	AverageRating  float64   `gorm:"column:average_rating;type:decimal(2,1);not null;default:0.0" json:"average_rating"`
+	ReviewCount    int       `gorm:"column:review_count;not null;default:0" json:"review_count"`
+	IsHot          bool      `gorm:"column:is_hot;not null;default:false" json:"is_hot"`
+	HotRank        int       `gorm:"column:hot_rank;not null;default:0" json:"hot_rank"`
+	HotScore       float64   `gorm:"column:hot_score;type:decimal(10,2);not null;default:0.00" json:"hot_score"`
+	CreatedAt      time.Time `gorm:"column:created_at;autoCreateTime" json:"created_at"`
+	UpdatedAt      time.Time `gorm:"column:updated_at;autoUpdateTime" json:"updated_at"`
 
 	// 关联
 	Hotel     *Hotel          `gorm:"foreignKey:HotelID" json:"hotel,omitempty"`

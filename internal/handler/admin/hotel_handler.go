@@ -499,6 +499,64 @@ func (h *HotelHandler) GetBooking(c *gin.Context) {
 	handler.MustSucceed(c, err, booking)
 }
 
+// SetRecommended 设置酒店推荐状态
+// @Summary 设置酒店推荐状态
+// @Tags 酒店管理
+// @Accept json
+// @Produce json
+// @Security Bearer
+// @Param id path int true "酒店ID"
+// @Param request body adminService.SetHotelRecommendedRequest true "请求参数"
+// @Success 200 {object} response.Response
+// @Router /admin/hotels/{id}/recommend [post]
+func (h *HotelHandler) SetRecommended(c *gin.Context) {
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
+	id, ok := handler.ParseID(c, "酒店")
+	if !ok {
+		return
+	}
+
+	var req adminService.SetHotelRecommendedRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "参数错误")
+		return
+	}
+
+	handler.MustSucceed(c, h.hotelService.SetHotelRecommended(c.Request.Context(), id, &req), nil)
+}
+
+// SetRoomHot 设置房间热门状态
+// @Summary 设置房间热门状态
+// @Tags 酒店管理
+// @Accept json
+// @Produce json
+// @Security Bearer
+// @Param id path int true "房间ID"
+// @Param request body adminService.SetRoomHotRequest true "请求参数"
+// @Success 200 {object} response.Response
+// @Router /admin/rooms/{id}/hot [put]
+func (h *HotelHandler) SetRoomHot(c *gin.Context) {
+	if _, ok := handler.RequireAdminID(c); !ok {
+		return
+	}
+
+	id, ok := handler.ParseID(c, "房间")
+	if !ok {
+		return
+	}
+
+	var req adminService.SetRoomHotRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "参数错误")
+		return
+	}
+
+	handler.MustSucceed(c, h.hotelService.SetRoomHot(c.Request.Context(), id, &req), nil)
+}
+
 // RegisterRoutes 注册路由
 func (h *HotelHandler) RegisterRoutes(r *gin.RouterGroup) {
 	// 酒店管理
@@ -509,6 +567,7 @@ func (h *HotelHandler) RegisterRoutes(r *gin.RouterGroup) {
 		hotels.GET("/:id", h.GetHotel)
 		hotels.PUT("/:id", h.UpdateHotel)
 		hotels.PUT("/:id/status", h.UpdateHotelStatus)
+		hotels.POST("/:id/recommend", h.SetRecommended)
 		hotels.DELETE("/:id", h.DeleteHotel)
 	}
 
@@ -519,6 +578,7 @@ func (h *HotelHandler) RegisterRoutes(r *gin.RouterGroup) {
 		rooms.GET("", h.ListRooms)
 		rooms.GET("/:id", h.GetRoom)
 		rooms.PUT("/:id", h.UpdateRoom)
+		rooms.PUT("/:id/hot", h.SetRoomHot)
 		rooms.DELETE("/:id", h.DeleteRoom)
 	}
 

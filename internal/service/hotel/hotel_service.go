@@ -412,3 +412,167 @@ func jsonToStringSlice(j models.JSON) []string {
 	}
 	return result
 }
+
+// RecommendedHotelInfo 推荐酒店信息
+type RecommendedHotelInfo struct {
+	ID             int64    `json:"id"`
+	Name           string   `json:"name"`
+	StarRating     *int     `json:"star_rating,omitempty"`
+	City           string   `json:"city"`
+	District       string   `json:"district"`
+	Address        string   `json:"address"`
+	Images         []string `json:"images"`
+	MinPrice       float64  `json:"min_price"`
+	RecommendScore int      `json:"recommend_score"`
+}
+
+// GetRecommendedHotels 获取推荐酒店列表
+func (s *HotelService) GetRecommendedHotels(ctx context.Context, limit int) ([]*RecommendedHotelInfo, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+	if limit > 50 {
+		limit = 50
+	}
+
+	hotels, err := s.hotelRepo.ListRecommended(ctx, limit)
+	if err != nil {
+		return nil, errors.ErrDatabaseError.WithError(err)
+	}
+
+	var result []*RecommendedHotelInfo
+	for _, hotel := range hotels {
+		info := &RecommendedHotelInfo{
+			ID:             hotel.ID,
+			Name:           hotel.Name,
+			StarRating:     hotel.StarRating,
+			City:           hotel.City,
+			District:       hotel.District,
+			Address:        hotel.Address,
+			RecommendScore: hotel.RecommendScore,
+		}
+		if hotel.Images != nil {
+			info.Images = jsonToStringSlice(hotel.Images)
+		}
+		// 获取最低价格
+		if len(hotel.Rooms) > 0 {
+			minPrice := hotel.Rooms[0].HourlyPrice
+			for _, room := range hotel.Rooms {
+				if room.HourlyPrice < minPrice {
+					minPrice = room.HourlyPrice
+				}
+			}
+			info.MinPrice = minPrice
+		}
+		result = append(result, info)
+	}
+
+	return result, nil
+}
+
+// HotRoomInfo 热门房型信息
+type HotRoomInfo struct {
+	ID            int64    `json:"id"`
+	HotelID       int64    `json:"hotel_id"`
+	HotelName     string   `json:"hotel_name"`
+	RoomNo        string   `json:"room_no"`
+	RoomType      string   `json:"room_type"`
+	Images        []string `json:"images"`
+	HourlyPrice   float64  `json:"hourly_price"`
+	DailyPrice    float64  `json:"daily_price"`
+	BookingCount  int      `json:"booking_count"`
+	AverageRating float64  `json:"average_rating"`
+	ReviewCount   int      `json:"review_count"`
+	HotScore      float64  `json:"hot_score"`
+}
+
+// GetHotRooms 获取全站热门房型
+func (s *HotelService) GetHotRooms(ctx context.Context, limit int) ([]*HotRoomInfo, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+	if limit > 50 {
+		limit = 50
+	}
+
+	rooms, err := s.roomRepo.ListHotRooms(ctx, limit)
+	if err != nil {
+		return nil, errors.ErrDatabaseError.WithError(err)
+	}
+
+	var result []*HotRoomInfo
+	for _, room := range rooms {
+		info := &HotRoomInfo{
+			ID:            room.ID,
+			HotelID:       room.HotelID,
+			RoomNo:        room.RoomNo,
+			RoomType:      room.RoomType,
+			HourlyPrice:   room.HourlyPrice,
+			DailyPrice:    room.DailyPrice,
+			BookingCount:  room.BookingCount,
+			AverageRating: room.AverageRating,
+			ReviewCount:   room.ReviewCount,
+			HotScore:      room.HotScore,
+		}
+		if room.Hotel != nil {
+			info.HotelName = room.Hotel.Name
+		}
+		if room.Images != nil {
+			info.Images = jsonToStringSlice(room.Images)
+		}
+		result = append(result, info)
+	}
+
+	return result, nil
+}
+
+// GetHotRoomsByHotel 获取酒店内热门房型
+func (s *HotelService) GetHotRoomsByHotel(ctx context.Context, hotelID int64, limit int) ([]*HotRoomInfo, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+	if limit > 20 {
+		limit = 20
+	}
+
+	// 验证酒店存在
+	hotel, err := s.hotelRepo.GetByID(ctx, hotelID)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, errors.ErrHotelNotFound
+		}
+		return nil, errors.ErrDatabaseError.WithError(err)
+	}
+
+	if hotel.Status != int8(models.HotelStatusActive) {
+		return nil, errors.ErrHotelNotFound
+	}
+
+	rooms, err := s.roomRepo.ListHotRoomsByHotel(ctx, hotelID, limit)
+	if err != nil {
+		return nil, errors.ErrDatabaseError.WithError(err)
+	}
+
+	var result []*HotRoomInfo
+	for _, room := range rooms {
+		info := &HotRoomInfo{
+			ID:            room.ID,
+			HotelID:       room.HotelID,
+			HotelName:     hotel.Name,
+			RoomNo:        room.RoomNo,
+			RoomType:      room.RoomType,
+			HourlyPrice:   room.HourlyPrice,
+			DailyPrice:    room.DailyPrice,
+			BookingCount:  room.BookingCount,
+			AverageRating: room.AverageRating,
+			ReviewCount:   room.ReviewCount,
+			HotScore:      room.HotScore,
+		}
+		if room.Images != nil {
+			info.Images = jsonToStringSlice(room.Images)
+		}
+		result = append(result, info)
+	}
+
+	return result, nil
+}

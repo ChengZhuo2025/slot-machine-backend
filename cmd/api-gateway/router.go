@@ -25,6 +25,7 @@ import (
 	orderHandler "github.com/dumeirei/smart-locker-backend/internal/handler/order"
 	paymentHandler "github.com/dumeirei/smart-locker-backend/internal/handler/payment"
 	rentalHandler "github.com/dumeirei/smart-locker-backend/internal/handler/rental"
+	uploadHandler "github.com/dumeirei/smart-locker-backend/internal/handler/upload"
 	userHandler "github.com/dumeirei/smart-locker-backend/internal/handler/user"
 	userMiddleware "github.com/dumeirei/smart-locker-backend/internal/middleware"
 	"github.com/dumeirei/smart-locker-backend/internal/repository"
@@ -39,7 +40,9 @@ import (
 	orderService "github.com/dumeirei/smart-locker-backend/internal/service/order"
 	paymentService "github.com/dumeirei/smart-locker-backend/internal/service/payment"
 	rentalService "github.com/dumeirei/smart-locker-backend/internal/service/rental"
+	uploadService "github.com/dumeirei/smart-locker-backend/internal/service/upload"
 	userService "github.com/dumeirei/smart-locker-backend/internal/service/user"
+	"github.com/dumeirei/smart-locker-backend/pkg/oss"
 	"github.com/dumeirei/smart-locker-backend/pkg/sms"
 	"github.com/dumeirei/smart-locker-backend/pkg/wechatpay"
 )
@@ -98,6 +101,22 @@ func setupRouter(
 	smsClient := sms.NewMockSender() // 开发环境使用 Mock，生产环境使用阿里云
 	wechatPayClient, _ := wechatpay.NewClient(&wechatpay.Config{})
 
+	// 初始化 OSS 上传器
+	var ossUploader oss.Uploader
+	if cfg.OSS.Endpoint != "" && cfg.OSS.AccessKeyID != "" {
+		ossUploader, _ = oss.NewAliyunUploader(&oss.AliyunConfig{
+			Endpoint:        cfg.OSS.Endpoint,
+			AccessKeyID:     cfg.OSS.AccessKeyID,
+			AccessKeySecret: cfg.OSS.AccessKeySecret,
+			BucketName:      cfg.OSS.Bucket,
+			Domain:          cfg.OSS.CustomDomain,
+			BasePath:        cfg.OSS.UploadDir,
+		})
+	}
+	if ossUploader == nil {
+		ossUploader = oss.NewMockUploader() // 开发环境使用 Mock
+	}
+
 	// 初始化服务
 	codeService := authService.NewCodeService(redisClient, smsClient, &authService.CodeServiceConfig{
 		CodeLength: 6,
@@ -109,6 +128,7 @@ func setupRouter(
 
 	userSvc := userService.NewUserService(db, userRepo)
 	walletSvc := userService.NewWalletService(db, userRepo)
+	uploadSvc := uploadService.NewUploadService(ossUploader, userRepo)
 
 	// 会员相关服务
 	pointsSvc := userService.NewPointsService(db, userRepo, memberLevelRepo)
@@ -150,6 +170,7 @@ func setupRouter(
 	// 初始化处理器
 	authH := authHandler.NewHandler(authSvc, wechatSvc, codeService)
 	userH := userHandler.NewHandler(userSvc, walletSvc)
+	uploadH := uploadHandler.NewHandler(uploadSvc)
 	memberH := userHandler.NewMemberHandler(memberLevelSvc, memberPackageSvc, pointsSvc)
 	deviceH := deviceHandler.NewHandler(deviceSvc, venueSvc)
 	rentalH := rentalHandler.NewHandler(rentalSvc)
@@ -249,6 +270,10 @@ func setupRouter(
 
 			// 用户路由
 			userH.RegisterRoutes(user)
+			user.POST("/user/avatar", uploadH.UploadAvatar)
+
+			// 文件上传路由
+			user.POST("/upload/image", uploadH.UploadImage)
 
 			// 会员路由
 			memberH.RegisterRoutes(user)
@@ -316,9 +341,12 @@ func setupRouter(
 
 			// 酒店/预订相关
 			user.GET("/hotels", hotelH.GetHotelList)
+			user.GET("/hotels/recommended", hotelH.GetRecommendedHotels)
 			user.GET("/hotels/cities", hotelH.GetCities)
 			user.GET("/hotels/:id", hotelH.GetHotelDetail)
 			user.GET("/hotels/:id/rooms", hotelH.GetRoomList)
+			user.GET("/hotels/:id/rooms/hot", hotelH.GetHotelHotRooms)
+			user.GET("/rooms/hot", hotelH.GetHotRooms)
 			user.GET("/rooms/:id", hotelH.GetRoomDetail)
 			user.GET("/rooms/:id/availability", hotelH.CheckRoomAvailability)
 			user.GET("/rooms/:id/time-slots", hotelH.GetRoomTimeSlots)

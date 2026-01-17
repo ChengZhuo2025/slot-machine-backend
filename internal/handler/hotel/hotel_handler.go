@@ -166,3 +166,66 @@ func (h *Handler) GetRoomTimeSlots(c *gin.Context) {
 	slots, err := h.hotelService.GetTimeSlotsByRoom(c.Request.Context(), roomID)
 	handler.MustSucceed(c, err, slots)
 }
+
+// GetRecommendedHotels 获取推荐酒店列表
+// @Summary 获取推荐酒店列表
+// @Tags 酒店
+// @Produce json
+// @Param limit query int false "返回数量" default(10)
+// @Success 200 {object} response.Response{data=[]hotelService.RecommendedHotelInfo}
+// @Router /api/v1/hotels/recommended [get]
+func (h *Handler) GetRecommendedHotels(c *gin.Context) {
+	var req struct {
+		Limit int `form:"limit"`
+	}
+	if err := c.ShouldBindQuery(&req); err != nil {
+		req.Limit = 10
+	}
+
+	hotels, err := h.hotelService.GetRecommendedHotels(c.Request.Context(), req.Limit)
+	handler.MustSucceed(c, err, hotels)
+}
+
+// GetHotRooms 获取全站热门房型
+// @Summary 获取全站热门房型
+// @Tags 酒店
+// @Produce json
+// @Param limit query int false "返回数量" default(10)
+// @Success 200 {object} response.Response{data=[]hotelService.HotRoomInfo}
+// @Router /api/v1/rooms/hot [get]
+func (h *Handler) GetHotRooms(c *gin.Context) {
+	var req struct {
+		Limit int `form:"limit"`
+	}
+	if err := c.ShouldBindQuery(&req); err != nil {
+		req.Limit = 10
+	}
+
+	rooms, err := h.hotelService.GetHotRooms(c.Request.Context(), req.Limit)
+	handler.MustSucceed(c, err, rooms)
+}
+
+// GetHotelHotRooms 获取酒店内热门房型
+// @Summary 获取酒店内热门房型
+// @Tags 酒店
+// @Produce json
+// @Param id path int true "酒店ID"
+// @Param limit query int false "返回数量" default(10)
+// @Success 200 {object} response.Response{data=[]hotelService.HotRoomInfo}
+// @Router /api/v1/hotels/{id}/rooms/hot [get]
+func (h *Handler) GetHotelHotRooms(c *gin.Context) {
+	hotelID, ok := handler.ParseID(c, "酒店")
+	if !ok {
+		return
+	}
+
+	var req struct {
+		Limit int `form:"limit"`
+	}
+	if err := c.ShouldBindQuery(&req); err != nil {
+		req.Limit = 10
+	}
+
+	rooms, err := h.hotelService.GetHotRoomsByHotel(c.Request.Context(), hotelID, req.Limit)
+	handler.MustSucceed(c, err, rooms)
+}

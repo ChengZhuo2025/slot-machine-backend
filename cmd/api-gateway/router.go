@@ -17,6 +17,7 @@ import (
 	"github.com/dumeirei/smart-locker-backend/internal/common/middleware"
 	adminHandler "github.com/dumeirei/smart-locker-backend/internal/handler/admin"
 	authHandler "github.com/dumeirei/smart-locker-backend/internal/handler/auth"
+	contentHandler "github.com/dumeirei/smart-locker-backend/internal/handler/content"
 	deviceHandler "github.com/dumeirei/smart-locker-backend/internal/handler/device"
 	distributionHandler "github.com/dumeirei/smart-locker-backend/internal/handler/distribution"
 	hotelHandler "github.com/dumeirei/smart-locker-backend/internal/handler/hotel"
@@ -31,6 +32,7 @@ import (
 	"github.com/dumeirei/smart-locker-backend/internal/repository"
 	adminService "github.com/dumeirei/smart-locker-backend/internal/service/admin"
 	authService "github.com/dumeirei/smart-locker-backend/internal/service/auth"
+	contentService "github.com/dumeirei/smart-locker-backend/internal/service/content"
 	deviceService "github.com/dumeirei/smart-locker-backend/internal/service/device"
 	distributionService "github.com/dumeirei/smart-locker-backend/internal/service/distribution"
 	financeService "github.com/dumeirei/smart-locker-backend/internal/service/finance"
@@ -92,6 +94,9 @@ func setupRouter(
 	couponRepo := repository.NewCouponRepository(db)
 	userCouponRepo := repository.NewUserCouponRepository(db)
 	campaignRepo := repository.NewCampaignRepository(db)
+
+	// 内容相关仓储
+	bannerRepo := repository.NewBannerRepository(db)
 
 	// 会员相关仓储
 	memberLevelRepo := repository.NewMemberLevelRepository(db)
@@ -167,6 +172,9 @@ func setupRouter(
 	userCouponSvc := marketingService.NewUserCouponService(db, couponRepo, userCouponRepo)
 	campaignSvc := marketingService.NewCampaignService(campaignRepo)
 
+	// 内容服务
+	bannerSvc := contentService.NewBannerService(bannerRepo)
+
 	// 初始化处理器
 	authH := authHandler.NewHandler(authSvc, wechatSvc, codeService)
 	userH := userHandler.NewHandler(userSvc, walletSvc)
@@ -195,6 +203,9 @@ func setupRouter(
 	// 营销处理器
 	couponH := marketingHandler.NewCouponHandler(couponSvc, userCouponSvc)
 	_ = campaignSvc // 活动服务将来用于扩展
+
+	// 内容处理器
+	bannerH := contentHandler.NewBannerHandler(bannerSvc)
 
 	// 全局中间件
 	r.Use(userMiddleware.Recovery(logger))
@@ -243,13 +254,14 @@ func setupRouter(
 			deviceH.RegisterRoutes(public)
 
 			// 公开信息
-			public.GET("/banners", placeholderHandler("获取轮播图"))
+			public.GET("/banners", bannerH.ListByPosition)
 			public.GET("/articles", placeholderHandler("获取文章列表"))
 			public.GET("/articles/:id", placeholderHandler("获取文章详情"))
 
 			// 商城公开接口
 			public.GET("/categories", mallProductH.GetCategories)
 			public.GET("/products", mallProductH.GetProducts)
+			public.GET("/products/selected", mallProductH.GetSelectedProducts)
 			public.GET("/products/:id", mallProductH.GetProductDetail)
 			public.GET("/products/search", mallProductH.SearchProducts)
 			public.GET("/search/hot-keywords", mallProductH.GetHotKeywords)

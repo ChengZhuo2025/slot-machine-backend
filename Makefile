@@ -62,6 +62,15 @@ run: ## Run the API gateway
 	@echo "Running API Gateway..."
 	$(GOCMD) run $(CMD_DIR)/api-gateway/*.go
 
+run-fast: build ## Build and run the API gateway (faster startup)
+	@echo "Running API Gateway (pre-built)..."
+	$(BUILD_DIR)/$(BINARY_GATEWAY)
+
+run-watch: ## Run with hot-reload using air (install: go install github.com/air-verse/air@latest)
+	@echo "Running API Gateway with hot-reload..."
+	@command -v air >/dev/null 2>&1 || { echo "Installing air..."; go install github.com/air-verse/air@latest; }
+	air
+
 run-dev: docker-up ## Run in development mode with docker dependencies
 	@echo "Running in development mode..."
 	$(GOCMD) run $(CMD_DIR)/api-gateway/*.go

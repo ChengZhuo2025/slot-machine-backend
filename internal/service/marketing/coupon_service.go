@@ -206,8 +206,8 @@ func (s *CouponService) ReceiveCoupon(ctx context.Context, couponID, userID int6
 
 		// 增加已发放数量
 		result := tx.Model(&models.Coupon{}).
-			Where("id = ? AND total_count > received_count", couponID).
-			UpdateColumn("received_count", gorm.Expr("received_count + 1"))
+			Where("id = ? AND total_count > issued_count", couponID).
+			UpdateColumn("issued_count", gorm.Expr("issued_count + 1"))
 		if result.Error != nil {
 			return result.Error
 		}

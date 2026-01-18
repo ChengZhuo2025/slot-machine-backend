@@ -2,6 +2,8 @@
 package mall
 
 import (
+	"strconv"
+
 	"github.com/gin-gonic/gin"
 
 	"github.com/dumeirei/smart-locker-backend/internal/common/handler"
@@ -70,6 +72,20 @@ func (h *ProductHandler) GetProductDetail(c *gin.Context) {
 
 	product, err := h.productService.GetProductDetail(c.Request.Context(), productID)
 	handler.MustSucceed(c, err, product)
+}
+
+// GetSelectedProducts 获取精选商品
+// @Summary 获取精选商品
+// @Tags 商品
+// @Produce json
+// @Param limit query int false "数量" default(6)
+// @Success 200 {object} response.Response{data=[]mall.ProductInfo}
+// @Router /api/v1/products/selected [get]
+func (h *ProductHandler) GetSelectedProducts(c *gin.Context) {
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "6"))
+
+	products, err := h.productService.GetSelectedProducts(c.Request.Context(), limit)
+	handler.MustSucceed(c, err, products)
 }
 
 // SearchProducts 搜索商品

@@ -1306,6 +1306,51 @@
                 }
             }
         },
+        "/admin/hotels/{id}/recommend": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "酒店管理"
+                ],
+                "summary": "设置酒店推荐状态",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "酒店ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "请求参数",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/admin.SetHotelRecommendedRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
         "/admin/hotels/{id}/status": {
             "put": {
                 "security": [
@@ -1959,6 +2004,51 @@
                         "name": "id",
                         "in": "path",
                         "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/rooms/{id}/hot": {
+            "put": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "酒店管理"
+                ],
+                "summary": "设置房间热门状态",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "房间ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "请求参数",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/admin.SetRoomHotRequest"
+                        }
                     }
                 ],
                 "responses": {
@@ -10743,6 +10833,49 @@
                 }
             }
         },
+        "/api/v1/hotels/recommended": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "酒店"
+                ],
+                "summary": "获取推荐酒店列表",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 10,
+                        "description": "返回数量",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/hotel.RecommendedHotelInfo"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/hotels/{id}": {
             "get": {
                 "produces": [
@@ -10816,6 +10949,56 @@
                                             "type": "array",
                                             "items": {
                                                 "$ref": "#/definitions/hotel.RoomInfo"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/hotels/{id}/rooms/hot": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "酒店"
+                ],
+                "summary": "获取酒店内热门房型",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "酒店ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "default": 10,
+                        "description": "返回数量",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/hotel.HotRoomInfo"
                                             }
                                         }
                                     }
@@ -13108,6 +13291,49 @@
                 }
             }
         },
+        "/api/v1/rooms/hot": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "酒店"
+                ],
+                "summary": "获取全站热门房型",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 10,
+                        "description": "返回数量",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/hotel.HotRoomInfo"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/rooms/{id}": {
             "get": {
                 "produces": [
@@ -13348,6 +13574,68 @@
                                                 "type": "object",
                                                 "additionalProperties": true
                                             }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/upload/image": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "上传图片文件，支持 jpg/jpeg/png/gif/webp 格式，最大 10MB",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "文件上传"
+                ],
+                "summary": "上传图片",
+                "parameters": [
+                    {
+                        "type": "file",
+                        "description": "图片文件",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "enum": [
+                            "images",
+                            "hotel",
+                            "room",
+                            "product"
+                        ],
+                        "type": "string",
+                        "default": "images",
+                        "description": "文件类型",
+                        "name": "type",
+                        "in": "formData"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/upload.UploadImageResponse"
                                         }
                                     }
                                 }
@@ -13639,6 +13927,55 @@
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/response.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/user/avatar": {
+            "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "上传用户头像并自动更新用户信息，支持 jpg/jpeg/png/gif/webp 格式，最大 5MB",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "文件上传"
+                ],
+                "summary": "上传用户头像",
+                "parameters": [
+                    {
+                        "type": "file",
+                        "description": "头像文件",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/response.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/upload.UploadImageResponse"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -16548,6 +16885,28 @@
                 }
             }
         },
+        "admin.SetHotelRecommendedRequest": {
+            "type": "object",
+            "properties": {
+                "is_recommended": {
+                    "type": "boolean"
+                },
+                "score": {
+                    "type": "integer"
+                }
+            }
+        },
+        "admin.SetRoomHotRequest": {
+            "type": "object",
+            "properties": {
+                "is_hot": {
+                    "type": "boolean"
+                },
+                "rank": {
+                    "type": "integer"
+                }
+            }
+        },
         "admin.ShipRequest": {
             "type": "object",
             "required": [
@@ -18577,6 +18936,50 @@
                 }
             }
         },
+        "hotel.HotRoomInfo": {
+            "type": "object",
+            "properties": {
+                "average_rating": {
+                    "type": "number"
+                },
+                "booking_count": {
+                    "type": "integer"
+                },
+                "daily_price": {
+                    "type": "number"
+                },
+                "hot_score": {
+                    "type": "number"
+                },
+                "hotel_id": {
+                    "type": "integer"
+                },
+                "hotel_name": {
+                    "type": "string"
+                },
+                "hourly_price": {
+                    "type": "number"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "images": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "review_count": {
+                    "type": "integer"
+                },
+                "room_no": {
+                    "type": "string"
+                },
+                "room_type": {
+                    "type": "string"
+                }
+            }
+        },
         "hotel.HotelInfo": {
             "type": "object",
             "properties": {
@@ -18641,6 +19044,41 @@
                     "type": "string"
                 },
                 "room_count": {
+                    "type": "integer"
+                },
+                "star_rating": {
+                    "type": "integer"
+                }
+            }
+        },
+        "hotel.RecommendedHotelInfo": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "city": {
+                    "type": "string"
+                },
+                "district": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "images": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "min_price": {
+                    "type": "number"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "recommend_score": {
                     "type": "integer"
                 },
                 "star_rating": {
@@ -20226,6 +20664,9 @@
                 "images": {
                     "$ref": "#/definitions/models.JSON"
                 },
+                "is_recommended": {
+                    "type": "boolean"
+                },
                 "latitude": {
                     "type": "number"
                 },
@@ -20239,6 +20680,12 @@
                     "type": "string"
                 },
                 "province": {
+                    "type": "string"
+                },
+                "recommend_score": {
+                    "type": "integer"
+                },
+                "recommended_at": {
                     "type": "string"
                 },
                 "rooms": {
@@ -20982,8 +21429,14 @@
                 "area": {
                     "type": "integer"
                 },
+                "average_rating": {
+                    "type": "number"
+                },
                 "bed_type": {
                     "type": "string"
+                },
+                "booking_count": {
+                    "type": "integer"
                 },
                 "bookings": {
                     "type": "array",
@@ -21006,6 +21459,12 @@
                 "facilities": {
                     "$ref": "#/definitions/models.JSON"
                 },
+                "hot_rank": {
+                    "type": "integer"
+                },
+                "hot_score": {
+                    "type": "number"
+                },
                 "hotel": {
                     "description": "关联",
                     "allOf": [
@@ -21026,7 +21485,13 @@
                 "images": {
                     "$ref": "#/definitions/models.JSON"
                 },
+                "is_hot": {
+                    "type": "boolean"
+                },
                 "max_guests": {
+                    "type": "integer"
+                },
+                "review_count": {
                     "type": "integer"
                 },
                 "room_no": {
@@ -21924,6 +22389,20 @@
                 }
             }
         },
+        "upload.UploadImageResponse": {
+            "type": "object",
+            "properties": {
+                "file_name": {
+                    "type": "string"
+                },
+                "size": {
+                    "type": "integer"
+                },
+                "url": {
+                    "type": "string"
+                }
+            }
+        },
         "user.CreateAddressRequest": {
             "type": "object",
             "required": [
@@ -22067,6 +22546,17 @@
                 },
                 "name": {
                     "type": "string"
+                }
+            }
+        },
+        "user.NullableTime": {
+            "type": "object",
+            "properties": {
+                "time": {
+                    "type": "string"
+                },
+                "valid": {
+                    "type": "boolean"
                 }
             }
         },
@@ -22238,7 +22728,7 @@
                     "type": "string"
                 },
                 "birthday": {
-                    "type": "string"
+                    "$ref": "#/definitions/user.NullableTime"
                 },
                 "gender": {
                     "type": "integer"

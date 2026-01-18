@@ -1271,6 +1271,20 @@ definitions:
     required:
     - reply
     type: object
+  admin.SetHotelRecommendedRequest:
+    properties:
+      is_recommended:
+        type: boolean
+      score:
+        type: integer
+    type: object
+  admin.SetRoomHotRequest:
+    properties:
+      is_hot:
+        type: boolean
+      rank:
+        type: integer
+    type: object
   admin.ShipRequest:
     properties:
       express_company:
@@ -2649,6 +2663,35 @@ definitions:
       verified_at:
         type: string
     type: object
+  hotel.HotRoomInfo:
+    properties:
+      average_rating:
+        type: number
+      booking_count:
+        type: integer
+      daily_price:
+        type: number
+      hot_score:
+        type: number
+      hotel_id:
+        type: integer
+      hotel_name:
+        type: string
+      hourly_price:
+        type: number
+      id:
+        type: integer
+      images:
+        items:
+          type: string
+        type: array
+      review_count:
+        type: integer
+      room_no:
+        type: string
+      room_type:
+        type: string
+    type: object
   hotel.HotelInfo:
     properties:
       address:
@@ -2692,6 +2735,29 @@ definitions:
       province:
         type: string
       room_count:
+        type: integer
+      star_rating:
+        type: integer
+    type: object
+  hotel.RecommendedHotelInfo:
+    properties:
+      address:
+        type: string
+      city:
+        type: string
+      district:
+        type: string
+      id:
+        type: integer
+      images:
+        items:
+          type: string
+        type: array
+      min_price:
+        type: number
+      name:
+        type: string
+      recommend_score:
         type: integer
       star_rating:
         type: integer
@@ -3735,6 +3801,8 @@ definitions:
         type: integer
       images:
         $ref: '#/definitions/models.JSON'
+      is_recommended:
+        type: boolean
       latitude:
         type: number
       longitude:
@@ -3744,6 +3812,10 @@ definitions:
       phone:
         type: string
       province:
+        type: string
+      recommend_score:
+        type: integer
+      recommended_at:
         type: string
       rooms:
         description: 关联
@@ -4223,8 +4295,12 @@ definitions:
     properties:
       area:
         type: integer
+      average_rating:
+        type: number
       bed_type:
         type: string
+      booking_count:
+        type: integer
       bookings:
         items:
           $ref: '#/definitions/models.Booking'
@@ -4239,6 +4315,10 @@ definitions:
         type: integer
       facilities:
         $ref: '#/definitions/models.JSON'
+      hot_rank:
+        type: integer
+      hot_score:
+        type: number
       hotel:
         allOf:
         - $ref: '#/definitions/models.Hotel'
@@ -4251,7 +4331,11 @@ definitions:
         type: integer
       images:
         $ref: '#/definitions/models.JSON'
+      is_hot:
+        type: boolean
       max_guests:
+        type: integer
+      review_count:
         type: integer
       room_no:
         type: string
@@ -4839,6 +4923,15 @@ definitions:
       message:
         type: string
     type: object
+  upload.UploadImageResponse:
+    properties:
+      file_name:
+        type: string
+      size:
+        type: integer
+      url:
+        type: string
+    type: object
   user.CreateAddressRequest:
     properties:
       city:
@@ -4940,6 +5033,13 @@ definitions:
         type: integer
       name:
         type: string
+    type: object
+  user.NullableTime:
+    properties:
+      time:
+        type: string
+      valid:
+        type: boolean
     type: object
   user.PackageInfo:
     properties:
@@ -5052,7 +5152,7 @@ definitions:
       avatar:
         type: string
       birthday:
-        type: string
+        $ref: '#/definitions/user.NullableTime'
       gender:
         type: integer
       nickname:
@@ -5900,6 +6000,34 @@ paths:
       summary: 更新酒店
       tags:
       - 酒店管理
+  /admin/hotels/{id}/recommend:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 酒店ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 请求参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/admin.SetHotelRecommendedRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - Bearer: []
+      summary: 设置酒店推荐状态
+      tags:
+      - 酒店管理
   /admin/hotels/{id}/status:
     put:
       consumes:
@@ -6287,6 +6415,34 @@ paths:
       security:
       - Bearer: []
       summary: 更新房间
+      tags:
+      - 酒店管理
+  /admin/rooms/{id}/hot:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: 房间ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 请求参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/admin.SetRoomHotRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Response'
+      security:
+      - Bearer: []
+      summary: 设置房间热门状态
       tags:
       - 酒店管理
   /admin/time-slots:
@@ -11424,6 +11580,36 @@ paths:
       summary: 获取房间列表
       tags:
       - 酒店
+  /api/v1/hotels/{id}/rooms/hot:
+    get:
+      parameters:
+      - description: 酒店ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - default: 10
+        description: 返回数量
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/hotel.HotRoomInfo'
+                  type: array
+              type: object
+      summary: 获取酒店内热门房型
+      tags:
+      - 酒店
   /api/v1/hotels/cities:
     get:
       produces:
@@ -11441,6 +11627,31 @@ paths:
                   type: array
               type: object
       summary: 获取城市列表
+      tags:
+      - 酒店
+  /api/v1/hotels/recommended:
+    get:
+      parameters:
+      - default: 10
+        description: 返回数量
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/hotel.RecommendedHotelInfo'
+                  type: array
+              type: object
+      summary: 获取推荐酒店列表
       tags:
       - 酒店
   /api/v1/marketing/coupons:
@@ -12842,6 +13053,31 @@ paths:
       summary: 获取房间时段价格
       tags:
       - 酒店
+  /api/v1/rooms/hot:
+    get:
+      parameters:
+      - default: 10
+        description: 返回数量
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/hotel.HotRoomInfo'
+                  type: array
+              type: object
+      summary: 获取全站热门房型
+      tags:
+      - 酒店
   /api/v1/search/hot-keywords:
     get:
       produces:
@@ -12906,6 +13142,44 @@ paths:
       summary: 获取所有公开配置
       tags:
       - 管理-系统配置
+  /api/v1/upload/image:
+    post:
+      consumes:
+      - multipart/form-data
+      description: 上传图片文件，支持 jpg/jpeg/png/gif/webp 格式，最大 10MB
+      parameters:
+      - description: 图片文件
+        in: formData
+        name: file
+        required: true
+        type: file
+      - default: images
+        description: 文件类型
+        enum:
+        - images
+        - hotel
+        - room
+        - product
+        in: formData
+        name: type
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/upload.UploadImageResponse'
+              type: object
+      security:
+      - Bearer: []
+      summary: 上传图片
+      tags:
+      - 文件上传
   /api/v1/user/addresses:
     get:
       produces:
@@ -13069,6 +13343,34 @@ paths:
       summary: 获取默认收货地址
       tags:
       - 用户-地址
+  /api/v1/user/avatar:
+    post:
+      consumes:
+      - multipart/form-data
+      description: 上传用户头像并自动更新用户信息，支持 jpg/jpeg/png/gif/webp 格式，最大 5MB
+      parameters:
+      - description: 头像文件
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/upload.UploadImageResponse'
+              type: object
+      security:
+      - Bearer: []
+      summary: 上传用户头像
+      tags:
+      - 文件上传
   /api/v1/user/feedbacks:
     get:
       parameters:

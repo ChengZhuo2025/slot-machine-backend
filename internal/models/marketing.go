@@ -14,7 +14,7 @@ type Coupon struct {
 	MaxDiscount     *float64   `gorm:"type:decimal(10,2)" json:"max_discount,omitempty"`
 	TotalCount      int        `gorm:"not null" json:"total_count"`
 	UsedCount       int        `gorm:"not null;default:0" json:"used_count"`
-	ReceivedCount   int        `gorm:"not null;default:0" json:"received_count"`
+	ReceivedCount   int        `gorm:"column:issued_count;not null;default:0" json:"received_count"`
 	PerUserLimit    int        `gorm:"not null;default:1" json:"per_user_limit"`
 	ApplicableScope string     `gorm:"type:varchar(20);not null;default:'all'" json:"applicable_scope"`
 	ApplicableIDs   JSON       `gorm:"type:jsonb" json:"applicable_ids,omitempty"`

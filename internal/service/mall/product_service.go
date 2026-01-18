@@ -286,6 +286,36 @@ func (s *ProductService) GetNewProducts(ctx context.Context, limit int) ([]*Prod
 	return list, nil
 }
 
+// GetSelectedProducts 获取精选商品
+func (s *ProductService) GetSelectedProducts(ctx context.Context, limit int) ([]*ProductInfo, error) {
+	if limit <= 0 {
+		limit = 6
+	}
+
+	isOnSale := true
+	isHot := true
+
+	params := repository.ProductListParams{
+		Offset:   0,
+		Limit:    limit,
+		IsOnSale: &isOnSale,
+		IsHot:    &isHot,
+		SortBy:   "sales_desc", // 按销量排序
+	}
+
+	products, _, err := s.productRepo.List(ctx, params)
+	if err != nil {
+		return nil, errors.ErrDatabaseError.WithError(err)
+	}
+
+	var result []*ProductInfo
+	for _, p := range products {
+		result = append(result, s.toProductInfo(p))
+	}
+
+	return result, nil
+}
+
 // GetProductsByCategory 根据分类获取商品
 func (s *ProductService) GetProductsByCategory(ctx context.Context, categoryID int64, page, pageSize int) (*ProductListResponse, error) {
 	return s.GetProductList(ctx, &ProductListRequest{

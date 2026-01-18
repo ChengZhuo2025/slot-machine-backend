@@ -120,7 +120,7 @@ func (r *CouponRepository) ListActive(ctx context.Context, offset, limit int) ([
 		Where("status = ?", models.CouponStatusActive).
 		Where("start_time <= ?", now).
 		Where("end_time >= ?", now).
-		Where("total_count > received_count")
+		Where("total_count > issued_count")
 
 	if err := query.Count(&total).Error; err != nil {
 		return nil, 0, err
@@ -150,7 +150,7 @@ func (r *CouponRepository) ListAvailableForUser(ctx context.Context, userID int6
 		Where("coupons.status = ?", models.CouponStatusActive).
 		Where("coupons.start_time <= ?", now).
 		Where("coupons.end_time >= ?", now).
-		Where("coupons.total_count > coupons.received_count").
+		Where("coupons.total_count > coupons.issued_count").
 		Where("(uc.count IS NULL OR uc.count < coupons.per_user_limit)")
 
 	if err := query.Count(&total).Error; err != nil {
@@ -167,8 +167,8 @@ func (r *CouponRepository) ListAvailableForUser(ctx context.Context, userID int6
 // IncrementIssuedCount 增加已发放数量
 func (r *CouponRepository) IncrementIssuedCount(ctx context.Context, id int64) error {
 	result := r.db.WithContext(ctx).Model(&models.Coupon{}).
-		Where("id = ? AND total_count > received_count", id).
-		UpdateColumn("received_count", gorm.Expr("received_count + 1"))
+		Where("id = ? AND total_count > issued_count", id).
+		UpdateColumn("issued_count", gorm.Expr("issued_count + 1"))
 	if result.Error != nil {
 		return result.Error
 	}
@@ -188,8 +188,8 @@ func (r *CouponRepository) IncrementUsedCount(ctx context.Context, id int64) err
 // DecrementIssuedCount 减少已发放数量（用于退券）
 func (r *CouponRepository) DecrementIssuedCount(ctx context.Context, id int64) error {
 	result := r.db.WithContext(ctx).Model(&models.Coupon{}).
-		Where("id = ? AND received_count > 0", id).
-		UpdateColumn("received_count", gorm.Expr("received_count - 1"))
+		Where("id = ? AND issued_count > 0", id).
+		UpdateColumn("issued_count", gorm.Expr("issued_count - 1"))
 	if result.Error != nil {
 		return result.Error
 	}

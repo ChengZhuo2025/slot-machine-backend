@@ -86,8 +86,8 @@ ON CONFLICT DO NOTHING;
 
 -- 测试管理员账号 (密码: admin123，使用 bcrypt 加密)
 INSERT INTO admins (username, password_hash, name, phone, email, role_id, status) VALUES
-    ('admin', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iAt.G6eO', '超级管理员', '13900000001', 'admin@example.com', (SELECT id FROM roles WHERE code = 'super_admin'), 1),
-    ('platform', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iAt.G6eO', '平台管理员', '13900000002', 'platform@example.com', (SELECT id FROM roles WHERE code = 'platform_admin'), 1),
-    ('operator', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iAt.G6eO', '运营管理员', '13900000003', 'operator@example.com', (SELECT id FROM roles WHERE code = 'operation_admin'), 1),
-    ('finance', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iAt.G6eO', '财务管理员', '13900000004', 'finance@example.com', (SELECT id FROM roles WHERE code = 'finance_admin'), 1)
+    ('admin', '$2a$10$KdAXVq7l3.Xa0v7xS3qvXegaslCPPa45XVEWqekSLmRx1KCAeUNWe', '超级管理员', '13900000001', 'admin@example.com', (SELECT id FROM roles WHERE code = 'super_admin'), 1),
+    ('platform', '$2a$10$KdAXVq7l3.Xa0v7xS3qvXegaslCPPa45XVEWqekSLmRx1KCAeUNWe', '平台管理员', '13900000002', 'platform@example.com', (SELECT id FROM roles WHERE code = 'platform_admin'), 1),
+    ('operator', '$2a$10$KdAXVq7l3.Xa0v7xS3qvXegaslCPPa45XVEWqekSLmRx1KCAeUNWe', '运营管理员', '13900000003', 'operator@example.com', (SELECT id FROM roles WHERE code = 'operation_admin'), 1),
+    ('finance', '$2a$10$KdAXVq7l3.Xa0v7xS3qvXegaslCPPa45XVEWqekSLmRx1KCAeUNWe', '财务管理员', '13900000004', 'finance@example.com', (SELECT id FROM roles WHERE code = 'finance_admin'), 1)
 ON CONFLICT DO NOTHING;

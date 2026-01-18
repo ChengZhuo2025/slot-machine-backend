@@ -16,8 +16,8 @@ type Hotel struct {
 	Longitude      *float64  `gorm:"column:longitude;type:decimal(10,7)" json:"longitude,omitempty"`
 	Latitude       *float64  `gorm:"column:latitude;type:decimal(10,7)" json:"latitude,omitempty"`
 	Phone          string    `gorm:"column:phone;type:varchar(20);not null" json:"phone"`
-	Images         JSON      `gorm:"column:images;type:jsonb" json:"images,omitempty"`
-	Facilities     JSON      `gorm:"column:facilities;type:jsonb" json:"facilities,omitempty"`
+	Images         JSONArray `gorm:"column:images;type:jsonb" json:"images,omitempty"`
+	Facilities     JSONArray `gorm:"column:facilities;type:jsonb" json:"facilities,omitempty"`
 	Description    *string   `gorm:"column:description;type:text" json:"description,omitempty"`
 	CheckInTime    string    `gorm:"column:check_in_time;type:time;not null;default:'14:00'" json:"check_in_time"`
 	CheckOutTime   string    `gorm:"column:check_out_time;type:time;not null;default:'12:00'" json:"check_out_time"`
@@ -51,8 +51,8 @@ type Room struct {
 	RoomNo      string    `gorm:"column:room_no;type:varchar(20);not null" json:"room_no"`
 	RoomType    string    `gorm:"column:room_type;type:varchar(50);not null" json:"room_type"`
 	DeviceID    *int64    `gorm:"column:device_id" json:"device_id,omitempty"`
-	Images      JSON      `gorm:"column:images;type:jsonb" json:"images,omitempty"`
-	Facilities  JSON      `gorm:"column:facilities;type:jsonb" json:"facilities,omitempty"`
+	Images      JSONArray `gorm:"column:images;type:jsonb" json:"images,omitempty"`
+	Facilities  JSONArray `gorm:"column:facilities;type:jsonb" json:"facilities,omitempty"`
 	Area        *int      `gorm:"column:area" json:"area,omitempty"`
 	BedType     *string   `gorm:"column:bed_type;type:varchar(50)" json:"bed_type,omitempty"`
 	MaxGuests      int       `gorm:"column:max_guests;not null;default:2" json:"max_guests"`

@@ -236,19 +236,14 @@ func TestHotelService_GetHotelList(t *testing.T) {
 	// 实际项目中应使用 MySQL/PostgreSQL 数据库并在集成测试中验证此功能
 }
 
-func Test_jsonToStringSlice(t *testing.T) {
+func Test_jsonArrayToStringSlice(t *testing.T) {
 	t.Run("nil 返回 nil", func(t *testing.T) {
-		assert.Nil(t, jsonToStringSlice(nil))
+		assert.Nil(t, jsonArrayToStringSlice(nil))
 	})
 
 	t.Run("只提取 string 值", func(t *testing.T) {
-		j := models.JSON{
-			"a": "wifi",
-			"b": 123,
-			"c": "parking",
-			"d": true,
-		}
-		assert.ElementsMatch(t, []string{"wifi", "parking"}, jsonToStringSlice(j))
+		j := models.JSONArray{"wifi", 123, "parking", true}
+		assert.ElementsMatch(t, []string{"wifi", "parking"}, jsonArrayToStringSlice(j))
 	})
 }
 

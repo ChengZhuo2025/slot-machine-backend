@@ -157,10 +157,10 @@ func (s *HotelAdminService) CreateHotel(ctx context.Context, req *CreateHotelReq
 
 	// 设置图片和设施
 	if len(req.Images) > 0 {
-		hotel.Images = stringSliceToJSON(req.Images)
+		hotel.Images = stringSliceToJSONArray(req.Images)
 	}
 	if len(req.Facilities) > 0 {
-		hotel.Facilities = stringSliceToJSON(req.Facilities)
+		hotel.Facilities = stringSliceToJSONArray(req.Facilities)
 	}
 
 	if err := s.hotelRepo.Create(ctx, hotel); err != nil {
@@ -233,10 +233,10 @@ func (s *HotelAdminService) UpdateHotel(ctx context.Context, id int64, req *Upda
 		hotel.Status = *req.Status
 	}
 	if len(req.Images) > 0 {
-		hotel.Images = stringSliceToJSON(req.Images)
+		hotel.Images = stringSliceToJSONArray(req.Images)
 	}
 	if len(req.Facilities) > 0 {
-		hotel.Facilities = stringSliceToJSON(req.Facilities)
+		hotel.Facilities = stringSliceToJSONArray(req.Facilities)
 	}
 
 	if err := s.hotelRepo.Update(ctx, hotel); err != nil {
@@ -328,10 +328,10 @@ func (s *HotelAdminService) CreateRoom(ctx context.Context, req *CreateRoomReque
 	}
 
 	if len(req.Images) > 0 {
-		room.Images = stringSliceToJSON(req.Images)
+		room.Images = stringSliceToJSONArray(req.Images)
 	}
 	if len(req.Facilities) > 0 {
-		room.Facilities = stringSliceToJSON(req.Facilities)
+		room.Facilities = stringSliceToJSONArray(req.Facilities)
 	}
 
 	if err := s.roomRepo.Create(ctx, room); err != nil {
@@ -388,10 +388,10 @@ func (s *HotelAdminService) UpdateRoom(ctx context.Context, id int64, req *Updat
 		room.Status = *req.Status
 	}
 	if len(req.Images) > 0 {
-		room.Images = stringSliceToJSON(req.Images)
+		room.Images = stringSliceToJSONArray(req.Images)
 	}
 	if len(req.Facilities) > 0 {
-		room.Facilities = stringSliceToJSON(req.Facilities)
+		room.Facilities = stringSliceToJSONArray(req.Facilities)
 	}
 
 	if err := s.roomRepo.Update(ctx, room); err != nil {
@@ -489,6 +489,15 @@ func stringSliceToJSON(slice []string) models.JSON {
 	result := make(models.JSON)
 	for i, v := range slice {
 		result[fmt.Sprintf("%d", i)] = v
+	}
+	return result
+}
+
+// stringSliceToJSONArray 将字符串切片转换为 JSONArray 格式
+func stringSliceToJSONArray(slice []string) models.JSONArray {
+	result := make(models.JSONArray, len(slice))
+	for i, v := range slice {
+		result[i] = v
 	}
 	return result
 }

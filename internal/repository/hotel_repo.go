@@ -114,16 +114,21 @@ func (r *HotelRepository) ListActive(ctx context.Context, offset, limit int, fil
 func (r *HotelRepository) ListNearby(ctx context.Context, longitude, latitude float64, radiusKm float64, limit int) ([]*models.Hotel, error) {
 	var hotels []*models.Hotel
 
-	// 使用 Haversine 公式计算距离
-	query := r.db.WithContext(ctx).
+	// 使用 Haversine 公式计算距离，通过子查询过滤
+	// PostgreSQL 不支持在 HAVING 中使用非聚合别名，需要使用子查询
+	subQuery := r.db.WithContext(ctx).
+		Table("hotels").
 		Select("*, (6371 * acos(cos(radians(?)) * cos(radians(latitude)) * cos(radians(longitude) - radians(?)) + sin(radians(?)) * sin(radians(latitude)))) AS distance", latitude, longitude, latitude).
 		Where("status = ?", models.HotelStatusActive).
-		Where("latitude IS NOT NULL AND longitude IS NOT NULL").
-		Having("distance < ?", radiusKm).
-		Order("distance ASC").
-		Limit(limit)
+		Where("latitude IS NOT NULL AND longitude IS NOT NULL")
 
-	err := query.Find(&hotels).Error
+	err := r.db.WithContext(ctx).
+		Table("(?) AS h", subQuery).
+		Where("distance < ?", radiusKm).
+		Order("distance ASC").
+		Limit(limit).
+		Find(&hotels).Error
+
 	return hotels, err
 }
 

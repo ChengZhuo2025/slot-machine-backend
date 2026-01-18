@@ -301,12 +301,12 @@ func (s *HotelService) convertHotelInfo(hotel *models.Hotel) *HotelInfo {
 
 	// 解析图片
 	if hotel.Images != nil {
-		info.Images = jsonToStringSlice(hotel.Images)
+		info.Images = jsonArrayToStringSlice(hotel.Images)
 	}
 
 	// 解析设施
 	if hotel.Facilities != nil {
-		info.Facilities = jsonToStringSlice(hotel.Facilities)
+		info.Facilities = jsonArrayToStringSlice(hotel.Facilities)
 	}
 
 	// 描述
@@ -358,12 +358,12 @@ func (s *HotelService) convertRoomInfo(room *models.Room) *RoomInfo {
 
 	// 解析图片
 	if room.Images != nil {
-		info.Images = jsonToStringSlice(room.Images)
+		info.Images = jsonArrayToStringSlice(room.Images)
 	}
 
 	// 解析设施
 	if room.Facilities != nil {
-		info.Facilities = jsonToStringSlice(room.Facilities)
+		info.Facilities = jsonArrayToStringSlice(room.Facilities)
 	}
 
 	// 时段价格
@@ -399,8 +399,8 @@ func (s *HotelService) getRoomStatusName(status int8) string {
 	}
 }
 
-// jsonToStringSlice 将 JSON map 转换为字符串切片
-func jsonToStringSlice(j models.JSON) []string {
+// jsonArrayToStringSlice 将 JSONArray 转换为字符串切片
+func jsonArrayToStringSlice(j models.JSONArray) []string {
 	if j == nil {
 		return nil
 	}
@@ -452,7 +452,7 @@ func (s *HotelService) GetRecommendedHotels(ctx context.Context, limit int) ([]*
 			RecommendScore: hotel.RecommendScore,
 		}
 		if hotel.Images != nil {
-			info.Images = jsonToStringSlice(hotel.Images)
+			info.Images = jsonArrayToStringSlice(hotel.Images)
 		}
 		// 获取最低价格
 		if len(hotel.Rooms) > 0 {
@@ -518,7 +518,7 @@ func (s *HotelService) GetHotRooms(ctx context.Context, limit int) ([]*HotRoomIn
 			info.HotelName = room.Hotel.Name
 		}
 		if room.Images != nil {
-			info.Images = jsonToStringSlice(room.Images)
+			info.Images = jsonArrayToStringSlice(room.Images)
 		}
 		result = append(result, info)
 	}
@@ -569,7 +569,7 @@ func (s *HotelService) GetHotRoomsByHotel(ctx context.Context, hotelID int64, li
 			HotScore:      room.HotScore,
 		}
 		if room.Images != nil {
-			info.Images = jsonToStringSlice(room.Images)
+			info.Images = jsonArrayToStringSlice(room.Images)
 		}
 		result = append(result, info)
 	}

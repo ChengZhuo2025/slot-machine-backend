@@ -175,7 +175,7 @@ const (
 	WalletTxTypeReturnDeposit = "return_deposit" // 押金退还
 )
 
-// JSON 自定义 JSON 类型
+// JSON 自定义 JSON 类型（支持对象）
 type JSON map[string]interface{}
 
 // Scan 实现 sql.Scanner 接口
@@ -209,4 +209,28 @@ func (j JSON) Unmarshal(target interface{}) error {
 		return err
 	}
 	return json.Unmarshal(b, target)
+}
+
+// JSONArray 自定义 JSON 数组类型（支持数组）
+type JSONArray []interface{}
+
+// Scan 实现 sql.Scanner 接口
+func (j *JSONArray) Scan(value interface{}) error {
+	if value == nil {
+		*j = nil
+		return nil
+	}
+	bytes, ok := value.([]byte)
+	if !ok {
+		return nil
+	}
+	return json.Unmarshal(bytes, j)
+}
+
+// Value 实现 driver.Valuer 接口
+func (j JSONArray) Value() (driver.Value, error) {
+	if j == nil {
+		return nil, nil
+	}
+	return json.Marshal(j)
 }
